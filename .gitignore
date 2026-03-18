@@ -1,0 +1,22 @@
+# Environment variables — never commit real secrets
+.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Node
+frontend/node_modules/
+
+# Database
+*.db
+*.sqlite3
+
+# OS
+.DS_Store
