@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from backend.config import settings
@@ -16,6 +17,16 @@ AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=F
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migrate: add columns to existing SQLite databases
+        for migration in [
+            "ALTER TABLE analysis_results ADD COLUMN enrichment TEXT",
+            "ALTER TABLE analysis_results ADD COLUMN status TEXT DEFAULT 'new'",
+            "ALTER TABLE analysis_results ADD COLUMN officer_notes TEXT",
+        ]:
+            try:
+                await conn.execute(text(migration))
+            except Exception:
+                pass  # Column already exists
 
 
 async def get_db():

@@ -24,7 +24,12 @@ class AnalysisResultDB(Base):
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     airport_code = Column(String(10), index=True)
     transcript = Column(Text)
+    assessable = Column(Boolean, default=True)
+    assessable_confidence = Column(Float, default=1.0)
     is_compliant = Column(Boolean)
     violations = Column(JSON)   # list of Violation dicts
     summary = Column(Text)
     confidence_score = Column(Float)
+    enrichment = Column(JSON, nullable=True)  # speaker_segments, readback comparison, callsign clarity
+    status = Column(String(20), default="new")  # new/under_review/confirmed/false_positive/escalated
+    officer_notes = Column(Text, nullable=True)

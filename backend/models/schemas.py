@@ -39,6 +39,7 @@ class Violation(BaseModel):
     hfacs_level: HFACSLevel1
     severity: SeverityLevel
     description: str
+    safety_pathway: Optional[str] = None   # new: specific accident chain
     relevant_regulation: Optional[str] = None
     transcript_excerpt: Optional[str] = None
 
@@ -57,7 +58,10 @@ class AnalysisResult(BaseModel):
     timestamp: datetime
     airport_code: str
     transcript: str
+    assessable: bool = True               # False = transcript too degraded
+    assessable_confidence: float = 1.0    # STT/Gemini quality confidence
     is_compliant: bool
     violations: list[Violation]
     summary: str
     confidence_score: float  # 0.0 - 1.0
+    enrichment: Optional[dict] = None     # speaker_segments, readback comparison, callsign clarity

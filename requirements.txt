@@ -1,7 +1,7 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 websockets==13.1
-anthropic==0.40.0
+google-genai>=1.68.0
 faster-whisper==1.1.1
 sqlalchemy==2.0.36
 asyncpg==0.30.0
