@@ -1,5 +1,7 @@
 # ATC Compliance Monitor
 
+<img width="1600" height="1247" alt="image" src="https://github.com/user-attachments/assets/e37a9a23-8e5a-4078-aaa5-4bd939b5da00" />
+
 > *"I was parked at the threshold of 28R at KSFO, listening to the tower frequency on my handheld, when I heard something that didn't sound right — a clearance that seemed to conflict with another aircraft still on the runway. By the time I processed it, the controller had already issued a go-around. I wished I had something that could catch those moments automatically, log them, and tell me exactly what regulation was implicated."*
 
 This project exists because radio communications between pilots and air traffic controllers are dense, fast, and consequential. Mistakes — wrong readbacks, non-standard phraseology, missed altitude assignments — happen, and they matter. **ATC Compliance Monitor** listens to live ATC audio streams, transcribes them in real time, and uses AI to flag deviations from FAA/ICAO standards before they become incidents.
