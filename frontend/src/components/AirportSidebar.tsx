@@ -528,8 +528,8 @@ function AircraftList({
     const altStr    = ac.altFt != null
       ? (ac.altFt >= 18000 ? `FL${Math.round(ac.altFt / 100)}` : `${ac.altFt.toLocaleString()}ft`)
       : (ac.onGround ? "GND" : "—");
-    const compLabel = ac.compliant === false ? "VIOLATION"
-      : ac.compliant === true ? "COMPLIANT" : "UNASSESSED";
+    const compLabel = ac.compliant === false ? "NON-STANDARD"
+      : ac.compliant === true ? "STANDARD" : "UNASSESSED";
 
     return (
       <div
@@ -925,9 +925,9 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
           const sevColors: Record<string, string> = { critical: "#ff4444", high: "#ff8800", medium: "#e3b341", low: "#44aaff" };
           return (
             <div style={{ padding: "14px 16px", borderTop: "1px solid #21262d" }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: "#484f58", letterSpacing: 1.2, textTransform: "uppercase" as const, marginBottom: 10 }}>24h Violation Summary</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#484f58", letterSpacing: 1.2, textTransform: "uppercase" as const, marginBottom: 10 }}>24h Observation Summary</div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <span style={{ fontSize: 11, color: "#6e7681" }}>Compliance rate</span>
+                <span style={{ fontSize: 11, color: "#6e7681" }}>Conformance rate</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: rateColor }}>{compRate != null ? `${compRate}%` : "—"}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>

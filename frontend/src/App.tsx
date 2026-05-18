@@ -237,9 +237,9 @@ export default function App() {
       }}>
         <div>
           <h1 style={{ fontSize: isMobile ? 14 : 18, fontWeight: 700, letterSpacing: 0.5 }}>
-            ✈ {isMobile ? "ATC Monitor" : "ATC Compliance Monitor"}
+            ✈ Readback
           </h1>
-          {!isMobile && <p style={{ fontSize: 12, color: "#8b949e", marginTop: 2 }}>Real-time FAA / ICAO compliance analysis</p>}
+          {!isMobile && <p style={{ fontSize: 12, color: "#8b949e", marginTop: 2 }}>ATC phraseology, read back to you</p>}
         </div>
 
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -472,6 +472,19 @@ export default function App() {
           )}
         </div>
       )}
+
+      {/* ── Advisory footer ── */}
+      <footer style={{
+        flexShrink: 0,
+        borderTop: "1px solid #21262d",
+        padding: isMobile ? "8px 16px" : "10px 24px",
+        background: "#0d1117",
+      }}>
+        <p style={{ fontSize: 10, color: "#484f58", margin: 0, lineHeight: 1.6 }}>
+          Readback is an educational tool. Transcriptions may be imperfect and feeds are
+          often one-sided — notes and events are advisory, not authoritative.
+        </p>
+      </footer>
 
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
