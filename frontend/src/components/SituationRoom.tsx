@@ -24,10 +24,10 @@ const AIRPORTS: Airport[] = [
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#ff4444", high: "#ff8800", medium: "#e3b341",
-  low: "#44aaff", compliant: "#3fb950", unassessable: "#484f58",
+  low: "#44aaff", standard: "#3fb950", unassessable: "#484f58",
 };
 const SEV_ORDER: Record<string, number> = {
-  critical: 5, high: 4, medium: 3, low: 2, compliant: 1, unassessable: 0,
+  critical: 5, high: 4, medium: 3, low: 2, standard: 1, unassessable: 0,
 };
 const SEVERITIES = ["critical", "high", "medium", "low"] as const;
 
@@ -77,7 +77,7 @@ function SectionDivider({ label }: { label: string }) {
 // ── Computed statistics ───────────────────────────────────────────────────────
 
 interface AirportStat {
-  total: number; compliant: number;
+  total: number; standard: number;
   critical: number; high: number; medium: number; low: number;
   violationTypes: Record<string, number>;
   hfacs: Record<string, number>;
@@ -87,16 +87,16 @@ function useAirportStats(results: AnalysisResult[]) {
   return useMemo(() => {
     const map: Record<string, AirportStat> = {};
     for (const ap of AIRPORTS)
-      map[ap.code] = { total: 0, compliant: 0, critical: 0, high: 0, medium: 0, low: 0, violationTypes: {}, hfacs: {} };
+      map[ap.code] = { total: 0, standard: 0, critical: 0, high: 0, medium: 0, low: 0, violationTypes: {}, hfacs: {} };
     results.forEach(r => {
       const s = map[r.airport_code];
       if (!s) return;
       s.total++;
       const sev = getCardSeverity(r);
-      if (sev === "compliant") s.compliant++;
+      if (sev === "standard") s.standard++;
       else if (sev in s) (s as any)[sev]++;
-      (r.violations ?? []).forEach((v: any) => {
-        s.violationTypes[v.violation_type] = (s.violationTypes[v.violation_type] ?? 0) + 1;
+      (r.observations ?? []).forEach((v) => {
+        s.violationTypes[v.note_type] = (s.violationTypes[v.note_type] ?? 0) + 1;
         if (v.hfacs_level) s.hfacs[v.hfacs_level] = (s.hfacs[v.hfacs_level] ?? 0) + 1;
       });
     });
@@ -117,29 +117,29 @@ function topEntry(map: Record<string, number>): string | null {
 function useSessionStatus(results: AnalysisResult[]) {
   return useMemo(() => {
     const assessable = results.filter(r => r.assessable !== false);
-    const violations = assessable.filter(r => !r.is_compliant);
-    const critical   = violations.filter(r => getCardSeverity(r) === "critical").length;
-    const high       = violations.filter(r => getCardSeverity(r) === "high").length;
-    const compRate   = assessable.length > 0
-      ? Math.round(((assessable.length - violations.length) / assessable.length) * 100) : null;
+    const nonStandard = assessable.filter(r => !r.is_standard);
+    const critical    = nonStandard.filter(r => getCardSeverity(r) === "critical").length;
+    const high        = nonStandard.filter(r => getCardSeverity(r) === "high").length;
+    const compRate    = assessable.length > 0
+      ? Math.round(((assessable.length - nonStandard.length) / assessable.length) * 100) : null;
     const ch = critical + high;
     let label: string, color: string, message: string;
     if      (compRate === null)           { label = "NO DATA";  color = "#484f58"; message = "No assessable transmissions yet"; }
-    else if (ch > 3 || compRate < 75)     { label = "CRITICAL"; color = "#ff4444"; message = `${ch} high-priority violation${ch !== 1 ? "s" : ""} — escalate immediately`; }
-    else if (ch > 0 || compRate < 90)     { label = "ELEVATED"; color = "#ff8800"; message = `${ch} high-priority violation${ch !== 1 ? "s" : ""} — document before end of shift`; }
+    else if (ch > 3 || compRate < 75)     { label = "CRITICAL"; color = "#ff4444"; message = `${ch} high-priority observation${ch !== 1 ? "s" : ""} — escalate immediately`; }
+    else if (ch > 0 || compRate < 90)     { label = "ELEVATED"; color = "#ff8800"; message = `${ch} high-priority observation${ch !== 1 ? "s" : ""} — document before end of shift`; }
     else if (compRate < 95)               { label = "NOMINAL";  color = "#e3b341"; message = "Minor deviations — continue monitoring"; }
-    else                                  { label = "CLEAR";    color = "#3fb950"; message = "No significant violations this session"; }
-    return { label, color, message, compRate, critical, high, total: assessable.length, violations: violations.length };
+    else                                  { label = "CLEAR";    color = "#3fb950"; message = "No significant observations this session"; }
+    return { label, color, message, compRate, critical, high, total: assessable.length, violations: nonStandard.length };
   }, [results]);
 }
 
 function useHourlyData(results: AnalysisResult[]) {
   return useMemo(() => {
     const now  = new Date();
-    const bins: { hour: string; critical: number; high: number; medium: number; low: number; compliant: number }[] = [];
+    const bins: { hour: string; critical: number; high: number; medium: number; low: number; standard: number }[] = [];
     for (let h = 23; h >= 0; h--) {
       const t = new Date(now.getTime() - h * 3_600_000);
-      bins.push({ hour: `${String(t.getUTCHours()).padStart(2, "0")}:00`, critical: 0, high: 0, medium: 0, low: 0, compliant: 0 });
+      bins.push({ hour: `${String(t.getUTCHours()).padStart(2, "0")}:00`, critical: 0, high: 0, medium: 0, low: 0, standard: 0 });
     }
     results.forEach(r => {
       const age = (now.getTime() - new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z").getTime()) / 3_600_000;
@@ -156,24 +156,24 @@ function useHourlyData(results: AnalysisResult[]) {
 /** All deep-analysis intelligence derived from results in one memoised hook. */
 function useViolationIntelligence(results: AnalysisResult[]) {
   return useMemo(() => {
-    const allViolations = results.flatMap(r => r.violations ?? []);
+    const allObservations = results.flatMap(r => r.observations ?? []);
 
     // HFACS distribution
     const hfacsCounts: Record<string, number> = {};
-    allViolations.forEach((v: any) => {
+    allObservations.forEach((v) => {
       if (v.hfacs_level) hfacsCounts[v.hfacs_level] = (hfacsCounts[v.hfacs_level] ?? 0) + 1;
     });
 
-    // Violation type breakdown (top 8)
+    // Note type breakdown (top 8)
     const typeCounts: Record<string, number> = {};
-    allViolations.forEach((v: any) => {
-      if (v.violation_type) typeCounts[v.violation_type] = (typeCounts[v.violation_type] ?? 0) + 1;
+    allObservations.forEach((v) => {
+      if (v.note_type) typeCounts[v.note_type] = (typeCounts[v.note_type] ?? 0) + 1;
     });
     const sortedTypes = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).slice(0, 8) as [string, number][];
 
     // Most-cited regulations (top 6, truncate to doc name)
     const regCounts: Record<string, number> = {};
-    allViolations.forEach((v: any) => {
+    allObservations.forEach((v) => {
       if (v.relevant_regulation) {
         const short = v.relevant_regulation.split(",")[0].trim();
         regCounts[short] = (regCounts[short] ?? 0) + 1;
@@ -184,7 +184,7 @@ function useViolationIntelligence(results: AnalysisResult[]) {
     // Repeat offenders (callsigns with ≥2 non-compliant appearances)
     const csData: Record<string, { count: number; maxSev: string; lastTs: number }> = {};
     results.forEach(r => {
-      if (r.is_compliant || r.assessable === false) return;
+      if (r.is_standard || r.assessable === false) return;
       const cs = r.enrichment?.callsign_detected
         ?? r.transcript?.match(/\b([A-Z]{2,3}\d{1,4}[A-Z]?)\b/)?.[1];
       if (!cs) return;
@@ -218,7 +218,7 @@ function useViolationIntelligence(results: AnalysisResult[]) {
     const inWindow = (r: AnalysisResult, minAge: number, maxAge: number) => {
       const age = (now - new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z").getTime()) / 60000;
       const sev = getCardSeverity(r);
-      return age >= minAge && age < maxAge && sev !== "compliant" && sev !== "unassessable";
+      return age >= minAge && age < maxAge && sev !== "standard" && sev !== "unassessable";
     };
     const last30  = results.filter(r => inWindow(r, 0, 30)).length;
     const prior30 = results.filter(r => inWindow(r, 30, 60)).length;
@@ -396,7 +396,7 @@ function Globe({
         const { px, py, visible } = project(rot3, cx, cy, R);
         if (!visible) continue;
         newPos[ap.code] = { px, py };
-        const sev      = airportSeverity[ap.code] ?? "compliant";
+        const sev      = airportSeverity[ap.code] ?? "standard";
         const isActive = activeAirports.has(ap.code);
         const color    = SEV_COLOR[sev] ?? "#3fb950";
         const hasCrit  = sev === "critical" || sev === "high";
@@ -552,7 +552,7 @@ function SpikeAlert({ spike }: { spike: ReturnType<typeof useViolationIntelligen
 function EventTimeline({ results, compact = false }: { results: AnalysisResult[]; compact?: boolean }) {
   const events = useMemo(() =>
     [...results]
-      .filter(r => { const s = getCardSeverity(r); return s !== "compliant" && s !== "unassessable"; })
+      .filter(r => { const s = getCardSeverity(r); return s !== "standard" && s !== "unassessable"; })
       .slice(0, compact ? 20 : 40),
     [results, compact]
   );
@@ -611,7 +611,7 @@ function ActivityChart({ data }: { data: ReturnType<typeof useHourlyData> }) {
     <ResponsiveContainer width="100%" height={130}>
       <AreaChart data={data} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
         <defs>
-          {(["critical", "high", "medium", "low", "compliant"] as const).map(sev => (
+          {(["critical", "high", "medium", "low", "standard"] as const).map(sev => (
             <linearGradient key={sev} id={`sr-g-${sev}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%"  stopColor={SEV_COLOR[sev]} stopOpacity={0.35} />
               <stop offset="95%" stopColor={SEV_COLOR[sev]} stopOpacity={0}    />
@@ -625,7 +625,7 @@ function ActivityChart({ data }: { data: ReturnType<typeof useHourlyData> }) {
           contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 6, fontSize: 10 }}
           labelStyle={{ color: "#8b949e" }} itemStyle={{ color: "#e6edf3" }}
         />
-        {(["critical", "high", "medium", "low", "compliant"] as const).map(sev => (
+        {(["critical", "high", "medium", "low", "standard"] as const).map(sev => (
           <Area key={sev} type="monotone" dataKey={sev}
             stroke={SEV_COLOR[sev]} strokeWidth={1.5}
             fill={`url(#sr-g-${sev})`} stackId="1" />
@@ -667,7 +667,7 @@ function RiskMatrix({
             const s = airportStats[ap.code];
             const score = riskScore(s);
             const assessable = s.total > 0 ? s.total : 1;
-            const compPct = s.total > 0 ? Math.round((s.compliant / s.total) * 100) : null;
+            const compPct = s.total > 0 ? Math.round((s.standard / s.total) * 100) : null;
             const compColor = compPct == null ? "#484f58" : compPct >= 90 ? "#3fb950" : compPct >= 75 ? "#e3b341" : "#ff4444";
             return (
               <tr key={ap.code} style={{ borderTop: "1px solid #1c2128" }}>
@@ -731,7 +731,7 @@ function TemporalHeatmap({ results }: { results: AnalysisResult[] }) {
     results.forEach(r => {
       if (!g[r.airport_code]) return;
       const sev = getCardSeverity(r);
-      if (sev === "compliant" || sev === "unassessable") return;
+      if (sev === "standard" || sev === "unassessable") return;
       const h = new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z").getUTCHours();
       const weight = sev === "critical" ? 4 : sev === "high" ? 3 : sev === "medium" ? 2 : 1;
       g[r.airport_code][h] += weight;
@@ -1009,9 +1009,9 @@ function AirportDetailCards({
         const score    = riskScore(s);
         const topViol  = topEntry(s.violationTypes);
         const topHfacs = topEntry(s.hfacs);
-        const compPct  = s.total > 0 ? Math.round((s.compliant / s.total) * 100) : null;
+        const compPct  = s.total > 0 ? Math.round((s.standard / s.total) * 100) : null;
         const isActive = activeAirports.has(ap.code);
-        const topSev   = s.critical > 0 ? "critical" : s.high > 0 ? "high" : s.medium > 0 ? "medium" : s.low > 0 ? "low" : "compliant";
+        const topSev   = s.critical > 0 ? "critical" : s.high > 0 ? "high" : s.medium > 0 ? "medium" : s.low > 0 ? "low" : "standard";
         const borderTop = SEV_COLOR[topSev];
         const compColor = compPct == null ? "#484f58" : compPct >= 90 ? "#3fb950" : compPct >= 75 ? "#e3b341" : "#ff4444";
         return (
@@ -1108,7 +1108,7 @@ export function SituationRoom({ results, activeAirports, onAirportClick }: Props
   const hourlyData   = useHourlyData(results);
   const intel        = useViolationIntelligence(results);
   const violCount    = results.filter(r => {
-    const s = getCardSeverity(r); return s !== "compliant" && s !== "unassessable";
+    const s = getCardSeverity(r); return s !== "standard" && s !== "unassessable";
   }).length;
 
   const pad = isMobile ? 12 : 20;

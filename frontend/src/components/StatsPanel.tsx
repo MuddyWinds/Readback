@@ -188,7 +188,7 @@ const HFACS_ORDER = ["Unsafe Act", "Precondition", "Unsafe Supervision", "Organi
 
 // ── Colours ───────────────────────────────────────────────────────────────────
 
-const SEV: Record<string, string> = { critical: "#ff4444", high: "#ff8800", medium: "#e3b341", low: "#44aaff", compliant: "#3fb950" };
+const SEV: Record<string, string> = { critical: "#ff4444", high: "#ff8800", medium: "#e3b341", low: "#44aaff", standard: "#3fb950" };
 const SEVERITIES = ["critical", "high", "medium", "low"] as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -404,9 +404,9 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
   const hfacsByType = useMemo(() => {
     const map: Record<string, Record<string, number>> = {};
     results.forEach(r => {
-      r.violations?.forEach((v: any) => {
-        if (!map[v.violation_type]) map[v.violation_type] = {};
-        map[v.violation_type][v.hfacs_level] = (map[v.violation_type][v.hfacs_level] ?? 0) + 1;
+      r.observations?.forEach((v) => {
+        if (!map[v.note_type]) map[v.note_type] = {};
+        map[v.note_type][v.hfacs_level] = (map[v.note_type][v.hfacs_level] ?? 0) + 1;
       });
     });
     return map;
@@ -416,7 +416,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
   const hfacsTotal = useMemo(() => {
     const counts: Record<string, number> = {};
     results.forEach(r => {
-      r.violations?.forEach((v: any) => {
+      r.observations?.forEach((v) => {
         counts[v.hfacs_level] = (counts[v.hfacs_level] ?? 0) + 1;
       });
     });
@@ -428,14 +428,14 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
     type RegRow = { count: number; critical: number; high: number; medium: number; low: number; types: Record<string, number>; airports: Set<string> };
     const map: Record<string, RegRow> = {};
     results.forEach(r => {
-      r.violations?.forEach((v: any) => {
+      r.observations?.forEach((v) => {
         if (!v.relevant_regulation) return;
         const doc = v.relevant_regulation.split(",")[0].trim();
         if (!map[doc]) map[doc] = { count: 0, critical: 0, high: 0, medium: 0, low: 0, types: {}, airports: new Set() };
         map[doc].count++;
-        const sev = v.severity as keyof RegRow;
+        const sev = v.significance as keyof RegRow;
         if (sev === "critical" || sev === "high" || sev === "medium" || sev === "low") map[doc][sev]++;
-        map[doc].types[v.violation_type] = (map[doc].types[v.violation_type] ?? 0) + 1;
+        map[doc].types[v.note_type] = (map[doc].types[v.note_type] ?? 0) + 1;
         map[doc].airports.add(r.airport_code);
       });
     });
@@ -449,10 +449,10 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
   const violationExamples = useMemo(() => {
     const map: Record<string, { excerpt: string; airport: string; description: string }[]> = {};
     results.forEach(r => {
-      r.violations?.forEach((v: any) => {
-        if (!map[v.violation_type]) map[v.violation_type] = [];
-        if (map[v.violation_type].length < 3) {
-          map[v.violation_type].push({
+      r.observations?.forEach((v) => {
+        if (!map[v.note_type]) map[v.note_type] = [];
+        if (map[v.note_type].length < 3) {
+          map[v.note_type].push({
             excerpt: v.transcript_excerpt ?? "",
             airport: r.airport_code,
             description: v.description ?? "",
@@ -499,8 +499,8 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
     const map: Record<string, Record<string, number>> = {};
     results.forEach(r => {
       if (!map[r.airport_code]) map[r.airport_code] = {};
-      r.violations?.forEach((v: any) => {
-        map[r.airport_code][v.violation_type] = (map[r.airport_code][v.violation_type] ?? 0) + 1;
+      r.observations?.forEach((v) => {
+        map[r.airport_code][v.note_type] = (map[r.airport_code][v.note_type] ?? 0) + 1;
       });
     });
     return map;
@@ -511,7 +511,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
     const map: Record<string, Record<string, number>> = {};
     results.forEach(r => {
       if (!map[r.airport_code]) map[r.airport_code] = {};
-      r.violations?.forEach((v: any) => {
+      r.observations?.forEach((v) => {
         map[r.airport_code][v.hfacs_level] = (map[r.airport_code][v.hfacs_level] ?? 0) + 1;
       });
     });
@@ -539,12 +539,12 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
   // ── 24-hour activity chart data ───────────────────────────────────────────
   const hourlyData = useMemo(() => {
     const now  = new Date();
-    const bins: Record<number, { hour: string; critical: number; high: number; medium: number; low: number; compliant: number }> = {};
+    const bins: Record<number, { hour: string; critical: number; high: number; medium: number; low: number; standard: number }> = {};
     for (let h = 23; h >= 0; h--) {
       const t = new Date(now.getTime() - h * 3600000);
       bins[h]  = {
         hour:     `${String(t.getUTCHours()).padStart(2, "0")}:00`,
-        critical: 0, high: 0, medium: 0, low: 0, compliant: 0,
+        critical: 0, high: 0, medium: 0, low: 0, standard: 0,
       };
     }
     results.forEach(r => {
@@ -584,7 +584,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
         <ResponsiveContainer width="100%" height={160}>
           <AreaChart data={hourlyData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
             <defs>
-              {(["critical","high","medium","low","compliant"] as const).map(sev => (
+              {(["critical","high","medium","low","standard"] as const).map(sev => (
                 <linearGradient key={sev} id={`g-${sev}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor={SEV[sev] ?? "#3fb950"} stopOpacity={0.3} />
                   <stop offset="95%" stopColor={SEV[sev] ?? "#3fb950"} stopOpacity={0} />
@@ -599,7 +599,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
               labelStyle={{ color: "#8b949e" }}
               itemStyle={{ color: "#e6edf3" }}
             />
-            {(["critical","high","medium","low","compliant"] as const).map(sev => (
+            {(["critical","high","medium","low","standard"] as const).map(sev => (
               <Area
                 key={sev} type="monotone" dataKey={sev}
                 stroke={SEV[sev] ?? "#3fb950"} strokeWidth={1.5}
