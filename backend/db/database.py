@@ -21,7 +21,7 @@ async def init_db():
         for migration in [
             "ALTER TABLE analysis_results ADD COLUMN enrichment TEXT",
             "ALTER TABLE analysis_results ADD COLUMN status TEXT DEFAULT 'new'",
-            "ALTER TABLE analysis_results ADD COLUMN officer_notes TEXT",
+            "ALTER TABLE analysis_results ADD COLUMN reviewer_notes TEXT",
         ]:
             try:
                 await conn.execute(text(migration))
