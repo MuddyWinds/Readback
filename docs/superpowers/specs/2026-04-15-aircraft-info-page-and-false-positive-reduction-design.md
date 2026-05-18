@@ -283,7 +283,7 @@ Default order (normal state):
 
 1. Aircraft Type (open)
 2. Airline Configuration (open) — with sub-dropdowns `[seats | avionics | electrical | doors | emergency]` sourced from `backend/fleet/{airline}/{type}.yml`
-3. Recent Transmissions (open) — last 20 normalized turns, hoverable tokens, right-click → dispute parse
+3. Recent Transmissions (open) — last 20 normalized turns, hoverable tokens, right-click → submit feedback on parse
 4. Maintenance (collapsed)
 5. Incidents (collapsed, count badge)
 
