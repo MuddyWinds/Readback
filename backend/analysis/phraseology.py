@@ -35,7 +35,7 @@ def get_client():
     return _client
 
 
-BATCH_SYSTEM_PROMPT = """You are an expert aviation safety analyst with 20+ years of ATC compliance
+BATCH_SYSTEM_PROMPT = """You are an expert aviation safety analyst with 20+ years of ATC phraseology
 experience across FAA and ICAO regulatory frameworks.
 
 ═══════════════════════════════════════════════════════
@@ -175,7 +175,7 @@ Each object schema:
   "assessable_confidence": <float 0.0–1.0 — confidence in transcript quality>,
   "is_standard": <boolean — true if the transmission met standard phraseology;
     only meaningful when assessable is true>,
-  "confidence_score": <float 0.0–1.0 — confidence in your compliance verdict>,
+  "confidence_score": <float 0.0–1.0 — confidence in your phraseology assessment>,
   "summary": "<plain English; if assessable false, explain why>",
   "observations": [
     {
