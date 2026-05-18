@@ -53,10 +53,10 @@ interface AircraftInfo {
   onGround:    boolean;
   distNm:      number;
   phase:       "arr" | "dep" | "gnd" | "enr";
-  // Compliance linkage — populated after cross-referencing with results
+  // Phraseology linkage — populated after cross-referencing with results
   monitored:   boolean;
   compliant:   boolean | null;   // null = not assessed
-  lastEvent:   string | null;    // violation_type or "Compliant"
+  lastEvent:   string | null;    // note_type or "Standard"
   resultId:    number | null;
 }
 
@@ -142,10 +142,10 @@ function buildMonitorIndex(
     )?.toUpperCase().trim();
     if (!cs) continue;
     if (idx.has(cs)) continue; // keep newest
-    const topViolation = (r.violations ?? [])[0];
+    const topObservation = (r.observations ?? [])[0];
     idx.set(cs, {
-      compliant:  r.assessable === false ? null : (r.is_compliant ?? null),
-      lastEvent:  topViolation?.violation_type ?? (r.is_compliant ? "Compliant" : null),
+      compliant:  r.assessable === false ? null : (r.is_standard ?? null),
+      lastEvent:  topObservation?.note_type ?? (r.is_standard ? "Standard" : null),
       resultId:   r.id ?? null,
     });
   }
@@ -911,13 +911,13 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
           const recent  = results.filter(r => r.airport_code === airportCode && new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z").getTime() >= cutoff);
           const total   = recent.length;
           if (total === 0) return null;
-          const compliant  = recent.filter(r => r.is_compliant && r.assessable !== false).length;
+          const compliant  = recent.filter(r => r.is_standard && r.assessable !== false).length;
           const unassess   = recent.filter(r => r.assessable === false).length;
           const bySev: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0 };
           const typeCounts: Record<string, number> = {};
-          recent.forEach(r => (r.violations ?? []).forEach((v: any) => {
-            if (v.severity in bySev) bySev[v.severity]++;
-            typeCounts[v.violation_type] = (typeCounts[v.violation_type] ?? 0) + 1;
+          recent.forEach(r => (r.observations ?? []).forEach((v) => {
+            if (v.significance in bySev) bySev[v.significance]++;
+            typeCounts[v.note_type] = (typeCounts[v.note_type] ?? 0) + 1;
           }));
           const topType   = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
           const compRate  = total > unassess ? Math.round((compliant / (total - unassess)) * 100) : null;

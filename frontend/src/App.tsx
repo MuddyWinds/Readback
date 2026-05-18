@@ -16,13 +16,13 @@ const KNOWN_FEEDS: { label: string; url: string; code: string }[] = [
 ];
 
 const SEV_COLOR: Record<string, string> = {
-  compliant: "#3fb950", low: "#44aaff", medium: "#e3b341", high: "#ff8800", critical: "#ff4444",
+  standard: "#3fb950", low: "#44aaff", medium: "#e3b341", high: "#ff8800", critical: "#ff4444",
   unassessable: "#484f58",
 };
 
 const FILTER_BUTTONS: { key: Filter; label: string }[] = [
   { key: "all",          label: "All" },
-  { key: "compliant",    label: "Compliant" },
+  { key: "standard",     label: "Standard" },
   { key: "low",          label: "Low" },
   { key: "medium",       label: "Medium" },
   { key: "high",         label: "High" },
@@ -172,7 +172,7 @@ export default function App() {
     : results.filter(r => r.airport_code === airportFilter);
 
   const sevCounts = useMemo<Record<Filter, number>>(() => {
-    const counts = { all: 0, compliant: 0, low: 0, medium: 0, high: 0, critical: 0, unassessable: 0 };
+    const counts = { all: 0, standard: 0, low: 0, medium: 0, high: 0, critical: 0, unassessable: 0 };
     for (const r of visibleResults) {
       counts.all++;
       counts[getCardSeverity(r) as Filter]++;

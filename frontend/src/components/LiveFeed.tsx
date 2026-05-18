@@ -13,6 +13,19 @@ export interface Enrichment {
   callsign_clarity:     number; // 0-100
 }
 
+export type ObservationKind = "phraseology_note" | "situational_event";
+
+export interface Observation {
+  kind: ObservationKind;
+  note_type: string;
+  hfacs_level: string;
+  significance: "low" | "medium" | "high" | "critical";
+  description: string;
+  safety_pathway?: string | null;
+  relevant_regulation?: string | null;
+  transcript_excerpt?: string | null;
+}
+
 export interface AnalysisResult {
   id?: number;
   timestamp: string;
@@ -20,42 +33,42 @@ export interface AnalysisResult {
   transcript: string;
   assessable?: boolean;
   assessable_confidence?: number;
-  is_compliant: boolean;
-  violations: any[];
+  is_standard: boolean;
+  observations: Observation[];
   summary: string;
   confidence_score: number;
   enrichment?: Enrichment | null;
   status?: string;
-  officer_notes?: string;
+  reviewer_notes?: string;
 }
 
-export type Filter = "all" | "compliant" | "low" | "medium" | "high" | "critical" | "unassessable";
+export type Filter = "all" | "standard" | "low" | "medium" | "high" | "critical" | "unassessable";
 export type GroupBy = "none" | "airport";
-export type Severity = "compliant" | "low" | "medium" | "high" | "critical" | "unassessable";
+export type Severity = "standard" | "low" | "medium" | "high" | "critical" | "unassessable";
 
 const SEV_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
 export function getCardSeverity(r: AnalysisResult): Severity {
   if (r.assessable === false) return "unassessable";
-  if (!r.violations || r.violations.length === 0) return "compliant";
+  if (!r.observations || r.observations.length === 0) return "standard";
   let maxRank = 0, maxSev = "low";
-  for (const v of r.violations) {
-    const rank = SEV_ORDER[v.severity] ?? 0;
-    if (rank > maxRank) { maxRank = rank; maxSev = v.severity; }
+  for (const v of r.observations) {
+    const rank = SEV_ORDER[v.significance] ?? 0;
+    if (rank > maxRank) { maxRank = rank; maxSev = v.significance; }
   }
   return maxSev as Severity;
 }
 
 const SEV_BORDER: Record<Severity, string> = {
-  compliant: "#238636", low: "#44aaff", medium: "#e3b341", high: "#ff8800", critical: "#ff4444",
+  standard: "#238636", low: "#44aaff", medium: "#e3b341", high: "#ff8800", critical: "#ff4444",
   unassessable: "#3a3f47",
 };
 const SEV_BG: Record<Severity, string> = {
-  compliant: "#0d1117", low: "#0d1527", medium: "#1f1a0d", high: "#1a1005", critical: "#1f0d0d",
+  standard: "#0d1117", low: "#0d1527", medium: "#1f1a0d", high: "#1a1005", critical: "#1f0d0d",
   unassessable: "#0d1117",
 };
 const SEV_LABEL: Record<Severity, string> = {
-  compliant: "COMPLIANT", low: "LOW", medium: "MEDIUM", high: "HIGH", critical: "CRITICAL",
+  standard: "STANDARD", low: "LOW", medium: "MEDIUM", high: "HIGH", critical: "CRITICAL",
   unassessable: "UNASSESSABLE",
 };
 const SEV_ICON: Record<string, string> = {
@@ -425,7 +438,7 @@ function StatusWorkflow({ resultId, initial }: { resultId?: number; initial?: st
   );
 }
 
-function OfficerNotes({ resultId, initial }: { resultId?: number; initial?: string }) {
+function ReviewerNotes({ resultId, initial }: { resultId?: number; initial?: string }) {
   const [notes, setNotes] = React.useState(initial ?? "");
   const [editing, setEditing] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -434,7 +447,7 @@ function OfficerNotes({ resultId, initial }: { resultId?: number; initial?: stri
     if (resultId) {
       await fetch(`http://localhost:8000/api/results/${resultId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ officer_notes: notes }),
+        body: JSON.stringify({ reviewer_notes: notes }),
       });
     }
     setSaving(false); setEditing(false);
@@ -442,7 +455,7 @@ function OfficerNotes({ resultId, initial }: { resultId?: number; initial?: stri
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-        <SectionLabel>Officer Notes</SectionLabel>
+        <SectionLabel>Reviewer Notes</SectionLabel>
         {!editing && (
           <button onClick={() => setEditing(true)} style={{
             fontSize: 10, color: "#58a6ff", background: "none", border: "none",
@@ -491,28 +504,28 @@ function OfficerNotes({ resultId, initial }: { resultId?: number; initial?: stri
   );
 }
 
-/** Generate a plain-text incident report for copy-paste into a formal system. */
+/** Generate a plain-text study sheet for copy-paste into a formal system. */
 function buildReportText(r: AnalysisResult, callsign: string | null): string {
   const ts = r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z";
   const sev = getCardSeverity(r).toUpperCase();
   const lines = [
     "═══════════════════════════════════════════════",
-    "     ATC COMPLIANCE INCIDENT REPORT (DRAFT)",
+    "        ATC PHRASEOLOGY STUDY SHEET (DRAFT)",
     "═══════════════════════════════════════════════",
     `Generated:    ${new Date().toUTCString()}`,
     `Airport:      ${r.airport_code}`,
     `Event Time:   ${ts}`,
     `Callsign:     ${callsign ?? "Unknown"}`,
-    `Severity:     ${sev}`,
+    `Significance: ${sev}`,
     "",
     "── SUMMARY ─────────────────────────────────────",
     r.summary || "(no summary available)",
     "",
   ];
-  if (r.violations?.length) {
-    lines.push("── VIOLATIONS ──────────────────────────────────");
-    r.violations.forEach((v: any, i: number) => {
-      lines.push(`${i + 1}. [${(v.severity ?? "").toUpperCase()}] ${v.violation_type}`);
+  if (r.observations?.length) {
+    lines.push("── OBSERVATIONS ────────────────────────────────");
+    r.observations.forEach((v, i) => {
+      lines.push(`${i + 1}. [${(v.significance ?? "").toUpperCase()}] ${v.note_type}`);
       lines.push(`   Regulation : ${v.relevant_regulation ?? "—"}`);
       lines.push(`   HFACS      : ${v.hfacs_level ?? "—"}`);
       lines.push(`   Description: ${v.description}`);
@@ -524,13 +537,13 @@ function buildReportText(r: AnalysisResult, callsign: string | null): string {
   lines.push("── TRANSCRIPT ──────────────────────────────────");
   lines.push(r.transcript);
   lines.push("");
-  lines.push("── OFFICER NOTES ───────────────────────────────");
-  lines.push(r.officer_notes || "(add investigation notes here)");
+  lines.push("── REVIEWER NOTES ──────────────────────────────");
+  lines.push(r.reviewer_notes || "(add review notes here)");
   lines.push("═══════════════════════════════════════════════");
   return lines.join("\n");
 }
 
-// ─── Compliant card — minimal horizontal bar, expands on click ───────────────
+// ─── Standard card — minimal horizontal bar, expands on click ────────────────
 function CompliantCard({ r }: { r: AnalysisResult }) {
   const [expanded, setExpanded] = useState(false);
   const { callsign } = extractCallsign(r.transcript);
@@ -558,7 +571,7 @@ function CompliantCard({ r }: { r: AnalysisResult }) {
           padding: "2px 9px", borderRadius: 12,
           fontSize: 10, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0,
         }}>
-          COMPLIANT
+          STANDARD
         </span>
         <span style={{
           background: "#161b22", color: "#8b949e",
@@ -624,7 +637,7 @@ function CompliantCard({ r }: { r: AnalysisResult }) {
             display: "flex", flexDirection: "column" as const, gap: 12,
           }}>
             <StatusWorkflow resultId={r.id} initial={r.status} />
-            <OfficerNotes resultId={r.id} initial={r.officer_notes} />
+            <ReviewerNotes resultId={r.id} initial={r.reviewer_notes} />
           </div>
         </div>
       )}
@@ -681,7 +694,7 @@ function HazardBanner({ airport, timestamp }: { airport: string; timestamp: stri
             {s.hazard}{s.severity ? ` (${s.severity})` : ""}
             {s.alt_low && s.alt_high ? ` · ${Math.round(s.alt_low/100)*100}–${Math.round(s.alt_high/100)*100} ft` : ""}
           </span>
-          <span style={{ fontSize: 10, color: "#484f58", fontStyle: "italic" }}>active at time of violation</span>
+          <span style={{ fontSize: 10, color: "#484f58", fontStyle: "italic" }}>active at time of transmission</span>
         </div>
       ))}
       {activeAirmets.map((a: any, i: number) => (
@@ -689,7 +702,7 @@ function HazardBanner({ airport, timestamp }: { airport: string; timestamp: stri
           <span style={{ fontSize: 10, fontWeight: 700, color: "#ff8800", background: "#ff880018",
             border: "1px solid #ff880044", borderRadius: 3, padding: "1px 5px", flexShrink: 0 }}>AIRMET</span>
           <span style={{ fontSize: 11, color: "#c9d1d9" }}>{a.hazard}</span>
-          <span style={{ fontSize: 10, color: "#484f58", fontStyle: "italic" }}>active at time of violation</span>
+          <span style={{ fontSize: 10, color: "#484f58", fontStyle: "italic" }}>active at time of transmission</span>
         </div>
       ))}
       {recentPireps.map((p: any, i: number) => (
@@ -833,7 +846,7 @@ function PositionSnapshot({
         )}
         {dataSource && (
           <span style={{ fontSize: 9, color: dataSource === "snapshot" ? "#3fb950" : "#8b949e", background: "#21262d", borderRadius: 3, padding: "1px 6px" }}>
-            {dataSource === "snapshot" ? "⏱ at violation time" : "⚡ current"}
+            {dataSource === "snapshot" ? "⏱ at transmission time" : "⚡ current"}
           </span>
         )}
         <span style={{ marginLeft: "auto", fontSize: 10, color: "#484f58", fontFamily: "monospace" }}>
@@ -1012,9 +1025,9 @@ function ViolationCard({ r, priorOccurrences, lastSeenAgo }: {
               {watchList.has(callsign) ? "★" : "☆"}
             </button>
           )}
-          {r.violations?.length > 0 && (
+          {r.observations?.length > 0 && (
             <span style={{ fontSize: 11, color: "#8b949e" }}>
-              · {r.violations.length} violation{r.violations.length !== 1 ? "s" : ""}
+              · {r.observations.length} observation{r.observations.length !== 1 ? "s" : ""}
             </span>
           )}
           {actions.map(a => (
@@ -1145,110 +1158,164 @@ function ViolationCard({ r, priorOccurrences, lastSeenAgo }: {
         )}
       </div>
 
-      {/* ── 3. ANALYSIS — violations with regulation inline, no separate list ── */}
-      {r.violations?.length > 0 && (
-        <div style={{ padding: "14px 16px 0" }}>
-          <SectionLabel>Analysis</SectionLabel>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {[...r.violations].sort((a, b) => (SEV_ORDER[b.severity] ?? 0) - (SEV_ORDER[a.severity] ?? 0)).map((v, i) => {
-              const vColor = SEV_COLOR[v.severity] ?? "#888";
-              const vLabelColor = ["medium", "low"].includes(v.severity) ? "#0d1117" : "#fff";
-              const hfacsPlain = HFACS_PLAIN[v.hfacs_level] ?? v.hfacs_level;
-              const isLast = i === r.violations.length - 1;
-              return (
-                <div key={i} style={{
-                  paddingBottom: 14,
-                  marginBottom: isLast ? 0 : 14,
-                  borderBottom: isLast ? "none" : "1px solid #21262d",
+      {/* ── 3. ANALYSIS — observations split by kind ── */}
+      {r.observations?.length > 0 && (() => {
+        const phraseologyNotes = [...r.observations]
+          .filter(v => v.kind === "phraseology_note")
+          .sort((a, b) => (SEV_ORDER[b.significance] ?? 0) - (SEV_ORDER[a.significance] ?? 0));
+        const situationalEvents = [...r.observations]
+          .filter(v => v.kind === "situational_event")
+          .sort((a, b) => (SEV_ORDER[b.significance] ?? 0) - (SEV_ORDER[a.significance] ?? 0));
+
+        const renderObservation = (v: Observation, i: number, list: Observation[]) => {
+          const vColor = SEV_COLOR[v.significance] ?? "#888";
+          const vLabelColor = ["medium", "low"].includes(v.significance) ? "#0d1117" : "#fff";
+          const hfacsPlain = HFACS_PLAIN[v.hfacs_level] ?? v.hfacs_level;
+          const isLast = i === list.length - 1;
+          return (
+            <div key={i} style={{
+              paddingBottom: 14,
+              marginBottom: isLast ? 0 : 14,
+              borderBottom: isLast ? "none" : "1px solid #21262d",
+            }}>
+              {/* Heading row: number + type | regulation badge | significance badge */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                flexWrap: "nowrap", marginBottom: 8, overflow: "hidden",
+              }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, color: vColor,
+                  textTransform: "uppercase" as const, letterSpacing: 0.8,
+                  whiteSpace: "nowrap", flexShrink: 0,
                 }}>
-                  {/* Heading row: number + type | regulation badge | severity badge */}
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    flexWrap: "nowrap", marginBottom: 8, overflow: "hidden",
-                  }}>
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, color: vColor,
-                      textTransform: "uppercase" as const, letterSpacing: 0.8,
-                      whiteSpace: "nowrap", flexShrink: 0,
-                    }}>
-                      {i + 1}. {v.violation_type}
-                    </span>
-                    {v.relevant_regulation && (
-                      <RegBadge regulation={v.relevant_regulation} />
-                    )}
-                    <span style={{ flex: 1 }} />
-                    <span style={{
-                      fontSize: 10, fontWeight: 700,
-                      color: vLabelColor, background: vColor,
-                      padding: "1px 8px", borderRadius: 10,
-                      flexShrink: 0, whiteSpace: "nowrap",
-                    }}>
-                      {v.severity.toUpperCase()}
-                    </span>
-                  </div>
+                  {i + 1}. {v.note_type}
+                </span>
+                {v.relevant_regulation && (
+                  <RegBadge regulation={v.relevant_regulation} />
+                )}
+                <span style={{ flex: 1 }} />
+                <span style={{
+                  fontSize: 10, fontWeight: 700,
+                  color: vLabelColor, background: vColor,
+                  padding: "1px 8px", borderRadius: 10,
+                  flexShrink: 0, whiteSpace: "nowrap",
+                }}>
+                  {v.significance.toUpperCase()}
+                </span>
+              </div>
 
-                  {/* Description — smaller, analytical; preserve any newlines for readability */}
-                  <div style={{
-                    fontSize: 13, color: "#c9d1d9", lineHeight: 1.75,
-                    whiteSpace: "pre-wrap", marginBottom: 10,
-                  }}>
-                    {v.description}
-                  </div>
+              {/* Description */}
+              <div style={{
+                fontSize: 13, color: "#c9d1d9", lineHeight: 1.75,
+                whiteSpace: "pre-wrap", marginBottom: 10,
+              }}>
+                {v.description}
+              </div>
 
-                  {/* HFACS */}
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    marginBottom: v.transcript_excerpt ? 10 : 0,
-                  }}>
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, color: "#484f58",
-                      letterSpacing: 1.1, textTransform: "uppercase" as const,
-                    }}>
-                      HFACS
-                    </span>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, color: "#8b949e",
-                      background: "#21262d", padding: "2px 7px",
-                      borderRadius: 4, border: "1px solid #30363d",
-                    }}>
-                      {v.hfacs_level}
-                    </span>
-                    <span style={{ fontSize: 11, color: "#6e7681" }}>
-                      {hfacsPlain}
-                    </span>
-                  </div>
+              {/* HFACS */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                marginBottom: v.transcript_excerpt ? 10 : 0,
+              }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, color: "#484f58",
+                  letterSpacing: 1.1, textTransform: "uppercase" as const,
+                }}>
+                  HFACS
+                </span>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: "#8b949e",
+                  background: "#21262d", padding: "2px 7px",
+                  borderRadius: 4, border: "1px solid #30363d",
+                }}>
+                  {v.hfacs_level}
+                </span>
+                <span style={{ fontSize: 11, color: "#6e7681" }}>
+                  {hfacsPlain}
+                </span>
+              </div>
 
-                  {/* Safety pathway */}
-                  {v.safety_pathway && (
-                    <div style={{
-                      fontSize: 11, color: "#8b949e", fontStyle: "italic",
-                      lineHeight: 1.6, marginBottom: v.transcript_excerpt ? 8 : 0,
-                      paddingLeft: 2,
-                    }}>
-                      ⚡ {v.safety_pathway}
-                    </div>
-                  )}
-
-                  {/* Evidence */}
-                  {v.transcript_excerpt && (
-                    <div style={{
-                      background: `${vColor}0d`,
-                      border: `1px solid ${vColor}33`,
-                      borderLeft: `3px solid ${vColor}`,
-                      borderRadius: "0 6px 6px 0",
-                      padding: "7px 12px",
-                      fontSize: 12, fontFamily: "'SF Mono', 'Fira Code', monospace",
-                      color: "#ffa657", fontStyle: "italic", lineHeight: 1.6,
-                    }}>
-                      "{v.transcript_excerpt}"
-                    </div>
-                  )}
+              {/* Safety pathway */}
+              {v.safety_pathway && (
+                <div style={{
+                  fontSize: 11, color: "#8b949e", fontStyle: "italic",
+                  lineHeight: 1.6, marginBottom: v.transcript_excerpt ? 8 : 0,
+                  paddingLeft: 2,
+                }}>
+                  ⚡ {v.safety_pathway}
                 </div>
-              );
-            })}
+              )}
+
+              {/* Transcript excerpt */}
+              {v.transcript_excerpt && (
+                <div style={{
+                  background: `${vColor}0d`,
+                  border: `1px solid ${vColor}33`,
+                  borderLeft: `3px solid ${vColor}`,
+                  borderRadius: "0 6px 6px 0",
+                  padding: "7px 12px",
+                  fontSize: 12, fontFamily: "'SF Mono', 'Fira Code', monospace",
+                  color: "#ffa657", fontStyle: "italic", lineHeight: 1.6,
+                }}>
+                  "{v.transcript_excerpt}"
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div style={{ padding: "14px 16px 0" }}>
+            {/* Advisory tooltip icon */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <SectionLabel>Analysis</SectionLabel>
+              <span
+                title="Advisory — transcription may be imperfect and feeds are often one-sided."
+                style={{
+                  fontSize: 11, color: "#484f58", cursor: "help",
+                  userSelect: "none" as const, marginTop: -8, flexShrink: 0,
+                }}
+              >
+                ⓘ
+              </span>
+            </div>
+
+            {/* Phraseology Notes subsection */}
+            {phraseologyNotes.length > 0 && (
+              <div style={{ marginBottom: situationalEvents.length > 0 ? 18 : 0 }}>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: "#44aaff",
+                  letterSpacing: 1.1, textTransform: "uppercase" as const,
+                  borderLeft: "3px solid #44aaff44", paddingLeft: 8,
+                  marginBottom: 10,
+                }}>
+                  Phraseology Notes
+                </div>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {phraseologyNotes.map((v, i) => renderObservation(v, i, phraseologyNotes))}
+                </div>
+              </div>
+            )}
+
+            {/* Situational Events subsection */}
+            {situationalEvents.length > 0 && (
+              <div>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: "#8b949e",
+                  letterSpacing: 1.1, textTransform: "uppercase" as const,
+                  borderLeft: "3px solid #30363d", paddingLeft: 8,
+                  marginBottom: 10,
+                }}>
+                  Situational Events
+                </div>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {situationalEvents.map((v, i) => renderObservation(v, i, situationalEvents))}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── 4. REQUIRED ACTION ── */}
       <div style={{ padding: "14px 16px 10px" }}>
@@ -1281,7 +1348,7 @@ function ViolationCard({ r, priorOccurrences, lastSeenAgo }: {
         display: "flex", flexDirection: "column" as const, gap: 12,
       }}>
         <StatusWorkflow resultId={r.id} initial={r.status} />
-        <OfficerNotes resultId={r.id} initial={r.officer_notes} />
+        <ReviewerNotes resultId={r.id} initial={r.reviewer_notes} />
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
             onClick={() => {
@@ -1299,10 +1366,10 @@ function ViolationCard({ r, priorOccurrences, lastSeenAgo }: {
             }}
           >
             <span>{reportCopied ? "✓" : "⎘"}</span>
-            {reportCopied ? "Copied to clipboard" : "Copy incident report"}
+            {reportCopied ? "Copied to clipboard" : "Copy study sheet"}
           </button>
           <span style={{ fontSize: 10, color: "#3a3f47", fontStyle: "italic" }}>
-            Paste into your reporting system
+            Paste into your review system
           </span>
         </div>
       </div>
@@ -1405,7 +1472,7 @@ function UnassessableCard({ r }: { r: AnalysisResult }) {
           </div>
           <div style={{ padding: "6px 14px 12px" }}>
             <p style={{ fontSize: 11, color: "#484f58", margin: 0, fontStyle: "italic" }}>
-              This transmission was excluded from compliance rate calculations.
+              This transmission was excluded from phraseology rate calculations.
             </p>
           </div>
           <div style={{
@@ -1429,7 +1496,7 @@ const ResultCard = React.memo(function ResultCard({ r, priorOccurrences, lastSee
 }) {
   const severity = getCardSeverity(r);
   if (severity === "unassessable") return <UnassessableCard r={r} />;
-  if (severity === "compliant") return <CompliantCard r={r} />;
+  if (severity === "standard") return <CompliantCard r={r} />;
   return <ViolationCard r={r} priorOccurrences={priorOccurrences} lastSeenAgo={lastSeenAgo} />;
 });
 
@@ -1450,7 +1517,7 @@ export function ViolationDensity({ results, airportFilter, compact }: { results:
       const bi = Math.floor(8 - age);
       if (bi < 0 || bi >= 8) return;
       const sev = getCardSeverity(r);
-      if (sev === "compliant" || sev === "unassessable") return;
+      if (sev === "standard" || sev === "unassessable") return;
       (buckets[bi] as any)[sev]++;
     });
     return buckets;
@@ -1462,7 +1529,7 @@ export function ViolationDensity({ results, airportFilter, compact }: { results:
   const sevOrder = ["critical", "high", "medium", "low"] as const;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }} title="Violations last 2 hours (15-min buckets)">
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }} title="Observations last 2 hours (15-min buckets)">
       <span style={{ fontSize: 10, color: "#484f58", whiteSpace: "nowrap" }}>2h trend</span>
       <svg width={W} height={H} style={{ overflow: "visible" }}>
         {data.map((b, i) => {
