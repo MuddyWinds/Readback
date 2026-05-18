@@ -26,10 +26,10 @@ class AnalysisResultDB(Base):
     transcript = Column(Text)
     assessable = Column(Boolean, default=True)
     assessable_confidence = Column(Float, default=1.0)
-    is_compliant = Column(Boolean)
-    violations = Column(JSON)   # list of Violation dicts
+    is_standard = Column(Boolean)
+    observations = Column(JSON)   # list of Observation dicts
     summary = Column(Text)
     confidence_score = Column(Float)
     enrichment = Column(JSON, nullable=True)  # speaker_segments, readback comparison, callsign clarity
     status = Column(String(20), default="new")  # new/under_review/confirmed/false_positive/escalated
-    officer_notes = Column(Text, nullable=True)
+    reviewer_notes = Column(Text, nullable=True)
