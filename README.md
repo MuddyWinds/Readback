@@ -1,10 +1,16 @@
-# ATC Compliance Monitor
+# Readback
+
+> *ATC phraseology, read back to you.*
 
 <img width="1600" height="1247" alt="image" src="https://github.com/user-attachments/assets/e37a9a23-8e5a-4078-aaa5-4bd939b5da00" />
 
 > *"I was parked at the threshold of 28R at KSFO, listening to the tower frequency on my handheld, when I heard something that didn't sound right — a clearance that seemed to conflict with another aircraft still on the runway. By the time I processed it, the controller had already issued a go-around. I wished I had something that could catch those moments automatically, log them, and tell me exactly what regulation was implicated."*
 
-This project exists because radio communications between pilots and air traffic controllers are dense, fast, and consequential. Mistakes — wrong readbacks, non-standard phraseology, missed altitude assignments — happen, and they matter. **ATC Compliance Monitor** listens to live ATC audio streams, transcribes them in real time, and uses AI to flag deviations from FAA/ICAO standards before they become incidents.
+> **Readback is an educational tool.** Transcriptions may be imperfect and
+> feeds are often one-sided — notes and events are advisory, not authoritative.
+> It is for learning and situational awareness, not enforcement.
+
+This project exists because radio communications between pilots and air traffic controllers are dense, fast, and consequential. **Readback** listens to live ATC audio streams, transcribes them in real time, and uses AI to compare transmissions against FAA/ICAO standard phraseology — surfacing read-back errors, non-standard calls, and situational events so you can learn from them.
 
 Built for aviation enthusiasts, safety researchers, student pilots, and anyone who finds themselves glued to LiveATC on a Saturday afternoon.
 
@@ -14,23 +20,23 @@ Built for aviation enthusiasts, safety researchers, student pilots, and anyone w
 
 - Streams live audio from [LiveATC.net](https://www.liveatc.net) feeds (or any compatible MP3 stream)
 - Transcribes ATC communications using [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (local, no cloud STT cost)
-- Batches transcripts and sends them to **Gemini Flash** for compliance analysis every 4 minutes
-- Applies the *Reasonable Controller Test* — flags genuine deviations, ignores transcription noise and one-sided readback gaps
-- Classifies violations using **HFACS taxonomy** (Human Factors Analysis and Classification System)
+- Batches transcripts and sends them to **Gemini Flash** for phraseology analysis every 4 minutes
+- Applies the *Reasonable Controller Test* — notes genuine deviations, ignores transcription noise and one-sided readback gaps
+- Classifies observations using **HFACS taxonomy** (Human Factors Analysis and Classification System)
 - Correlates findings with live **ADS-B traffic** from OpenSky Network
 - Pulls **METAR weather**, **NOTAMs**, and **SIGMET/AIRMET/PIREP** hazards for full situational context
 - Streams results live to a React dashboard via WebSocket
-- Generates **per-aircraft safety reports** aggregating all transmissions for a callsign
+- Generates **per-aircraft study sheets** aggregating all transmissions for a callsign
 
 ---
 
 ## Why This Exists
 
-Standard ATC monitoring tools show you what is happening — radar returns, frequency activity, flight strips. They don't tell you *whether what was said was correct*. This tool fills that gap:
+Standard ATC monitoring tools show you what is happening — radar returns, frequency activity, flight strips. They don't tell you *whether what was said matched standard phraseology*. Readback fills that gap:
 
-- **Student pilots** can study phraseology against real-world examples and see when actual controllers deviate from the book
-- **Enthusiasts** can monitor their home airport and get notified of unusual events (emergencies, go-arounds, TCAS RAs)
-- **Safety researchers** can build a longitudinal dataset of compliance events at specific airports
+- **Student pilots** can study phraseology against real-world examples and see where actual transmissions depart from the book
+- **Enthusiasts** can monitor their home airport and get notified of notable events (emergencies, go-arounds, TCAS RAs)
+- **Safety researchers** can build a longitudinal dataset of phraseology observations at specific airports
 - **Instructors** can use real-world clips to illustrate what a read-back error or non-standard clearance sounds like in practice
 
 ---
@@ -68,9 +74,10 @@ LiveATC Stream (MP3)
         ▼
    React Dashboard
    ├── AirportSidebar      select/manage monitored airports
-   ├── LiveFeed            real-time transcript + violation stream
-   ├── StatsPanel          aggregate compliance statistics
-   ├── ViolationCard       per-violation detail + HFACS category
+   ├── LiveFeed            real-time transcript + observation stream
+   ├── StatsPanel          aggregate phraseology statistics
+   ├── PhraseologyNote /   per-observation detail + HFACS category
+   │   Event rendering
    └── SituationRoom       unified ops view with weather + NOTAMs
 ```
 
@@ -86,18 +93,25 @@ LiveATC Stream (MP3)
 
 ---
 
-## Violation Categories
+## Phraseology Notes
 
-| Category | Example |
+| Type | Example |
 |---|---|
-| Runway Incursion / Excursion | Aircraft enters runway without clearance |
-| Altitude / Speed Deviation | Crew reports leaving wrong altitude |
-| Read-back Error | Incorrect or missing readback of cleared altitude |
-| Communication Failure | Loss of contact, frequency confusion |
-| CFIT Risk | Controlled flight toward terrain indicators |
-| TCAS Non-compliance | Crew ignores or contradicts resolution advisory |
-| Navigation Error | Wrong fix, wrong approach, wrong runway |
-| Fuel Mismanagement | Minimum fuel declared, fuel emergency |
+| Read-back Error | Incorrect or missing readback of a cleared altitude |
+| Frequency/Channel Error | Frequency confusion, wrong channel |
+| Communication Failure | Loss of contact, blocked transmission |
+| Navigation Error | Wrong fix or approach named in a transmission |
+
+## Situational Events
+
+| Type | Example |
+|---|---|
+| Runway Incursion / Excursion | Aircraft enters a runway without clearance |
+| Altitude / Speed Deviation | Crew reports leaving a wrong altitude |
+| CFIT Risk | Terrain-proximity indications |
+| TCAS Event | Crew responds to a resolution advisory |
+| Go-around | Missed approach or rejected landing |
+| Fuel Advisory | Minimum fuel or fuel emergency declared |
 
 ---
 
@@ -172,13 +186,13 @@ npm install && npm start
 | `POST` | `/api/monitor/stop` | Stop monitoring |
 | `GET` | `/api/monitor/status` | Active monitors |
 | `GET` | `/api/results` | Paginated analysis history |
-| `GET` | `/api/stats` | Aggregate compliance statistics |
+| `GET` | `/api/stats` | Aggregate phraseology statistics |
 | `GET` | `/api/adsb/{airport_code}` | Live ADS-B traffic (60s cache) |
 | `GET` | `/api/adsb-snapshot/{result_id}` | ADS-B state captured at analysis time |
 | `GET` | `/api/metar/{airport_code}` | Current METAR weather |
 | `GET` | `/api/notam/{airport_code}` | Active NOTAMs (5-min cache) |
 | `GET` | `/api/hazards/{airport_code}` | SIGMET / AIRMET / PIREP (5-min cache) |
-| `GET` | `/api/report/{result_id}` | Per-aircraft Gemini safety report |
+| `GET` | `/api/study-sheet/{id}` | Per-aircraft Gemini study sheet |
 | `WS` | `/ws/live` | Real-time results stream |
 
 ---
@@ -214,7 +228,7 @@ Supported airports with full ADS-B correlation out of the box:
 |---|---|
 | Audio ingestion | ffmpeg |
 | Speech-to-text | faster-whisper (Whisper large-v2, int8) |
-| Compliance AI | Google Gemini Flash |
+| Phraseology AI | Google Gemini Flash |
 | Backend | Python / FastAPI / SQLAlchemy (async) |
 | Database | PostgreSQL 16 |
 | ADS-B data | OpenSky Network (free, anonymous) |
