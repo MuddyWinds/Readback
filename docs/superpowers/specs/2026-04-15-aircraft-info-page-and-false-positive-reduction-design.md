@@ -1,30 +1,35 @@
 # Aircraft Info Page + False-Positive Reduction — Design Spec
 
+> **Vocabulary note (2026-05-18):** This spec predates the Readback reframe.
+> Terminology here follows `2026-05-18-readback-reframe-design.md`, which is the
+> source of truth for naming. "Compliance"/"violation" wording below has been
+> updated to "phraseology"/"phraseology note"/"situational event" accordingly.
+
 **Date:** 2026-04-15
 **Status:** Approved for planning
-**Scope:** Two linked problems — reducing compliance false positives from ATC shorthand misclassification, and adding a third page (Aircraft Info) with rich visuals, scoped chatbot, and linked incident context.
+**Scope:** Two linked problems — reducing phraseology false positives from ATC shorthand misclassification, and adding a third page (Aircraft Info) with rich visuals, scoped chatbot, and linked incident context.
 
 ---
 
 ## 1. Problem Statement
 
-The ATC Compliance Monitor currently produces a high rate of false-positive violations because Gemini Flash, the compliance analyzer, cannot reliably disambiguate ATC shorthand. Example: "two five zero" can mean FL250, heading 250, or 2,500 ft depending on flight phase, current altitude, and assigned clearance — the analyzer sees only the raw transcript with no grounding. Numeric sequences like "1250 14 7" (a valid wind call of 250°/14G07) are misread as altitudes or headings.
+Readback currently produces a high rate of false-positive phraseology notes / situational events because Gemini Flash, the phraseology analyzer, cannot reliably disambiguate ATC shorthand. Example: "two five zero" can mean FL250, heading 250, or 2,500 ft depending on flight phase, current altitude, and assigned clearance — the analyzer sees only the raw transcript with no grounding. Numeric sequences like "1250 14 7" (a valid wind call of 250°/14G07) are misread as altitudes or headings.
 
-Simultaneously, the app needs a third page showing per-aircraft forensic detail: a toggled interior/exterior visual, airline-specific configuration data, linked incidents that escalate on active violations, and a scoped conversational interface for querying the aircraft, its situation, and correlated historical incidents.
+Simultaneously, the app needs a third page showing per-aircraft forensic detail: a toggled interior/exterior visual, airline-specific configuration data, linked incidents that escalate on active observations, and a scoped conversational interface for querying the aircraft, its situation, and correlated historical incidents.
 
 These two problems share a common root cause: the system has no unified, live, per-aircraft context object. The fix for both is the same data spine.
 
 ## 2. Goals
 
-1. Reduce false-positive rate on compliance violations by grounding the LLM in deterministic parses and live aircraft state.
+1. Reduce false-positive rate on phraseology observations by grounding the LLM in deterministic parses and live aircraft state.
 2. Add an Aircraft Info page (`/aircraft/:callsign`) reachable from the Monitoring page.
 3. Provide a scoped chatbot capable of deep-searching historical incidents across NTSB, ASRS, and the app's own DB.
-4. Establish a lightweight feedback loop (user disputes → few-shot injection) that improves the analyzer over time without ML infrastructure.
+4. Establish a lightweight feedback loop (user feedback → few-shot injection) that improves the analyzer over time without ML infrastructure.
 
 ## 3. Non-Goals (v1)
 
 - True 3D (Three.js) aircraft models — deferred; v1 uses 2.5D SVG schematics.
-- Fine-tuning the analyzer model — disputed examples feed few-shot injection; fine-tuning is a future option.
+- Fine-tuning the analyzer model — feedback examples feed few-shot injection; fine-tuning is a future option.
 - Cross-corpus deduplication in the incident database.
 - Real-time ASRS scraping — monthly refresh only.
 - Generative summaries across retrieved incidents in the chatbot.
@@ -39,24 +44,24 @@ The design introduces the **Aircraft Context Object (ACO)** — a live, per-call
           │   live, per-callsign, ~10s refresh              │
           │                                                 │
           │  identity · state · clearance · transmissions   │
-          │  violations · fleet cfg · maintenance           │
+          │  observations · fleet cfg · maintenance         │
           └──────────────┬──────────────────────────────────┘
                          │
        ┌─────────────────┼──────────────────┐
        ▼                 ▼                  ▼
-  ┌─────────┐      ┌──────────┐      ┌──────────────┐
-  │Compliance│     │Aircraft  │      │Chatbot       │
-  │Analyzer  │     │Info Page │      │(γ hybrid:    │
-  │(A+B+D)   │     │(visual + │      │ tools + RAG) │
-  │          │     │ details) │      │              │
-  └─────────┘      └──────────┘      └──────────────┘
+  ┌─────────────┐   ┌──────────┐      ┌──────────────┐
+  │Phraseology  │   │Aircraft  │      │Chatbot       │
+  │Analyzer     │   │Info Page │      │(γ hybrid:    │
+  │(A+B+D)      │   │(visual + │      │ tools + RAG) │
+  │             │   │ details) │      │              │
+  └─────────────┘   └──────────┘      └──────────────┘
 ```
 
 High-leverage shifts:
 
 1. **ADS-B becomes a continuous stream writing into the ACO** (not a correlation-at-analysis-time afterthought).
-2. **A deterministic normalizer sits in front of the compliance path AND the transcript display.** Every transcript is structured-tagged before the LLM sees it, and before the frontend displays it.
-3. **Disputed violations become a first-class DB table**, fed into the Gemini prompt as few-shot examples. No ML infrastructure required.
+2. **A deterministic normalizer sits in front of the phraseology path AND the transcript display.** Every transcript is structured-tagged before the LLM sees it, and before the frontend displays it.
+3. **Feedback examples become a first-class DB table**, fed into the Gemini prompt as few-shot examples. No ML infrastructure required.
 
 New backend modules: `backend/context/`, `backend/parsers/`, `backend/corpus/`, `backend/chat/`. New API namespace: `/api/aircraft/{callsign}`. New WebSocket topic: `/ws/aircraft/{callsign}`. Two new frontend surfaces: `AircraftPage` and `ChatFab`.
 
@@ -98,9 +103,9 @@ class AircraftContext:
     # Transmissions (ring buffer, last 20)
     transmissions: list[NormalizedTurn]
 
-    # Compliance
-    active_violations: list[Violation]
-    historical_violations: list[Violation]  # past 30 days, this callsign
+    # Phraseology
+    active_observations: list[Observation]
+    historical_observations: list[Observation]  # past 30 days, this callsign
 
     # Context
     airport_icao: str
@@ -112,7 +117,7 @@ class AircraftContext:
 **Lifecycle:**
 
 - **Create:** when a callsign first appears in either a transcript OR ADS-B traffic for a monitored airport.
-- **Refresh:** 10s loop for ADS-B state; on every transcript for transmissions; on every Gemini result for violations.
+- **Refresh:** 10s loop for ADS-B state; on every transcript for transmissions; on every Gemini result for observations.
 - **Evict:** 30 min after last sighting — in-memory record dropped.
 - **Persist:** continuously mirrored to SQLite (`aircraft_sessions` table) so the Aircraft Info page can read history after eviction.
 
@@ -153,13 +158,13 @@ A deterministic regex + grammar parser that converts raw transcripts to structur
 
 **Out of scope for v1:** intent parsing, readback matching, semantic reasoning — all handled by Gemini downstream.
 
-**Ambiguity handling:** when two parses are possible ("two five zero" could be FL250 or 2500 ft or heading 250), the normalizer emits **all valid parses** as candidates. The compliance analyzer picks based on ACO state.
+**Ambiguity handling:** when two parses are possible ("two five zero" could be FL250 or 2500 ft or heading 250), the normalizer emits **all valid parses** as candidates. The phraseology analyzer picks based on ACO state.
 
-**Dual-use:** the same normalized tokens are sent to the frontend for the Recent Transmissions section, where hovering a token shows the parse (`FL250 · conf 0.92`). Right-click → dispute writes a row to the disputed-examples table.
+**Dual-use:** the same normalized tokens are sent to the frontend for the Recent Transmissions section, where hovering a token shows the parse (`FL250 · conf 0.92`). Right-click → feedback writes a row to the feedback-examples table.
 
-## 7. Compliance Pipeline Upgrade
+## 7. Phraseology Pipeline Upgrade
 
-**Modified file:** `backend/analysis/compliance.py`
+**Modified file:** `backend/analysis/phraseology.py`
 
 The existing `run_batcher()` orchestrator in `backend/core/batcher.py` stays. The payload per transcript is expanded:
 
@@ -192,21 +197,21 @@ The existing `run_batcher()` orchestrator in `backend/core/batcher.py` stays. Th
 
 1. **Input structure** — explains the three new inputs and tells the model to trust the normalizer over its own interpretation of ambiguous digits.
 2. **ACO trust rule** — when the normalizer marks a token ambiguous, pick the candidate consistent with `aircraft_context`.
-3. **Few-shot block** — "Previously disputed violations" section, populated dynamically.
+3. **Few-shot block** — "Previously flagged observations" section, populated dynamically.
 
 The existing prompt body (Reasonable Controller Test, mandatory read-back list, severity ladder) is kept verbatim.
 
-**DisputedExample table:**
+**FeedbackExample table:**
 
 ```sql
-CREATE TABLE disputed_examples (
+CREATE TABLE feedback_examples (
   id INTEGER PRIMARY KEY,
   transcript TEXT NOT NULL,
   normalized_json TEXT NOT NULL,
   original_verdict TEXT NOT NULL,
   user_reason TEXT,
   created_at DATETIME NOT NULL,
-  status TEXT DEFAULT 'disputed',   -- 'disputed' | 'confirmed_fp' | 'reviewed_true_positive'
+  status TEXT DEFAULT 'feedback',   -- 'feedback' | 'confirmed_fp' | 'reviewed_true_positive'
   airport TEXT,
   aircraft_type TEXT
 );
@@ -214,25 +219,25 @@ CREATE TABLE disputed_examples (
 
 **Few-shot selector (`backend/analysis/few_shot.py`):**
 
-- Selects 10 most recent `disputed` / `confirmed_fp` rows.
-- Ranks by (a) same airport, (b) same aircraft type, (c) same violation_type.
+- Selects 10 most recent `feedback` / `confirmed_fp` rows.
+- Ranks by (a) same airport, (b) same aircraft type, (c) same observation_type.
 - Budget: ~2,000 tokens; truncate if exceeded.
-- Cached per batch; invalidated on new dispute.
+- Cached per batch; invalidated on new feedback submission.
 
-**Frontend dispute flow:**
+**Frontend feedback flow:**
 
-- Every `ViolationCard` gains a small `👎 False positive` button with optional one-line reason field.
-- `POST /api/violations/{id}/dispute` writes a row.
+- Every `PhraseologyNoteCard / EventCard` gains a small `👎 False positive` button with optional one-line reason field.
+- `POST /api/observations/{id}/feedback` writes a row.
 - Immediate UI feedback; next batch picks up the new few-shot row.
 
 **Structural gate (synchronous post-LLM validator):**
 
-Before returning violations to the frontend:
+Before returning observations to the frontend:
 
-- If `violation_type == "Read-back Error"` but `pilot_readback is null` → drop (one-sided recording hallucination).
-- If `violation_type == "Altitude Deviation"` but no `altitude` token in `normalized` → drop.
+- If `observation_type == "Read-back Error"` but `pilot_readback is null` → drop (one-sided recording hallucination).
+- If `observation_type == "Altitude Deviation"` but no `altitude` token in `normalized` → drop.
 - If `safety_pathway` < 30 chars or matches filler patterns ("could cause confusion", "may result in issues") → drop.
-- Dropped violations logged to a `gate_rejections` table for observability.
+- Dropped observations logged to a `gate_rejections` table for observability.
 
 ## 8. Aircraft Info Page (Frontend)
 
@@ -270,7 +275,7 @@ Before returning violations to the frontend:
 - **Interior view:** 2.5D SVG schematic (Path 2). SVG files live in `frontend/public/aircraft-svg/{type}__{airline}.svg`. Named groups: `#engine-1`, `#engine-2`, `#hydraulic-system-a`, `#hydraulic-system-b`, `#gear-nose`, `#gear-main-l`, `#gear-main-r`, `#elec-main-bus`, `#apu`, `#cabin-fwd-galley`, etc.
 - **Interaction:** pan/zoom via CSS transforms; click a group → tooltip with sub-system name. `[3D view — coming soon]` badge acknowledges the future Three.js upgrade without blocking v1.
 - **View selector:** 4 pre-rendered angles (front, side, top, cutaway) crossfaded to fake rotation.
-- **Violation linkage:** an active violation with `affected_systems: ["hydraulic-system-a"]` gives the corresponding `<g>` a red pulsing stroke + faint red fill. Hover shows the violation summary; click scrolls to Incidents section.
+- **Phraseology note linkage:** an active observation with `affected_systems: ["hydraulic-system-a"]` gives the corresponding `<g>` a red pulsing stroke + faint red fill. Hover shows the observation summary; click scrolls to Incidents section.
 
 **Details panel — collapsible accordion sections:**
 
@@ -282,15 +287,15 @@ Default order (normal state):
 4. Maintenance (collapsed)
 5. Incidents (collapsed, count badge)
 
-**Active-violation reconfiguration (Framing Y with aggressive X-escalation):**
+**Active-observation reconfiguration (Framing Y with aggressive X-escalation):**
 
 - Incidents section animates to position 1, auto-expands, header tinted by severity.
-- Top-of-column banner: `⚠ Active violation: Altitude Deviation (high) — 14s ago`.
+- Top-of-column banner: `⚠ Active phraseology note: Altitude Deviation (high) — 14s ago`.
 - SVG affected region flashes 3s then settles into persistent red outline.
-- Chatbot FAB pulses red with badge `💬 1` and a violation-specific suggested prompt is queued (e.g. *"Explain what happened with UAL237 and what regulation applies."*).
+- Chatbot FAB pulses red with badge `💬 1` and an observation-specific suggested prompt is queued (e.g. *"Explain what happened with UAL237 and what regulation applies."*).
 - Auto-scroll places the affected visual region in view *only if* the user hasn't interacted in the last 3s.
 
-**Incidents section rendering:** each violation is an expandable card with type, severity, timestamp, ATC instruction, pilot readback, safety pathway, regulation cite, and below the body a **"Similar incidents"** list of the top 3 correlation results (built in §10), each linking to NTSB/ASRS source or internal history. Dispute button on every card.
+**Incidents section rendering:** each observation is an expandable card with type, severity, timestamp, ATC instruction, pilot readback, safety pathway, regulation cite, and below the body a **"Similar incidents"** list of the top 3 correlation results (built in §10), each linking to NTSB/ASRS source or internal history. Feedback button on every card.
 
 **Chatbot FAB (`ChatFab.tsx`):** fixed bottom-right, 56px icon; expands into a 380×560 panel anchored bottom-right on desktop, full-width bottom sheet (`height: 75vh`) on mobile. Keyboard shortcut `⌘K` to open. Scoped to current callsign.
 
@@ -304,7 +309,7 @@ Default order (normal state):
 - Details sections: single column <768px, two columns 768–1200px, three columns >1200px for dense sections.
 - Existing pages audited against new breakpoint tokens in Phase 3.
 
-**State management:** one `violationState` React context drives escalation. `useAircraftContext(callsign)` hook subscribes to `/ws/aircraft/{callsign}` and returns a live ACO.
+**State management:** one `observationState` React context drives escalation. `useAircraftContext(callsign)` hook subscribes to `/ws/aircraft/{callsign}` and returns a live ACO.
 
 **New components:**
 
@@ -342,10 +347,10 @@ backend/chat/
 |---|---|---|
 | `get_aircraft_state(callsign)` | ACO | live position, phase, clearance |
 | `get_recent_transmissions(callsign, n=20)` | ACO | normalized turns |
-| `get_violations(callsign, include_historical=False)` | ACO + DB | current + past violations |
+| `get_observations(callsign, include_historical=False)` | ACO + DB | current + past observations |
 | `get_fleet_config(airline, type)` | YAML | airline-specific variant |
-| `search_incidents(query, aircraft_type?, violation_type?, limit=10)` | Corpus | semantic search across NTSB+ASRS+OWN |
-| `deep_correlate(violation_id, max_results=5)` | Corpus | multi-feature correlation |
+| `search_incidents(query, aircraft_type?, observation_type?, limit=10)` | Corpus | semantic search across NTSB+ASRS+OWN |
+| `deep_correlate(observation_id, max_results=5)` | Corpus | multi-feature correlation |
 | `lookup_regulation(section_or_keyword)` | Local reg corpus | FAR, AIM, ICAO Doc 4444 chunks |
 | `get_aircraft_type_facts(type, topic)` | Static JSON | specs, V-speeds, systems overview |
 
@@ -391,7 +396,7 @@ class IncidentRecord:
     location: str | None
     summary: str             # 1–2 sentences
     narrative: str           # full text
-    tags: list[str]          # normalized — match violation taxonomy
+    tags: list[str]          # normalized — match observation taxonomy
     severity: str | None
     url: str | None
     embedding: list[float] | None
@@ -399,9 +404,9 @@ class IncidentRecord:
 
 **Ingestion pipelines (`backend/corpus/ingest_{ntsb,asrs,own_db}.py`):**
 
-1. **NTSB:** downloads public NTSB Aviation Accident DB dumps; filters to aviation; field-mapped to `IncidentRecord`; narrative passed through a Gemini Flash tag extractor to produce normalized tags matching the violation taxonomy; embedded; written to Chroma. Monthly refresh via scheduled task. ~20k filtered records.
+1. **NTSB:** downloads public NTSB Aviation Accident DB dumps; filters to aviation; field-mapped to `IncidentRecord`; narrative passed through a Gemini Flash tag extractor to produce normalized tags matching the observation taxonomy; embedded; written to Chroma. Monthly refresh via scheduled task. ~20k filtered records.
 2. **ASRS:** NASA ASRS CSV quarterly dumps; filtered to "ATC Communications" category; same pipeline. ~15k filtered.
-3. **OWN:** reads existing `Violation` rows from `atcmonitor.db`; trigger fires on every new confirmed violation to embed + add to corpus in real-time; tags come directly from HFACS classification.
+3. **OWN:** reads existing `Observation` rows from `atcmonitor.db`; trigger fires on every new confirmed observation to embed + add to corpus in real-time; tags come directly from HFACS classification.
 
 **Vector store:** Chroma, file-backed, co-located with `atcmonitor.db`. ~500 MB disk budget.
 
@@ -410,16 +415,16 @@ class IncidentRecord:
 **Deep correlation (`deep_correlate`):**
 
 ```python
-def deep_correlate(v: Violation) -> list[ScoredIncident]:
+def deep_correlate(v: Observation) -> list[ScoredIncident]:
     # 1. Vector search over description + safety_pathway
     candidates = vectorstore.search(v.description + " " + v.safety_pathway, k=50)
     # 2. Re-rank by feature overlap
     for c in candidates:
         score = 0.0
-        if c.aircraft_type == v.aircraft_type:    score += 0.25
-        if c.phase == v.flight_phase:              score += 0.20
-        if any(t in c.tags for t in v.tags):       score += 0.20
-        if c.violation_type == v.violation_type:   score += 0.15
+        if c.aircraft_type == v.aircraft_type:       score += 0.25
+        if c.phase == v.flight_phase:                score += 0.20
+        if any(t in c.tags for t in v.tags):         score += 0.20
+        if c.observation_type == v.observation_type: score += 0.15
         score += 0.20 * c.semantic_similarity
         c.final_score = score
     return top_n(candidates, 5)
@@ -431,10 +436,10 @@ This is used both by the `deep_correlate` chat tool and by the Incidents section
 
 1. ADS-B poll loop → ACO.state update.
 2. Audio chunk → faster-whisper → transcript string → normalizer → NormalizedTurn → ACO.transmissions (ring buffer) + `transcript_queue` for batcher.
-3. `run_batcher()` flush (every 240s) → build per-transcript payload (raw + normalized + ACO snapshot + airport context) → prepend few-shot block → Gemini batch call → parse response → structural gate → persist violations → update ACO.active_violations → push to `/ws/aircraft/{callsign}` and `/ws/live`.
+3. `run_batcher()` flush (every 240s) → build per-transcript payload (raw + normalized + ACO snapshot + airport context) → prepend few-shot block → Gemini batch call → parse response → structural gate → persist observations → update ACO.active_observations → push to `/ws/aircraft/{callsign}` and `/ws/live`.
 4. User clicks aircraft on Monitoring → `/aircraft/:callsign` → `useAircraftContext(callsign)` subscribes → page renders from live ACO.
-5. New violation received over WS → `violationState` context updates → layout reconfigures, SVG group highlights, ChatFab pulses.
-6. User disputes a violation → `POST /api/violations/{id}/dispute` → row added to `disputed_examples` → next batch picks it up as few-shot.
+5. New observation received over WS → `observationState` context updates → layout reconfigures, SVG group highlights, ChatFab pulses.
+6. User submits feedback on an observation → `POST /api/observations/{id}/feedback` → row added to `feedback_examples` → next batch picks it up as few-shot.
 7. User opens chatbot, asks question → scope classifier → orchestrator → tool loop → response streamed back.
 
 ## 12. Rollout Phases
@@ -442,14 +447,14 @@ This is used both by the `deep_correlate` chat tool and by the Incidents section
 | Phase | Weeks | Deliverable | De-risks |
 |---|---|---|---|
 | 1. ACO + Normalizer | 1–2 | Working parser, ACO in-memory + persistence, `/api/aircraft/{callsign}` GET | Normalizer quality on real corpus |
-| 2. Compliance upgrade | 3 | New prompt, dispute flow, structural gate, few-shot selector | False-positive reduction measurable before building any page |
+| 2. Phraseology upgrade | 3 | New prompt, feedback flow, structural gate, few-shot selector | False-positive reduction measurable before building any page |
 | 3. Aircraft page skeleton | 4–5 | Route, layout, sections, WebSocket hook, no SVG/chatbot yet | Y-with-X escalation validated before expensive visuals |
 | 4. SVG library + visual linkage | 6–7 | 3 aircraft types × 4 views, `affected_systems` wiring | Scalability of LLM system-tagging |
 | 5. Corpus + deep_correlate | 8–9 | NTSB + ASRS + OWN ingestion, "Similar incidents" in Incidents section | Corpus quality before chatbot depends on it |
 | 6. Chatbot γ | 10–11 | Scope guard, orchestrator, tool set, FAB wired | — |
 | 7. Polish | 12 | Performance audit, 3 more aircraft types, cross-page responsive audit | — |
 
-**Checkpoint after Phase 2:** run new pipeline against the last 2 weeks of existing transcripts. Compare violation count and quality. If not measurably better, stop and diagnose before continuing.
+**Checkpoint after Phase 2:** run new pipeline against the last 2 weeks of existing transcripts. Compare observation count and quality. If not measurably better, stop and diagnose before continuing.
 
 ## 13. Risks
 
@@ -467,7 +472,7 @@ This is used both by the `deep_correlate` chat tool and by the Incidents section
 
 **Biggest single risk:** the normalizer. Phase 1 is deliberately standalone so normalizer failure is caught before anything depends on it.
 
-**Biggest single dependency:** user keeps disputing false positives in real use. Without human labels flowing, few-shot stays empty and the learning loop never activates — which is why the dispute button is one click with optional reason, not a modal.
+**Biggest single dependency:** user keeps submitting feedback on false positives in real use. Without human labels flowing, few-shot stays empty and the learning loop never activates — which is why the feedback button is one click with optional reason, not a modal.
 
 ## 14. Open Questions for Implementation
 
