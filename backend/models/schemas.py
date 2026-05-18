@@ -11,7 +11,12 @@ class HFACSLevel1(str, Enum):
     ORGANIZATIONAL = "Organizational Influence"
 
 
-class ViolationType(str, Enum):
+class ObservationKind(str, Enum):
+    PHRASEOLOGY_NOTE = "phraseology_note"
+    SITUATIONAL_EVENT = "situational_event"
+
+
+class NoteType(str, Enum):
     RUNWAY_INCURSION = "Runway Incursion"
     RUNWAY_EXCURSION = "Runway Excursion"
     ALTITUDE_DEVIATION = "Altitude Deviation"
@@ -27,19 +32,38 @@ class ViolationType(str, Enum):
     OTHER = "Other"
 
 
-class SeverityLevel(str, Enum):
+# Maps each note_type to its observation kind (spec §4).
+KIND_BY_NOTE_TYPE: dict[str, ObservationKind] = {
+    "Read-back Error":          ObservationKind.PHRASEOLOGY_NOTE,
+    "Frequency/Channel Error":  ObservationKind.PHRASEOLOGY_NOTE,
+    "Communication Failure":    ObservationKind.PHRASEOLOGY_NOTE,
+    "Navigation Error":         ObservationKind.PHRASEOLOGY_NOTE,
+    "Other":                    ObservationKind.PHRASEOLOGY_NOTE,
+    "Runway Incursion":         ObservationKind.SITUATIONAL_EVENT,
+    "Runway Excursion":         ObservationKind.SITUATIONAL_EVENT,
+    "Altitude Deviation":       ObservationKind.SITUATIONAL_EVENT,
+    "Speed Deviation":          ObservationKind.SITUATIONAL_EVENT,
+    "CFIT Risk":                ObservationKind.SITUATIONAL_EVENT,
+    "TCAS Non-compliance":      ObservationKind.SITUATIONAL_EVENT,
+    "Go-around Non-compliance": ObservationKind.SITUATIONAL_EVENT,
+    "Fuel Mismanagement":       ObservationKind.SITUATIONAL_EVENT,
+}
+
+
+class SignificanceLevel(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
 
 
-class Violation(BaseModel):
-    violation_type: ViolationType
+class Observation(BaseModel):
+    kind: ObservationKind
+    note_type: NoteType
     hfacs_level: HFACSLevel1
-    severity: SeverityLevel
+    significance: SignificanceLevel
     description: str
-    safety_pathway: Optional[str] = None   # new: specific accident chain
+    safety_pathway: Optional[str] = None   # teaching explanation: why this phraseology matters
     relevant_regulation: Optional[str] = None
     transcript_excerpt: Optional[str] = None
 
@@ -60,8 +84,8 @@ class AnalysisResult(BaseModel):
     transcript: str
     assessable: bool = True               # False = transcript too degraded
     assessable_confidence: float = 1.0    # STT/Gemini quality confidence
-    is_compliant: bool
-    violations: list[Violation]
+    is_standard: bool                     # met standard phraseology
+    observations: list[Observation]
     summary: str
     confidence_score: float  # 0.0 - 1.0
     enrichment: Optional[dict] = None     # speaker_segments, readback comparison, callsign clarity
