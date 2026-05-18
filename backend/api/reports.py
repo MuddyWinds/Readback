@@ -1,4 +1,4 @@
-"""Aircraft-level Gemini safety report, aggregating all transmissions for a callsign."""
+"""Aircraft-level Gemini study sheet, aggregating all transmissions for a callsign."""
 
 import re
 
@@ -9,7 +9,7 @@ from fastapi import Depends
 
 from backend.db.database import get_db
 from backend.db.models import AnalysisResultDB
-from backend.analysis.compliance import generate_aircraft_report
+from backend.analysis.phraseology import generate_study_sheet
 
 router = APIRouter()
 
@@ -21,8 +21,8 @@ def _extract_callsign(text: str) -> str | None:
     return m.group(1) if m else None
 
 
-@router.get("/api/report/{result_id}")
-async def get_aircraft_report(result_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/api/study-sheet/{result_id}")
+async def get_study_sheet(result_id: int, db: AsyncSession = Depends(get_db)):
     row = await db.get(AnalysisResultDB, result_id)
     if not row:
         return {"error": "Result not found"}
@@ -41,10 +41,10 @@ async def get_aircraft_report(result_id: int, db: AsyncSession = Depends(get_db)
             "timestamp": r.timestamp.isoformat(),
             "airport_code": r.airport_code,
             "transcript": r.transcript,
-            "is_compliant": r.is_compliant,
+            "is_standard": r.is_standard,
             "summary": r.summary,
         }
         for r in related
     ]
-    report = await generate_aircraft_report(callsign, threads)
-    return {"callsign": callsign, "thread_count": len(threads), "report": report}
+    study_sheet = await generate_study_sheet(callsign, threads)
+    return {"callsign": callsign, "transmission_count": len(threads), "study_sheet": study_sheet}

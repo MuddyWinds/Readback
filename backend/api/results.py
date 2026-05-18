@@ -10,11 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.database import get_db
 from backend.db.models import AnalysisResultDB
 from backend.analysis.categorizer import build_stats
-from backend.models.schemas import AnalysisResult, Violation
+from backend.models.schemas import AnalysisResult, Observation
 
 router = APIRouter()
 
-_VALID_STATUSES = {"new", "under_review", "confirmed", "false_positive", "escalated"}
+_VALID_STATUSES = {"new", "under_review", "confirmed", "false_positive"}
 
 
 def _row_to_dict(r: AnalysisResultDB) -> dict:
@@ -25,13 +25,13 @@ def _row_to_dict(r: AnalysisResultDB) -> dict:
         "transcript": r.transcript,
         "assessable": r.assessable if r.assessable is not None else True,
         "assessable_confidence": r.assessable_confidence or 1.0,
-        "is_compliant": r.is_compliant,
-        "violations": r.violations,
+        "is_standard": r.is_standard,
+        "observations": r.observations,
         "summary": r.summary,
         "confidence_score": r.confidence_score,
         "enrichment": r.enrichment,
         "status": r.status or "new",
-        "officer_notes": r.officer_notes,
+        "reviewer_notes": r.reviewer_notes,
     }
 
 
@@ -55,7 +55,7 @@ async def get_results(
 
 class ResultUpdate(BaseModel):
     status: str | None = None
-    officer_notes: str | None = None
+    reviewer_notes: str | None = None
 
 
 @router.patch("/api/results/{result_id}")
@@ -71,8 +71,8 @@ async def update_result(
         if update.status not in _VALID_STATUSES:
             raise HTTPException(status_code=400, detail=f"Invalid status: {update.status}")
         row.status = update.status
-    if update.officer_notes is not None:
-        row.officer_notes = update.officer_notes
+    if update.reviewer_notes is not None:
+        row.reviewer_notes = update.reviewer_notes
     await db.commit()
     return {"ok": True, "id": result_id}
 
@@ -95,8 +95,8 @@ async def get_stats(
             timestamp=r.timestamp,
             airport_code=r.airport_code,
             transcript=r.transcript,
-            is_compliant=r.is_compliant,
-            violations=[Violation(**v) for v in (r.violations or [])],
+            is_standard=r.is_standard,
+            observations=[Observation(**v) for v in (r.observations or [])],
             summary=r.summary,
             confidence_score=r.confidence_score,
         )

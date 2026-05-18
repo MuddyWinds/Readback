@@ -1,5 +1,5 @@
 """
-ATC Compliance Monitor — application entry point.
+Readback — application entry point.
 
 This file is intentionally thin: it wires together the FastAPI app,
 registers routers, and starts background workers via the lifespan hook.
@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     batcher.cancel()
 
 
-app = FastAPI(title="ATC Compliance Monitor", lifespan=lifespan)
+app = FastAPI(title="Readback", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
