@@ -13,12 +13,12 @@ interface Stats {
   total_chunks_analyzed: number;
   assessable_chunks: number;
   unassessable_chunks: number;
-  non_compliant_chunks: number;
-  compliance_rate: number | null;
+  non_standard_chunks: number;
+  conformance_rate: number | null;
   severity_breakdown: Record<string, number>;
-  airport_compliance: Record<string, number | null>;
+  airport_conformance: Record<string, number | null>;
   airport_risk_matrix: Record<string, AirportRow>;
-  violation_type_details: Record<string, ViolationDetail>;
+  note_type_details: Record<string, ViolationDetail>;
 }
 
 // ── Expert knowledge — hardcoded per violation type ───────────────────────────
@@ -313,7 +313,7 @@ function ViolationIntelCard({
             </div>
             {divergent.length > 0 && (
               <p style={{ fontSize: 11, color: "#e3b341", margin: 0, lineHeight: 1.6 }}>
-                This session shows violations at <strong>{divergent.join(", ")}</strong> level — atypical for this violation type. This may indicate a systemic or organisational contributor beyond individual crew error.
+                This session shows observations at <strong>{divergent.join(", ")}</strong> level — atypical for this observation type. This may indicate a systemic or organisational contributor beyond individual crew error.
               </p>
             )}
           </div>
@@ -463,10 +463,10 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
     return map;
   }, [results]);
 
-  // Sorted violation types by risk score
+  // Sorted observation types by risk score
   const sortedViolations = useMemo(() => {
     if (!stats) return [];
-    return Object.entries(stats.violation_type_details)
+    return Object.entries(stats.note_type_details)
       .map(([type, d]) => ({
         type, ...d,
         score: (d.critical * 5 + d.high * 3 + d.medium * 2 + d.low) * (VIOLATION_INTEL[type]?.risk_weight ?? 1),
@@ -478,7 +478,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
   const sortedAirports = useMemo(() => {
     if (!stats) return [];
     return Object.entries(stats.airport_risk_matrix)
-      .map(([code, row]) => ({ code, row, rate: stats.airport_compliance[code] ?? 100, score: riskScore(row) }))
+      .map(([code, row]) => ({ code, row, rate: stats.airport_conformance[code] ?? 100, score: riskScore(row) }))
       .sort((a, b) => b.score - a.score);
   }, [stats]);
 
@@ -527,13 +527,13 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
   // Session status
   const statusInfo = (() => {
     if (!stats) return { label: "—", color: "#484f58", message: "" };
-    const cr = stats.compliance_rate;
+    const cr = stats.conformance_rate;
     if (cr === null) return { label: "NO DATA", color: "#484f58", message: "No assessable transmissions yet" };
     const ch = criticalHighCount;
-    if (ch > 3 || cr < 75) return { label: "CRITICAL", color: "#ff4444", message: `${ch} high-priority violations require immediate escalation` };
-    if (ch > 0 || cr < 90) return { label: "ELEVATED RISK", color: "#ff8800", message: `${ch} high-priority violation${ch !== 1 ? "s" : ""} detected — formal documentation required` };
+    if (ch > 3 || cr < 75) return { label: "CRITICAL", color: "#ff4444", message: `${ch} high-priority observations require immediate escalation` };
+    if (ch > 0 || cr < 90) return { label: "ELEVATED RISK", color: "#ff8800", message: `${ch} high-priority observation${ch !== 1 ? "s" : ""} detected — formal documentation required` };
     if (cr < 95) return { label: "NOMINAL", color: "#e3b341", message: "Minor deviations detected — continue monitoring" };
-    return { label: "CLEAR", color: "#3fb950", message: "No significant violations in current session" };
+    return { label: "CLEAR", color: "#3fb950", message: "No significant observations in current session" };
   })();
 
   // ── 24-hour activity chart data ───────────────────────────────────────────
@@ -580,7 +580,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
 
       {/* ── 24h Activity Chart ── */}
       <div style={{ ...card, padding: "16px 18px" }}>
-        <div style={{ ...label, marginBottom: 14 }}>Violation Activity — Last 24 Hours</div>
+        <div style={{ ...label, marginBottom: 14 }}>Observation Activity — Last 24 Hours</div>
         <ResponsiveContainer width="100%" height={160}>
           <AreaChart data={hourlyData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
             <defs>
@@ -632,34 +632,34 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
               <p style={{ fontSize: 11, color: "#8b949e", margin: 0, lineHeight: 1.6 }}>{statusInfo.message}</p>
             </div>
 
-            {/* Compliance Rate */}
+            {/* Conformance Rate */}
             <div style={{ padding: "18px 24px", flexShrink: 0, width: 240, borderRight: "1px solid #21262d" }}>
-              <div style={{ ...label, marginBottom: 8 }}>Compliance Rate</div>
-              {stats.compliance_rate === null ? (
+              <div style={{ ...label, marginBottom: 8 }}>Conformance Rate</div>
+              {stats.conformance_rate === null ? (
                 <div style={{ fontSize: 13, color: "#484f58", fontStyle: "italic" }}>No assessable data yet</div>
               ) : (
                 <>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
                     <span style={{
                       fontSize: 36, fontWeight: 700, lineHeight: 1,
-                      color: stats.compliance_rate >= 90 ? "#3fb950" : stats.compliance_rate >= 75 ? "#e3b341" : "#ff4444",
+                      color: stats.conformance_rate >= 90 ? "#3fb950" : stats.conformance_rate >= 75 ? "#e3b341" : "#ff4444",
                     }}>
-                      {stats.compliance_rate}%
+                      {stats.conformance_rate}%
                     </span>
                     <span style={{ fontSize: 11, color: "#484f58" }}>target 90%</span>
                   </div>
                   <div style={{ position: "relative", marginBottom: 8 }}>
                     <div style={{ background: "#21262d", borderRadius: 3, height: 7 }}>
                       <div style={{
-                        width: `${Math.min(stats.compliance_rate, 100)}%`,
-                        background: stats.compliance_rate >= 90 ? "#3fb950" : stats.compliance_rate >= 75 ? "#e3b341" : "#ff4444",
+                        width: `${Math.min(stats.conformance_rate, 100)}%`,
+                        background: stats.conformance_rate >= 90 ? "#3fb950" : stats.conformance_rate >= 75 ? "#e3b341" : "#ff4444",
                         height: "100%", borderRadius: 3,
                       }} />
                     </div>
                     <div style={{ position: "absolute", left: "90%", top: -3, width: 2, height: 13, background: "#484f58", borderRadius: 1 }} />
                   </div>
                   <div style={{ fontSize: 11, color: "#484f58" }}>
-                    {stats.non_compliant_chunks} violations / {stats.assessable_chunks ?? stats.total_chunks_analyzed} assessable tx
+                    {stats.non_standard_chunks} non-standard / {stats.assessable_chunks ?? stats.total_chunks_analyzed} assessable tx
                   </div>
                   {(stats.unassessable_chunks ?? 0) > 0 && (
                     <div style={{ fontSize: 11, color: "#3a3f47", marginTop: 4 }}>
@@ -670,9 +670,9 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
               )}
             </div>
 
-            {/* Violation breakdown */}
+            {/* Observation breakdown */}
             <div style={{ padding: "18px 20px", flex: 1 }}>
-              <div style={{ ...label, marginBottom: 10 }}>Violation Breakdown</div>
+              <div style={{ ...label, marginBottom: 10 }}>Observation Breakdown</div>
               <div style={{ display: "flex", height: 10, borderRadius: 4, overflow: "hidden", gap: 1, marginBottom: 12 }}>
                 {SEVERITIES.filter(s => (stats.severity_breakdown[s] ?? 0) > 0).map(s => {
                   const total = SEVERITIES.reduce((a, sv) => a + (stats.severity_breakdown[sv] ?? 0), 0);
@@ -755,7 +755,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                   )}
                 </>
               ) : (
-                <p style={{ fontSize: 12, color: "#484f58", margin: 0 }}>No violations recorded</p>
+                <p style={{ fontSize: 12, color: "#484f58", margin: 0 }}>No observations recorded</p>
               )}
             </div>
 
@@ -771,7 +771,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                       <span style={{ fontSize: 13, fontFamily: "monospace", color: "#e6edf3", fontWeight: 700 }}>{a.code}</span>
                       <div style={{ textAlign: "right" }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: "#ff4444" }}>{a.rate}%</span>
-                        <span style={{ fontSize: 10, color: "#484f58", marginLeft: 4 }}>compliance</span>
+                        <span style={{ fontSize: 10, color: "#484f58", marginLeft: 4 }}>conformance</span>
                       </div>
                     </div>
                   ))}
@@ -780,12 +780,12 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
             </div>
           </div>
 
-          {/* ── 2. VIOLATION INTELLIGENCE ── */}
+          {/* ── 2. OBSERVATION INTELLIGENCE ── */}
           {sortedViolations.length > 0 && (
             <div style={card}>
               <div style={{ marginBottom: 16 }}>
                 <h3 style={{ fontSize: 13, fontWeight: 700, color: "#8b949e", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 4px" }}>
-                  Violation Intelligence
+                  Observation Intelligence
                 </h3>
                 <p style={{ fontSize: 11, color: "#484f58", margin: 0 }}>
                   Sorted by weighted risk · expand each type for safety implications, causal analysis, and prevention actions
@@ -841,10 +841,10 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                   <div style={{ width: 1, alignSelf: "stretch", background: "#21262d", flexShrink: 0 }} />
                   <p style={{ fontSize: 12, color: "#c9d1d9", margin: 0, lineHeight: 1.7 }}>
                     {systemicPct === 0
-                      ? "All violations are individual-level errors. Targeted retraining and phraseology review is the primary intervention."
+                      ? "All observations are individual-level errors. Targeted retraining and phraseology review is the primary intervention."
                       : systemicPct <= 20
-                      ? `${systemicCount} violation(s) have supervisory or organisational contributors. Supplement individual retraining with supervisory review.`
-                      : `${systemicPct}% of violations originate above the individual level. Individual retraining alone will not resolve the root cause — management escalation is required.`}
+                      ? `${systemicCount} observation(s) have supervisory or organisational contributors. Supplement individual retraining with supervisory review.`
+                      : `${systemicPct}% of observations originate above the individual level. Individual retraining alone will not resolve the root cause — management escalation is required.`}
                   </p>
                 </div>
 
@@ -922,7 +922,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                 Airport Risk Profiles
               </h3>
               <p style={{ fontSize: 11, color: "#484f58", margin: "0 0 16px" }}>
-                Risk score = weighted violations per 100 transmissions (Critical ×5, High ×3, Medium ×2, Low ×1) · sorted highest risk first
+                Risk score = weighted observations per 100 transmissions (Critical ×5, High ×3, Medium ×2, Low ×1) · sorted highest risk first
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 {sortedAirports.map(({ code, row, rate, score }) => {
@@ -948,7 +948,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                         </div>
                         <div style={{ textAlign: "right" }}>
                           <div style={{ fontSize: 26, fontWeight: 700, color: rateColor, lineHeight: 1 }}>{rate}%</div>
-                          <div style={{ fontSize: 10, color: "#484f58" }}>compliance</div>
+                          <div style={{ fontSize: 10, color: "#484f58" }}>conformance</div>
                         </div>
                       </div>
 
@@ -963,13 +963,13 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                             <span style={{ fontSize: 10, color: "#484f58", marginLeft: 3 }}>{s}</span>
                           </div>
                         ))}
-                        {totalViol === 0 && <span style={{ fontSize: 12, color: "#3fb950" }}>No violations</span>}
+                        {totalViol === 0 && <span style={{ fontSize: 12, color: "#3fb950" }}>No observations</span>}
                       </div>
 
                       {/* Top violation types */}
                       {topViolations.length > 0 && (
                         <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #21262d" }}>
-                          <div style={{ ...label, marginBottom: 8 }}>Top Violations</div>
+                          <div style={{ ...label, marginBottom: 8 }}>Top Observations</div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                             {topViolations.map(([type, c]) => (
                               <div key={type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

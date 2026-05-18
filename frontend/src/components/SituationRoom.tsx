@@ -493,7 +493,7 @@ function SessionStatusStrip({
               <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1, color: compRate >= 90 ? "#3fb950" : compRate >= 75 ? "#e3b341" : "#ff4444" }}>
                 {compRate}%
               </div>
-              <div style={{ fontSize: 9, color: "#484f58", textTransform: "uppercase" as const, letterSpacing: 0.8 }}>Compliant</div>
+              <div style={{ fontSize: 9, color: "#484f58", textTransform: "uppercase" as const, letterSpacing: 0.8 }}>Standard</div>
             </div>
           )}
           {critical > 0 && (
@@ -514,7 +514,7 @@ function SessionStatusStrip({
           </div>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1, color: violations > 0 ? "#ff8800" : "#3fb950" }}>{violations}</div>
-            <div style={{ fontSize: 9, color: "#484f58", textTransform: "uppercase" as const, letterSpacing: 0.8 }}>Violations</div>
+            <div style={{ fontSize: 9, color: "#484f58", textTransform: "uppercase" as const, letterSpacing: 0.8 }}>Observations</div>
           </div>
         </div>
       )}
@@ -535,11 +535,11 @@ function SpikeAlert({ spike }: { spike: ReturnType<typeof useViolationIntelligen
       <span style={{ fontSize: 16, flexShrink: 0 }}>🔺</span>
       <div>
         <div style={{ fontSize: 10, fontWeight: 700, color: "#ff4444", letterSpacing: 1, marginBottom: 2 }}>
-          VIOLATION SPIKE DETECTED
+          OBSERVATION SPIKE DETECTED
         </div>
         <span style={{ fontSize: 11, color: "#c9d1d9" }}>
-          {spike.last30} violation{spike.last30 !== 1 ? "s" : ""} in the last 30 min —{" "}
-          {Math.round(spike.ratio)}× higher than the prior 30 min ({spike.prior30} violation{spike.prior30 !== 1 ? "s" : ""}).
+          {spike.last30} observation{spike.last30 !== 1 ? "s" : ""} in the last 30 min —{" "}
+          {Math.round(spike.ratio)}× higher than the prior 30 min ({spike.prior30} observation{spike.prior30 !== 1 ? "s" : ""}).
           Review recent transmissions immediately.
         </span>
       </div>
@@ -558,7 +558,7 @@ function EventTimeline({ results, compact = false }: { results: AnalysisResult[]
   );
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
-      {events.length === 0 && <EmptyState label="No violations yet." />}
+      {events.length === 0 && <EmptyState label="No observations yet." />}
       {events.map((r, i) => {
         const sev   = getCardSeverity(r);
         const color = SEV_COLOR[sev] ?? "#888";
@@ -658,7 +658,7 @@ function RiskMatrix({
               RISK
             </th>
             <th style={{ padding: "4px 8px 8px", color: "#484f58", fontSize: 9, fontWeight: 700, letterSpacing: 0.8, textAlign: "center" }}>
-              COMP%
+              CONF%
             </th>
           </tr>
         </thead>
@@ -791,7 +791,7 @@ function TemporalHeatmap({ results }: { results: AnalysisResult[] }) {
 
 function HFACSChart({ counts }: { counts: Record<string, number> }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  if (total === 0) return <EmptyState label="No HFACS data yet — violations required." />;
+  if (total === 0) return <EmptyState label="No HFACS data yet — observations required." />;
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   const maxVal = sorted[0][1];
   return (
@@ -815,7 +815,7 @@ function HFACSChart({ counts }: { counts: Record<string, number> }) {
         );
       })}
       <div style={{ fontSize: 9, color: "#484f58", marginTop: 2, fontStyle: "italic" }}>
-        {total} violation instance{total !== 1 ? "s" : ""} classified across all HFACS levels
+        {total} observation instance{total !== 1 ? "s" : ""} classified across all HFACS levels
       </div>
       <div style={{ borderTop: "1px solid #1c2128", paddingTop: 8 }}>
         <div style={{ fontSize: 9, color: "#484f58", lineHeight: 1.7 }}>
@@ -839,7 +839,7 @@ function HFACSChart({ counts }: { counts: Record<string, number> }) {
 // ── Violation type breakdown (horizontal bars) ────────────────────────────────
 
 function ViolationTypeChart({ types }: { types: [string, number][] }) {
-  if (types.length === 0) return <EmptyState label="No violations recorded yet." />;
+  if (types.length === 0) return <EmptyState label="No observations recorded yet." />;
   const max = types[0][1];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -922,7 +922,7 @@ function ReadbackQualityPanel({ readback }: { readback: ReturnType<typeof useVio
 
 function RepeatOffendersTable({ offenders }: { offenders: ReturnType<typeof useViolationIntelligence>["repeatOffenders"] }) {
   if (offenders.length === 0) {
-    return <EmptyState label="No callsign has appeared in multiple non-compliant transmissions yet." />;
+    return <EmptyState label="No callsign has appeared in multiple non-standard transmissions yet." />;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1058,7 +1058,7 @@ function AirportDetailCards({
                 {compPct !== null && (
                   <div style={{ marginBottom: 8 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                      <span style={{ fontSize: 10, color: "#6e7681" }}>Compliant</span>
+                      <span style={{ fontSize: 10, color: "#6e7681" }}>Standard</span>
                       <span style={{ fontSize: 10, fontWeight: 700, color: compColor }}>{compPct}%</span>
                     </div>
                     <div style={{ background: "#21262d", borderRadius: 2, height: 4 }}>
@@ -1135,7 +1135,7 @@ export function SituationRoom({ results, activeAirports, onAirportClick }: Props
       <CardHead label="Event Timeline" badge={
         violCount > 0 ? (
           <span style={{ fontSize: 9, fontWeight: 700, color: "#ff4444", background: "#ff444418", border: "1px solid #ff444433", borderRadius: 8, padding: "1px 6px" }}>
-            {violCount} violations
+            {violCount} observations
           </span>
         ) : undefined
       } />
@@ -1158,7 +1158,7 @@ export function SituationRoom({ results, activeAirports, onAirportClick }: Props
     <div style={{ ...cardStyle }}>
       <CardHead label="Airport Risk Matrix" badge={
         <span style={{ fontSize: 9, color: "#484f58", marginLeft: "auto" }}>
-          Risk = weighted violation score per transmission
+          Risk = weighted observation score per transmission
         </span>
       } />
       <div style={{ padding: "12px 16px" }}>
@@ -1169,7 +1169,7 @@ export function SituationRoom({ results, activeAirports, onAirportClick }: Props
 
   const heatmapPanel = (
     <div style={{ ...cardStyle }}>
-      <CardHead label="Violation Heatmap — Hour of Day" badge={
+      <CardHead label="Observation Heatmap — Hour of Day" badge={
         <span style={{ fontSize: 9, color: "#484f58", marginLeft: "auto" }}>
           Identifies rush-hour or shift-change patterns
         </span>
@@ -1195,7 +1195,7 @@ export function SituationRoom({ results, activeAirports, onAirportClick }: Props
 
   const typePanel = (
     <div style={{ ...cardStyle }}>
-      <CardHead label="Violation Type Breakdown" />
+      <CardHead label="Observation Type Breakdown" />
       <div style={{ padding: "12px 16px" }}>
         <ViolationTypeChart types={intel.sortedTypes} />
       </div>
