@@ -1,7 +1,8 @@
 """
-Sends ATC transcripts to Gemini Flash for compliance analysis.
+Sends ATC transcripts to Gemini Flash for phraseology analysis.
 Uses batch analysis: collects transcripts from all airports over a window,
 then sends ONE Gemini call covering all of them — conserving the daily quota.
+Produces Observations classified as phraseology notes or situational events.
 """
 
 import asyncio
@@ -14,7 +15,7 @@ from google import genai
 from google.genai import types
 
 from backend.config import settings
-from backend.models.schemas import AnalysisResult, Violation
+from backend.models.schemas import AnalysisResult, Observation, KIND_BY_NOTE_TYPE
 
 _client = None
 _semaphore: asyncio.Semaphore | None = None
@@ -172,19 +173,25 @@ Each object schema:
   "index": <integer matching the [INDEX] tag>,
   "assessable": <boolean — false if transcript too garbled to evaluate>,
   "assessable_confidence": <float 0.0–1.0 — confidence in transcript quality>,
-  "is_compliant": <boolean — only meaningful when assessable is true>,
+  "is_standard": <boolean — true if the transmission met standard phraseology;
+    only meaningful when assessable is true>,
   "confidence_score": <float 0.0–1.0 — confidence in your compliance verdict>,
   "summary": "<plain English; if assessable false, explain why>",
-  "violations": [
+  "observations": [
     {
-      "violation_type": <one of ["Runway Incursion","Runway Excursion",
+      "kind": <"phraseology_note" — non-standard phrasing, readback gaps,
+        frequency confusion; OR "situational_event" — something operationally
+        notable observed (go-around, emergency, TCAS RA, runway incursion,
+        minimum/emergency fuel). Phraseology notes are educational; situational
+        events are neutral awareness signals. Assign exactly one.>,
+      "note_type": <one of ["Runway Incursion","Runway Excursion",
         "Altitude Deviation","Speed Deviation","Read-back Error",
         "Frequency/Channel Error","CFIT Risk","TCAS Non-compliance",
         "Go-around Non-compliance","Navigation Error",
         "Communication Failure","Fuel Mismanagement","Other"]>,
       "hfacs_level": <one of ["Unsafe Act","Precondition",
         "Unsafe Supervision","Organizational Influence"]>,
-      "severity": <"low"|"medium"|"high"|"critical">,
+      "significance": <"low"|"medium"|"high"|"critical">,
       "description": "<what happened and why it matters>",
       "safety_pathway": "<wrong action → mechanism → potential outcome>",
       "relevant_regulation": "<e.g. ICAO Doc 4444 §4.5.3.1>",
@@ -207,8 +214,8 @@ speaker_segments: split transcript into labelled turns; if one-sided, label all 
 readback_correct: true=matches; false=discrepancy; null=cannot determine (one-sided or no readback).
 callsign_clarity: 90-100 standard ICAO format; 50-89 phonetically expanded; 20-49 partial; 0-19 none.
 
-If assessable is false: set is_compliant true, violations [], still populate enrichment fields.
-If compliant: set violations [].
+If assessable is false: set is_standard true, observations [], still populate enrichment fields.
+If the transmission met standard phraseology: set observations [].
 Always populate all enrichment fields.
 """
 
@@ -228,7 +235,7 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
         f"[{i} | {item['airport_code']} | {item['timestamp'].isoformat()}Z]\n\"\"\"\n{item['transcript']}\n\"\"\""
         for i, item in enumerate(items)
     )
-    user_message = f"""Analyze the following {len(items)} ATC transcript(s) for FAA/ICAO compliance.
+    user_message = f"""Analyze the following {len(items)} ATC transcript(s) against FAA/ICAO standard phraseology.
 
 {chunks_text}"""
 
@@ -279,14 +286,18 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
         assessable = entry.get("assessable", True)
         assessable_confidence = entry.get("assessable_confidence", 0.5)
 
-        violations = []
+        observations = []
         if assessable:
-            for v in entry.get("violations", []):
+            for v in entry.get("observations", []):
                 try:
-                    violations.append(Violation(
-                        violation_type=v.get("violation_type", "Other"),
+                    note_type = v.get("note_type", "Other")
+                    kind = v.get("kind") or KIND_BY_NOTE_TYPE.get(
+                        note_type, "phraseology_note")
+                    observations.append(Observation(
+                        kind=kind,
+                        note_type=note_type,
                         hfacs_level=v.get("hfacs_level", "Unsafe Act"),
-                        severity=v.get("severity", "low"),
+                        significance=v.get("significance", "low"),
                         description=v.get("description", ""),
                         safety_pathway=v.get("safety_pathway"),
                         relevant_regulation=v.get("relevant_regulation"),
@@ -311,8 +322,8 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
             transcript=item["transcript"],
             assessable=assessable,
             assessable_confidence=assessable_confidence,
-            is_compliant=entry.get("is_compliant", True),
-            violations=violations,
+            is_standard=entry.get("is_standard", entry.get("is_compliant", True)),
+            observations=observations,
             summary=entry.get("summary", ""),
             confidence_score=entry.get("confidence_score", 0.5),
             enrichment=enrichment,
@@ -320,31 +331,35 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
     return results
 
 
-async def generate_aircraft_report(callsign: str, threads: list[dict]) -> str:
+async def generate_study_sheet(callsign: str, threads: list[dict]) -> str:
     client = get_client()
 
     timeline = "\n\n".join([
         f"[{t['timestamp']} | {t['airport_code']}]\n{t['transcript']}\n"
-        f"→ Compliant: {t['is_compliant']} | {t['summary']}"
+        f"→ Standard: {t['is_standard']} | {t['summary']}"
         for t in threads
     ])
 
-    prompt = f"""You are an aviation safety investigator writing a concise incident report.
+    prompt = f"""You are an experienced flight instructor writing a study sheet
+for an aviation enthusiast or student pilot reviewing real ATC communications.
 
 Aircraft Callsign: {callsign}
-Number of transmissions analysed: {len(threads)}
+Number of transmissions reviewed: {len(threads)}
 
 --- TRANSMISSION TIMELINE ---
 {timeline}
 --- END TIMELINE ---
 
-Write a short safety report (200-300 words) covering:
+Write a short study sheet (200-300 words) covering:
 1. **Overview** — what this aircraft was doing across these transmissions
-2. **Key Issues** — any repeated patterns, violations, or safety concerns
-3. **HFACS Assessment** — what human factor category best explains any issues
-4. **Recommendation** — what action a regulator should consider
+2. **Phraseology Patterns** — how the phrasing compared to standard FAA/ICAO
+   phraseology; call out good examples as well as non-standard ones
+3. **Situational Events** — any operationally notable events observed
+   (go-arounds, emergencies, etc.), described neutrally
+4. **Study Suggestions** — what a student could practice or read up on
 
-Use plain English. Be concise and factual."""
+This is an educational study aid, not an investigation. Use plain English,
+be encouraging, and do not assign blame to any individual."""
 
     try:
         response = client.models.generate_content(
@@ -353,4 +368,4 @@ Use plain English. Be concise and factual."""
         )
         return response.text.strip()
     except Exception as e:
-        return f"Report generation failed: {type(e).__name__}: {e}"
+        return f"Study sheet generation failed: {type(e).__name__}: {e}"
