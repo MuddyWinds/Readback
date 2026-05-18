@@ -1,6 +1,6 @@
-# Contributing to ATC Compliance Monitor
+# Contributing to Readback
 
-Thanks for your interest in contributing. This is a hobbyist aviation safety project — all skill levels are welcome, whether you're a pilot, an ATC enthusiast, or just a developer who finds the problem interesting.
+Thanks for your interest in contributing. This is a hobbyist aviation education project — all skill levels are welcome, whether you're a pilot, an ATC enthusiast, or just a developer who finds the problem interesting.
 
 ## Ways to Contribute
 
@@ -22,7 +22,7 @@ Thanks for your interest in contributing. This is a hobbyist aviation safety pro
    - Any error output from the backend logs (`docker compose logs backend`)
    - Your OS and Python version
 
-For **false positives** (the AI flagged something that wasn't actually a violation) or **false negatives** (a clear violation was missed), please include:
+For **false positives** (the AI flagged something that wasn't actually a phraseology observation) or **false negatives** (a clear situational event was missed), please include:
 - The raw transcript text
 - The airport and approximate time
 - What the correct assessment should be and why
@@ -81,7 +81,7 @@ npm install && npm start
 ### PR Guidelines
 
 - Keep PRs focused — one change per PR is easier to review
-- If you're changing the Gemini prompt in `compliance.py`, include before/after examples of how the output changed
+- If you're changing the Gemini prompt in `phraseology.py`, include before/after examples of how the output changed
 - Don't commit `.env`, `venv/`, `*.db`, or `node_modules/` — they're in `.gitignore` for a reason
 - Don't add new dependencies without discussing in an issue first
 
@@ -89,10 +89,10 @@ npm install && npm start
 
 ## Prompt / AI Behaviour Changes
 
-The compliance analysis prompt in `backend/analysis/compliance.py` is the most sensitive part of the project. Changes here can have wide effects on false positive/negative rates.
+The phraseology analysis prompt in `backend/analysis/phraseology.py` is the most sensitive part of the project. Changes here can have wide effects on false positive/negative rates.
 
 If you want to improve it:
-- Open an issue first describing the problem you're seeing (e.g. "it keeps flagging single-sided readbacks as violations")
+- Open an issue first describing the problem you're seeing (e.g. "it keeps flagging single-sided readbacks as observations")
 - Include example transcripts that trigger the wrong behaviour
 - Propose the specific prompt change
 
