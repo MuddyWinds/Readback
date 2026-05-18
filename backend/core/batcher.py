@@ -16,7 +16,7 @@ from backend.config import settings
 from backend.core.state import adsb_snapshots, broadcast, transcript_queue
 from backend.db.database import AsyncSessionLocal
 from backend.db.models import AnalysisResultDB, TranscriptChunkDB
-from backend.analysis.compliance import analyze_batch
+from backend.analysis.phraseology import analyze_batch
 from backend.ingestion.audio_stream import stream_audio_chunks
 from backend.ingestion.transcriber import transcribe
 from backend.models.schemas import AnalysisResult
@@ -32,7 +32,7 @@ AIRPORT_GEO: dict[str, tuple[float, float]] = {
     "KORD": (41.97, -87.91),
 }
 
-_VIOLATION_KEYWORDS = [
+_NOTABLE_KEYWORDS = [
     "mayday", "pan pan", "emergency", "declare",
     "go around", "go-around", "missed approach", "abort", "rejected takeoff",
     "runway incursion", "stop stop stop", "hold position", "cancel takeoff",
@@ -45,7 +45,7 @@ _VIOLATION_KEYWORDS = [
 
 def _needs_analysis(transcript: str) -> bool:
     t = transcript.lower()
-    return any(kw in t for kw in _VIOLATION_KEYWORDS)
+    return any(kw in t for kw in _NOTABLE_KEYWORDS)
 
 
 async def _fetch_adsb_snapshot(airports: set[str]) -> dict[str, list]:
@@ -105,8 +105,8 @@ async def _persist_batch(
                 transcript=item["transcript"],
                 assessable=result.assessable,
                 assessable_confidence=result.assessable_confidence,
-                is_compliant=result.is_compliant,
-                violations=[v.model_dump() for v in result.violations],
+                is_standard=result.is_standard,
+                observations=[v.model_dump() for v in result.observations],
                 summary=result.summary,
                 confidence_score=result.confidence_score,
                 enrichment=result.enrichment,
@@ -161,8 +161,8 @@ async def run_batcher() -> None:
                 transcript=it["transcript"],
                 assessable=False,
                 assessable_confidence=it.get("assessable_confidence", 0.0),
-                is_compliant=True,
-                violations=[],
+                is_standard=True,
+                observations=[],
                 summary=it.get("stt_reason") or "Audio quality too low for reliable transcription",
                 confidence_score=0.0,
             )))
