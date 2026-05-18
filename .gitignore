@@ -2,6 +2,7 @@
 .env
 
 # Python
+.venv/
 venv/
 __pycache__/
 *.pyc
@@ -17,6 +18,8 @@ frontend/node_modules/
 # Database
 *.db
 *.sqlite3
+*.db.*.bak
+*.sqlite3.*.bak
 
 # OS
 .DS_Store
