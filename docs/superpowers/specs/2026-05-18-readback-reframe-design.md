@@ -75,17 +75,43 @@ The risk is not storing a callsign locally (the same audio is public — anyone 
 
 ## 7. Data Model Changes
 
-Applied to the existing SQLite `atcmonitor.db` via a one-shot migration script (`backend/db/migrations/0001_readback_reframe.py`).
+**Actual schema (verified against the code):** there is no `violations` table. Findings are stored as a **JSON column** (`violations`) on the `analysis_results` table (`AnalysisResultDB`), each element an embedded `Violation` Pydantic dict. The reframe therefore changes a Pydantic model, one column name, the JSON content of that column, and several scalar fields — not a table.
 
-- **`violations` table → `observations`.**
-  - New column `kind TEXT NOT NULL` ∈ {`phraseology_note`, `situational_event`}.
-  - `violation_type` → `note_type` (its value also informs `kind` per the §4 mapping).
-  - `severity` → `significance`.
-  - `safety_pathway` retained, unchanged name.
-  - All other columns retained.
-- **Migration logic:** existing rows copied into `observations`; `kind` derived from old `violation_type` using the §4 mapping table; `significance` copied from `severity`. Old `violations` table dropped after copy. Migration is idempotent (checks for `observations` existence first) and prints a row-count summary.
-- **`disputed_examples`** (defined in the 2026-04-15 spec, not yet built) is renamed in that spec to `feedback_examples` — see §9. No live table to migrate.
-- **API:** `/api/violations` → `/api/observations`; dispute endpoint `/api/violations/{id}/dispute` → `/api/observations/{id}/feedback`. No backward-compat alias — pre-release project.
+### 7.1 Pydantic model (`backend/models/schemas.py`)
+
+- `Violation` model → **`Observation`**, gaining a required field `kind: ObservationKind` ∈ {`phraseology_note`, `situational_event`}.
+- `Violation.violation_type` → `Observation.note_type`; the `ViolationType` enum → `NoteType` (same members, see §4 mapping for which `kind` each implies).
+- `Violation.severity` → `Observation.significance`; the `SeverityLevel` enum → `SignificanceLevel` (same members `low/medium/high/critical`).
+- `safety_pathway`, `description`, `relevant_regulation`, `transcript_excerpt` retained unchanged.
+- `AnalysisResult.is_compliant` → `is_standard`; `AnalysisResult.violations` → `observations`.
+
+### 7.2 SQLAlchemy model & DB (`backend/db/models.py`, `atcmonitor.db`)
+
+- `AnalysisResultDB.is_compliant` column → `is_standard`.
+- `AnalysisResultDB.violations` JSON column → `observations`.
+- `AnalysisResultDB.officer_notes` column → `reviewer_notes`.
+- `status` column: allowed values drop `escalated` → {`new`, `under_review`, `confirmed`, `false_positive`}.
+
+### 7.3 Migration (`backend/db/migrations/0001_readback_reframe.py`)
+
+A one-shot script run against the existing `atcmonitor.db`. It:
+
+1. Backs up the DB file to `atcmonitor.db.pre-readback.bak`.
+2. `ALTER TABLE analysis_results RENAME COLUMN is_compliant TO is_standard` (SQLite ≥ 3.25).
+3. `ALTER TABLE analysis_results RENAME COLUMN violations TO observations`.
+4. `ALTER TABLE analysis_results RENAME COLUMN officer_notes TO reviewer_notes`.
+5. For every row, rewrites the `observations` JSON: for each finding dict, renames `violation_type`→`note_type`, `severity`→`significance`, and adds `kind` derived from `note_type` via the §4 mapping.
+6. `UPDATE analysis_results SET status='confirmed' WHERE status='escalated'` (collapse the dropped value).
+7. Is idempotent — checks whether `observations` already exists and exits early if so. Prints a row-count + findings-rewritten summary.
+
+The `init_db()` inline-migration block in `backend/db/database.py` is updated to match the new column names so fresh databases and migrated ones converge.
+
+### 7.4 Stats & API
+
+- `categorizer.build_stats`: `compliance_rate` → `conformance_rate`, `airport_compliance` → `airport_conformance`, `non_compliant_*` → `non_standard_*`, `violation_type_details` → `note_type_details`. Aggregation stays keyed by airport and note/event type only (§6) — no operator key is introduced.
+- API routes: `/api/results` PATCH body field `officer_notes` → `reviewer_notes`; `_VALID_STATUSES` drops `escalated`; `/api/report/{id}` → `/api/study-sheet/{id}` returning `{callsign, transmission_count, study_sheet}`.
+- `generate_aircraft_report()` → `generate_study_sheet()`: prompt rewritten to drop "investigator", "regulator", and "what action a regulator should consider"; reframed as a study sheet (Overview / Phraseology Patterns / Situational Events / Study Suggestions).
+- `disputed_examples` (defined in the 2026-04-15 spec, not yet built) is renamed there to `feedback_examples` — see §9. No live table to migrate.
 
 ## 8. Honesty / Advisory Layer
 
@@ -110,9 +136,19 @@ This pass keeps the two specs consistent so future implementation work reads one
 
 Reframe work, grouped:
 
-- **Docs:** `README.md` (title, tagline, "Why This Exists", architecture diagram labels, violation-category table → two tables, Quick Start), `CONTRIBUTING.md` (terminology), `docs/superpowers/specs/2026-04-15-*.md` (terminology pass per §9).
-- **Backend:** `backend/analysis/compliance.py` → `phraseology.py` (logic unchanged, prompt copy and the analyzer's output schema updated to emit `kind`); `backend/analysis/categorizer.py` (category constants → §4 split); `backend/core/batcher.py` (variable/comment naming); `backend/api/*` (route rename per §7); `backend/models/*` (`Violation` → `Observation`); `backend/db/*` (migration script).
-- **Frontend:** `ViolationCard.tsx` → `PhraseologyNoteCard.tsx` + `EventCard.tsx`; `LiveFeed.tsx`, `StatsPanel.tsx`, `SituationRoom.tsx`, `AirportSidebar.tsx`, `App.tsx`, `index.tsx` (labels, API paths, footer advisory line); any hooks calling `/api/violations`.
+- **Docs:** `README.md` (title, tagline, "Why This Exists", architecture diagram labels, violation-category table → two tables, Quick Start), `CONTRIBUTING.md` (terminology), `docs/superpowers/specs/2026-04-15-aircraft-info-page-and-false-positive-reduction-design.md` (terminology pass per §9).
+- **Backend:**
+  - `backend/models/schemas.py` — `Violation`→`Observation` (+`kind`), `ViolationType`→`NoteType`, `SeverityLevel`→`SignificanceLevel`, `AnalysisResult` field renames.
+  - `backend/db/models.py` — `AnalysisResultDB` column renames (§7.2).
+  - `backend/db/database.py` — `init_db()` inline migration list updated to new column names.
+  - `backend/db/migrations/0001_readback_reframe.py` — new migration script (§7.3).
+  - `backend/analysis/compliance.py` → `backend/analysis/phraseology.py` — logic unchanged; `BATCH_SYSTEM_PROMPT` and the JSON response schema updated to emit `kind` and new vocabulary; `analyze_batch()` builds `Observation`; `generate_aircraft_report()`→`generate_study_sheet()`.
+  - `backend/analysis/categorizer.py` — stats key renames (§7.4).
+  - `backend/core/batcher.py` — import of `phraseology`, `AnalysisResult` field names, comment/var naming, `_VIOLATION_KEYWORDS`→`_NOTABLE_KEYWORDS`.
+  - `backend/api/results.py` — `_row_to_dict`/`build_stats` field names, `_VALID_STATUSES`, `ResultUpdate.officer_notes`→`reviewer_notes`.
+  - `backend/api/reports.py` — `/api/report/{id}`→`/api/study-sheet/{id}`, calls `generate_study_sheet`.
+  - `backend/main.py` — verify router wiring still valid after route renames.
+- **Frontend:** `ViolationCard.tsx` → `PhraseologyNoteCard.tsx` + `EventCard.tsx`; `LiveFeed.tsx`, `StatsPanel.tsx`, `SituationRoom.tsx`, `AirportSidebar.tsx`, `App.tsx`, `index.tsx` (labels, API paths `/api/report`→`/api/study-sheet`, field names `is_compliant`→`is_standard`/`violations`→`observations`, footer advisory line).
 - **Analyzer prompt:** the `BATCH_SYSTEM_PROMPT` body is updated so the model emits the `kind` classification and uses the new vocabulary; the Reasonable Controller Test, mandatory readback list, and significance ladder are kept verbatim.
 
 ## 11. Sequencing
@@ -120,8 +156,8 @@ Reframe work, grouped:
 The reframe is documentation- and rename-heavy with one schema migration. Suggested order:
 
 1. **Spec pass** — apply §9 terminology pass to the 2026-04-15 spec. (Pure docs; no risk.)
-2. **Data model + migration** — `observations` table, migration script, run against a copy of `atcmonitor.db`, verify row counts.
-3. **Backend rename** — models, routes, `compliance.py` → `phraseology.py`, analyzer prompt + output schema for `kind`, categorizer split.
+2. **Data model + migration** — Pydantic/SQLAlchemy renames (§7.1–7.2), migration script (§7.3), run against a copy of `atcmonitor.db`, verify row + findings counts.
+3. **Backend rename** — `compliance.py` → `phraseology.py`, analyzer prompt + output schema for `kind`, `analyze_batch`/`batcher` field names, categorizer stat keys, API routes (§7.4).
 4. **Frontend rename** — split `ViolationCard`, update API paths, labels, footer advisory.
 5. **README + CONTRIBUTING rewrite** — positioning, two-table category section, advisory statement.
 
@@ -134,7 +170,8 @@ Each step is independently verifiable; the migration (step 2) is the only irreve
 | Migration corrupts existing `atcmonitor.db` | Low | Idempotent script; tested on a copy; original backed up before run; row-count summary printed |
 | `kind` mapping mis-buckets an old `violation_type` | Low | §4 mapping table is explicit and exhaustive over current categories; reviewed before migration |
 | 2026-04-15 spec drifts from new vocabulary later | Medium | §9 pass plus a pointer note at the top of that spec naming this one as vocabulary source |
-| Frontend API-path rename misses a caller | Low | Grep for `/api/violations` across `frontend/src`; no backward-compat alias means a missed caller fails loudly |
+| Frontend API-path/field rename misses a caller | Low | Grep for `/api/report`, `is_compliant`, `violations` across `frontend/src`; no backward-compat alias means a missed caller fails loudly |
+| `RENAME COLUMN` unsupported (SQLite < 3.25) | Low | Migration asserts `sqlite_version >= 3.25` at start; macOS/Linux ship far newer |
 | Reframe perceived as cosmetic only | Medium | The §4 taxonomy split and §6 identity rules are substantive, not cosmetic — they change behavior, not just labels |
 
 ## 13. Open Questions for Implementation
