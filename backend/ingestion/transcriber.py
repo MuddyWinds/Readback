@@ -4,14 +4,15 @@ Returns transcript text alongside Whisper confidence metrics so the caller
 can decide whether the result is assessable (Plan B quality gate).
 """
 
-import tempfile
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
-import soundfile as sf
 from faster_whisper import WhisperModel
 
 from backend.config import settings
 
 _model: WhisperModel | None = None
+_stt_executor: ThreadPoolExecutor | None = None
 
 # Plan B thresholds — if either is exceeded, mark transcript unassessable
 NO_SPEECH_PROB_THRESHOLD = 0.60   # >60% chance segment is not speech
@@ -22,8 +23,30 @@ def get_model() -> WhisperModel:
     global _model
     if _model is None:
         print(f"[Transcriber] Loading faster-whisper model: {settings.WHISPER_MODEL}")
-        _model = WhisperModel(settings.WHISPER_MODEL, device="cpu", compute_type="int8")
+        _model = WhisperModel(
+            settings.WHISPER_MODEL,
+            device="cpu",
+            compute_type="int8",
+            cpu_threads=settings.WHISPER_CPU_THREADS,
+        )
     return _model
+
+
+def get_stt_executor() -> ThreadPoolExecutor:
+    """Dedicated thread pool for transcription.
+
+    Bounding ``max_workers`` to ``STT_CONCURRENCY`` caps how many Whisper jobs
+    run at once across all feeds — without this, several feeds can each push a
+    chunk into the default executor and overcommit the CPU. Excess chunks queue
+    here rather than running in parallel.
+    """
+    global _stt_executor
+    if _stt_executor is None:
+        _stt_executor = ThreadPoolExecutor(
+            max_workers=max(1, settings.STT_CONCURRENCY),
+            thread_name_prefix="stt",
+        )
+    return _stt_executor
 
 
 def transcribe(audio: np.ndarray) -> dict:
@@ -40,10 +63,11 @@ def transcribe(audio: np.ndarray) -> dict:
     """
     model = get_model()
 
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-        sf.write(f.name, audio, 16000, format="WAV", subtype="FLOAT")
-        segments_gen, _ = model.transcribe(f.name, language="en", beam_size=5)
-        segments = list(segments_gen)
+    # faster-whisper accepts a float32 numpy array directly — no temp WAV needed.
+    segments_gen, _ = model.transcribe(
+        audio, language="en", beam_size=5, vad_filter=settings.WHISPER_VAD_FILTER
+    )
+    segments = list(segments_gen)
 
     if not segments:
         return {
