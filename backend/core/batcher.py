@@ -18,7 +18,7 @@ from backend.db.database import AsyncSessionLocal
 from backend.db.models import AnalysisResultDB, TranscriptChunkDB
 from backend.analysis.phraseology import analyze_batch
 from backend.ingestion.audio_stream import stream_audio_chunks
-from backend.ingestion.transcriber import transcribe
+from backend.ingestion.transcriber import get_stt_executor, transcribe
 from backend.models.schemas import AnalysisResult
 
 BATCH_INTERVAL_SECONDS = 240  # flush to Gemini every 4 minutes
@@ -195,7 +195,8 @@ async def run_monitor(feed_url: str, airport_code: str, start_delay: float = 0) 
         loop = asyncio.get_event_loop()
         async for audio_chunk in stream_audio_chunks(feed_url, settings.CHUNK_DURATION_SECONDS):
             print(f"[{airport_code}] Got chunk ({len(audio_chunk)} samples), transcribing...", flush=True)
-            result = await loop.run_in_executor(None, transcribe, audio_chunk)
+            # Bounded STT pool — caps concurrent Whisper jobs at STT_CONCURRENCY
+            result = await loop.run_in_executor(get_stt_executor(), transcribe, audio_chunk)
             transcript = result["text"]
 
             if not result["assessable"]:
