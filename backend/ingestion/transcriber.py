@@ -64,7 +64,9 @@ def transcribe(audio: np.ndarray) -> dict:
     model = get_model()
 
     # faster-whisper accepts a float32 numpy array directly — no temp WAV needed.
-    segments_gen, _ = model.transcribe(audio, language="en", beam_size=5)
+    segments_gen, _ = model.transcribe(
+        audio, language="en", beam_size=5, vad_filter=settings.WHISPER_VAD_FILTER
+    )
     segments = list(segments_gen)
 
     if not segments:
