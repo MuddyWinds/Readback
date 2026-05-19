@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     LIVEATC_FEED_URL: str = "http://feeds.liveatc.net/ksfo"
     CHUNK_DURATION_SECONDS: int = 30
 
+    # Speech-to-text resource limits (PR1 — energy/CPU)
+    WHISPER_CPU_THREADS: int = 0   # threads per transcription; 0 = CTranslate2 default
+    STT_CONCURRENCY: int = 1       # max simultaneous transcriptions across all feeds
+
     class Config:
         env_file = ".env"
 
