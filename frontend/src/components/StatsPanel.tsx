@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { AnalysisResult, getCardSeverity } from "./LiveFeed";
+import { useSettings } from "../SettingsContext";
 
 const API_BASE = "http://localhost:8000";
-const KNOWN_AIRPORTS = new Set(["KJFK", "KATL", "VHHH", "KLAX", "KORD"]);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ interface Stats {
   note_type_details: Record<string, ViolationDetail>;
 }
 
-// ── Expert knowledge — hardcoded per violation type ───────────────────────────
+// ── Expert knowledge — hardcoded per observation type ─────────────────────────
 
 interface ViolationIntel {
   implication: string;
@@ -33,7 +33,7 @@ interface ViolationIntel {
 
 const VIOLATION_INTEL: Record<string, ViolationIntel> = {
   "Runway Incursion": {
-    implication: "Highest-risk category. Any unauthorised entry onto a protected runway creates collision potential between landing and departing aircraft. Even low-severity Category D incidents mandate formal investigation.",
+    implication: "Highest-risk category. Any unauthorised entry onto a protected runway creates collision potential between landing and departing aircraft. Treat as a high-priority situational-awareness event and verify against primary sources.",
     prevention: [
       "Enforce strict hold-short phraseology — no ambiguous taxi instructions near active runways",
       "Require explicit runway-crossing clearance and read-back for every surface movement",
@@ -165,11 +165,11 @@ const VIOLATION_INTEL: Record<string, ViolationIntel> = {
     risk_weight: 4,
   },
   "Other": {
-    implication: "Unclassified safety deviation. Requires manual review to apply correct violation taxonomy and determine regulatory applicability.",
+    implication: "Unclassified observation. Requires manual review to apply the correct note/event taxonomy and determine what can be learned from the transcript.",
     prevention: [
-      "Assign to senior safety analyst for correct categorisation",
-      "Document for trend analysis even if below individual action threshold",
-      "Flag for supervisor review if transcript excerpt suggests escalation potential",
+      "Review transcript quality before categorisation",
+      "Document for trend analysis even if the individual observation is low-priority",
+      "Compare against airport context before treating it as significant",
     ],
     typical_hfacs: ["Unsafe Act"],
     regulation: "Review applicable 14 CFR Part 91 / ICAO Annex provisions",
@@ -178,10 +178,10 @@ const VIOLATION_INTEL: Record<string, ViolationIntel> = {
 };
 
 const HFACS_MEANING: Record<string, string> = {
-  "Unsafe Act":               "Direct error or wilful violation by the flight crew or controller — individual-level intervention needed",
-  "Precondition":             "Environmental, physiological, or crew condition that enabled the error — systems and environment review needed",
-  "Unsafe Supervision":       "Inadequate oversight or assignment by supervisors — management-level review needed",
-  "Organizational Influence": "Policy, culture, or resource allocation failure at the organisation level — executive intervention needed",
+  "Unsafe Act":               "Front-line action or communication choice — useful for individual practice",
+  "Precondition":             "Environmental, physiological, or workload context — useful for scenario review",
+  "Unsafe Supervision":       "Supervisory or task-management context — useful for system learning",
+  "Organizational Influence": "Policy, culture, or resource context — useful for system learning",
 };
 
 const HFACS_ORDER = ["Unsafe Act", "Precondition", "Unsafe Supervision", "Organizational Influence"];
@@ -378,7 +378,12 @@ interface Props {
 }
 
 export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Props) {
-  const results = rawResults.filter(r => KNOWN_AIRPORTS.has(r.airport_code));
+  const { settings } = useSettings();
+  const knownAirports = useMemo(
+    () => new Set((settings?.feeds ?? []).map(f => f.airport_code)),
+    [settings],
+  );
+  const results = rawResults.filter(r => knownAirports.has(r.airport_code));
   const [stats, setStats] = useState<Stats | null>(null);
   const [airports, setAirports] = useState<string[]>([]);
   const [airportFilter, setAirportFilter] = useState("all");
@@ -386,9 +391,9 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
   useEffect(() => {
     fetch(`${API_BASE}/api/airports`)
       .then(r => r.json())
-      .then((all: string[]) => setAirports(all.filter(a => KNOWN_AIRPORTS.has(a))))
+      .then((all: string[]) => setAirports(all.filter(a => knownAirports.has(a))))
       .catch(() => {});
-  }, []);
+  }, [knownAirports]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -530,8 +535,8 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
     const cr = stats.conformance_rate;
     if (cr === null) return { label: "NO DATA", color: "#484f58", message: "No assessable transmissions yet" };
     const ch = criticalHighCount;
-    if (ch > 3 || cr < 75) return { label: "CRITICAL", color: "#ff4444", message: `${ch} high-priority observations require immediate escalation` };
-    if (ch > 0 || cr < 90) return { label: "ELEVATED RISK", color: "#ff8800", message: `${ch} high-priority observation${ch !== 1 ? "s" : ""} detected — formal documentation required` };
+    if (ch > 3 || cr < 75) return { label: "CRITICAL", color: "#ff4444", message: `${ch} high-priority observation${ch !== 1 ? "s" : ""} need transcript verification` };
+    if (ch > 0 || cr < 90) return { label: "ELEVATED", color: "#ff8800", message: `${ch} high-priority observation${ch !== 1 ? "s" : ""} detected — verify before using for study` };
     if (cr < 95) return { label: "NOMINAL", color: "#e3b341", message: "Minor deviations detected — continue monitoring" };
     return { label: "CLEAR", color: "#3fb950", message: "No significant observations in current session" };
   })();
@@ -717,7 +722,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                       </span>
                       <div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: "#ff4444" }}>CRITICAL</div>
-                        <div style={{ fontSize: 11, color: "#8b949e" }}>Notify supervisor immediately</div>
+                        <div style={{ fontSize: 11, color: "#8b949e" }}>Verify transcript and context</div>
                       </div>
                     </div>
                   )}
@@ -844,7 +849,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                       ? "All observations are individual-level errors. Targeted retraining and phraseology review is the primary intervention."
                       : systemicPct <= 20
                       ? `${systemicCount} observation(s) have supervisory or organisational contributors. Supplement individual retraining with supervisory review.`
-                      : `${systemicPct}% of observations originate above the individual level. Individual retraining alone will not resolve the root cause — management escalation is required.`}
+                      : `${systemicPct}% of observations originate above the individual level. Individual retraining alone may miss broader system context.`}
                   </p>
                 </div>
 
@@ -889,7 +894,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                             <div style={{ background: "#21262d", borderRadius: 3, height: 5, overflow: "hidden", marginBottom: 10 }}>
                               <div style={{ width: `${(count / hfacsMax) * 100}%`, background: color, height: "100%", borderRadius: 3 }} />
                             </div>
-                            {/* Violation type tags */}
+                            {/* Observation type tags */}
                             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
                               {topViolations.map(([type, c]) => (
                                 <span key={type} style={{
@@ -966,7 +971,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                         {totalViol === 0 && <span style={{ fontSize: 12, color: "#3fb950" }}>No observations</span>}
                       </div>
 
-                      {/* Top violation types */}
+                      {/* Top observation types */}
                       {topViolations.length > 0 && (
                         <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #21262d" }}>
                           <div style={{ ...label, marginBottom: 8 }}>Top Observations</div>
@@ -1044,7 +1049,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                         })}
                       </div>
 
-                      {/* Row 3: severity counts + violation types + airports */}
+                      {/* Row 3: severity counts + observation types + airports */}
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
                         {/* Severity micro counts */}
                         <div style={{ display: "flex", gap: 5 }}>
@@ -1056,7 +1061,7 @@ export function StatsPanel({ results: rawResults, dateFilter, getStartDate }: Pr
                           ))}
                         </div>
                         <div style={{ width: 1, height: 10, background: "#30363d" }} />
-                        {/* Top violation types */}
+                        {/* Top observation types */}
                         {d.topTypes.map(t => (
                           <span key={t} style={{
                             fontSize: 10, color: "#8b949e",

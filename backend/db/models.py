@@ -31,5 +31,14 @@ class AnalysisResultDB(Base):
     summary = Column(Text)
     confidence_score = Column(Float)
     enrichment = Column(JSON, nullable=True)  # speaker_segments, readback comparison, callsign clarity
-    status = Column(String(20), default="new")  # new/under_review/confirmed/false_positive/escalated
+    status = Column(String(20), default="new")  # new/under_review/confirmed/false_positive
     reviewer_notes = Column(Text, nullable=True)
+
+
+class AppSettingsDB(Base):
+    __tablename__ = "app_settings"
+
+    # Single-row table, always pinned to id=1 by settings_store.
+    id = Column(Integer, primary_key=True)
+    data = Column(JSON)
+    updated_at = Column(DateTime, default=datetime.utcnow)

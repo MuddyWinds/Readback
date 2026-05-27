@@ -23,3 +23,6 @@ frontend/node_modules/
 
 # OS
 .DS_Store
+
+# Local agent planning/work files
+docs/superpowers/

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { useSettings } from "../SettingsContext";
 
 export interface SpeakerSegment { role: "ATC" | "PILOT" | "UNKNOWN"; text: string; }
 
@@ -46,6 +47,13 @@ export type Filter = "all" | "standard" | "low" | "medium" | "high" | "critical"
 export type GroupBy = "none" | "airport";
 export type Severity = "standard" | "low" | "medium" | "high" | "critical" | "unassessable";
 
+interface PipelineStatusSummary {
+  queued_transcripts: number;
+  next_batch_at: string | null;
+  last_audio_at: string | null;
+  last_gemini_error: string | null;
+}
+
 const SEV_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
 export function getCardSeverity(r: AnalysisResult): Severity {
@@ -75,19 +83,19 @@ const SEV_ICON: Record<string, string> = {
   critical: "🚨", high: "⚠️", medium: "📋", low: "📝", unassessable: "◌",
 };
 const ACTION_REQUIRED: Record<string, string> = {
-  critical: "Immediately notify supervisor — do not delay. Ground or redirect affected aircraft if airborne.",
-  high:     "Flag for formal investigation. File incident documentation before end of shift.",
-  medium:   "Document this occurrence. Monitor callsign for any recurrence within the session.",
-  low:      "Log for trend analysis. No immediate action required.",
+  critical: "Treat as a high-priority study item. Verify the transcript, review the context, and avoid drawing operational conclusions from this tool alone.",
+  high:     "Verify the transcript and supporting context before using this as a training or research example.",
+  medium:   "Save for review and compare against standard phraseology when studying the session.",
+  low:      "Log as a low-priority learning note. No operational action is implied.",
 };
 const SEV_COLOR: Record<string, string> = {
   critical: "#ff4444", high: "#ff8800", medium: "#e3b341", low: "#44aaff", unassessable: "#484f58",
 };
 const HFACS_PLAIN: Record<string, string> = {
-  "Unsafe Act":               "Direct crew error or intentional violation",
+  "Unsafe Act":               "Front-line action or communication choice",
   "Precondition":             "Environmental or physiological condition that enabled the error",
-  "Unsafe Supervision":       "Inadequate oversight or task management by supervisors",
-  "Organizational Influence": "Company policy, culture, or resource allocation at root",
+  "Unsafe Supervision":       "Supervisory or task-management context",
+  "Organizational Influence": "Policy, culture, or resource context",
 };
 
 function extractActions(transcript: string): string[] {
@@ -364,7 +372,7 @@ function toDocName(reg: string): string {
   return i > 0 ? reg.slice(0, i).trim() : reg.trim();
 }
 
-/** Inline regulation badge for a single violation. Truncates at chapter level; hover shows full citation. */
+/** Inline regulation badge for a single observation. Truncates at chapter level; hover shows full citation. */
 function RegBadge({ regulation }: { regulation: string }) {
   if (!regulation) return null;
   const display = truncateAtChapter(regulation);
@@ -392,22 +400,22 @@ function parseBullets(summary: string): string[] {
     .filter(s => s.length > 8);
 }
 
-// ── Investigation workflow ────────────────────────────────────────────────────
+// ── Review workflow ───────────────────────────────────────────────────────────
 
-type InvStatus = "new" | "under_review" | "confirmed" | "false_positive" | "escalated";
-const STATUS_LABEL: Record<InvStatus, string> = {
+type ReviewStatus = "new" | "under_review" | "confirmed" | "false_positive";
+const STATUS_LABEL: Record<ReviewStatus, string> = {
   new: "NEW", under_review: "REVIEWING", confirmed: "CONFIRMED",
-  false_positive: "FALSE +VE", escalated: "ESCALATED",
+  false_positive: "FALSE +VE",
 };
-const STATUS_COLOR: Record<InvStatus, string> = {
+const STATUS_COLOR: Record<ReviewStatus, string> = {
   new: "#484f58", under_review: "#e3b341", confirmed: "#ff4444",
-  false_positive: "#3fb950", escalated: "#ff8800",
+  false_positive: "#3fb950",
 };
 
 function StatusWorkflow({ resultId, initial }: { resultId?: number; initial?: string }) {
-  const [status, setStatus] = React.useState<InvStatus>((initial || "new") as InvStatus);
+  const [status, setStatus] = React.useState<ReviewStatus>((initial || "new") as ReviewStatus);
   const [saving, setSaving] = React.useState(false);
-  const change = async (s: InvStatus) => {
+  const change = async (s: ReviewStatus) => {
     setStatus(s);
     if (!resultId) return;
     setSaving(true);
@@ -421,7 +429,7 @@ function StatusWorkflow({ resultId, initial }: { resultId?: number; initial?: st
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" as const }}>
       <span style={{ fontSize: 9, fontWeight: 700, color: "#484f58", letterSpacing: 0.8, marginRight: 2 }}>STATUS</span>
-      {(["new", "under_review", "confirmed", "false_positive", "escalated"] as InvStatus[]).map(s => (
+      {(["new", "under_review", "confirmed", "false_positive"] as ReviewStatus[]).map(s => (
         <button key={s} onClick={() => change(s)} style={{
           fontSize: 9, fontWeight: 700, letterSpacing: 0.3,
           padding: "2px 7px", borderRadius: 4, cursor: "pointer", fontFamily: "inherit",
@@ -476,7 +484,7 @@ function ReviewerNotes({ resultId, initial }: { resultId?: number; initial?: str
               fontFamily: "inherit", lineHeight: 1.6, resize: "vertical" as const,
               minHeight: 64, boxSizing: "border-box" as const,
             }}
-            placeholder="Investigation notes, follow-up actions, disposition…"
+            placeholder="Review notes, transcript caveats, study context…"
           />
           <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
             <button onClick={save} disabled={saving} style={{
@@ -629,7 +637,7 @@ function CompliantCard({ r }: { r: AnalysisResult }) {
             />
           </div>
 
-          {/* Investigation */}
+          {/* Review */}
           <div style={{
             margin: "10px 14px 12px",
             background: "#0d1117", border: "1px solid #21262d",
@@ -664,7 +672,7 @@ function isActiveAt(from: string | null, to: string | null, ts: string): boolean
   return t >= f && t <= e;
 }
 
-/** Banner shown on ViolationCard when met hazards were active at violation time. */
+/** Banner shown on ObservationCard when met hazards were active at observation time. */
 function HazardBanner({ airport, timestamp }: { airport: string; timestamp: string }) {
   const [hazards, setHazards] = useState<any | null>(null);
   useEffect(() => { fetchHazards(airport).then(setHazards).catch(() => {}); }, [airport]);
@@ -760,6 +768,7 @@ interface AdsbAircraft {
 function PositionSnapshot({
   r, callsign, confidence, borderColor,
 }: { r: AnalysisResult; callsign: string | null; confidence: "high" | "low"; borderColor: string }) {
+  const { geo } = useSettings();
   const [aircraft,   setAircraft]   = useState<AdsbAircraft[] | null>(null);
   const [loading,    setLoading]    = useState(false);
   const [err,        setErr]        = useState<string | null>(null);
@@ -803,15 +812,11 @@ function PositionSnapshot({
     return { label: "En-route", detail: `FL${Math.round(altFt / 100)} · ${spdKt ?? "—"} kt` };
   };
 
-  // Distance from airport (rough, using ADS-B lat/lon vs known airport coords)
-  const AIRPORT_GEO: Record<string, [number, number]> = {
-    KJFK: [40.64,-73.78], KATL: [33.64,-84.43], VHHH: [22.31,113.92], KLAX: [33.94,-118.41], KORD: [41.97,-87.91],
-  };
   const distNmFromAirport = (a: AdsbAircraft): number | null => {
-    const geo = AIRPORT_GEO[r.airport_code];
-    if (!geo || a.latitude == null || a.longitude == null) return null;
-    const dlat = (a.latitude - geo[0]) * 60;
-    const dlon = (a.longitude - geo[1]) * 60 * Math.cos(geo[0] * Math.PI / 180);
+    const g = geo[r.airport_code];
+    if (!g || a.latitude == null || a.longitude == null) return null;
+    const dlat = (a.latitude - g[0]) * 60;
+    const dlon = (a.longitude - g[1]) * 60 * Math.cos(g[0] * Math.PI / 180);
     return Math.round(Math.sqrt(dlat*dlat + dlon*dlon) * 10) / 10;
   };
 
@@ -948,8 +953,8 @@ function PositionSnapshot({
   );
 }
 
-// ─── Violation card — full detail ────────────────────────────────────────────
-function ViolationCard({ r, priorOccurrences, lastSeenAgo }: {
+// ─── Observation card — full detail ──────────────────────────────────────────
+function ObservationCard({ r, priorOccurrences, lastSeenAgo }: {
   r: AnalysisResult;
   priorOccurrences?: number;
   lastSeenAgo?: string | null;
@@ -1078,7 +1083,7 @@ function ViolationCard({ r, priorOccurrences, lastSeenAgo }: {
         </div>
       )}
 
-      {/* ── Hazard banner — SIGMET / AIRMET / PIREP active at violation time ── */}
+      {/* ── Hazard banner — SIGMET / AIRMET / PIREP active at observation time ── */}
       <HazardBanner airport={r.airport_code} timestamp={r.timestamp} />
 
       {/* ── 1. WHAT HAPPENED ── */}
@@ -1317,7 +1322,7 @@ function ViolationCard({ r, priorOccurrences, lastSeenAgo }: {
         );
       })()}
 
-      {/* ── 4. REQUIRED ACTION ── */}
+      {/* ── 4. REVIEW GUIDANCE ── */}
       <div style={{ padding: "14px 16px 10px" }}>
         <div style={{
           display: "flex", alignItems: "flex-start", gap: 12,
@@ -1331,16 +1336,16 @@ function ViolationCard({ r, priorOccurrences, lastSeenAgo }: {
               fontSize: 10, fontWeight: 700, color: borderColor,
               letterSpacing: 1.2, textTransform: "uppercase" as const, marginBottom: 4,
             }}>
-              Required Action
+              Review Guidance
             </div>
             <p style={{ fontSize: 13, color: "#e6edf3", margin: 0, lineHeight: 1.55, fontWeight: 500 }}>
-              {ACTION_REQUIRED[severity] ?? "Document and review this incident."}
+              {ACTION_REQUIRED[severity] ?? "Document and review this observation."}
             </p>
           </div>
         </div>
       </div>
 
-      {/* ── 5. INVESTIGATION ── */}
+      {/* ── 5. REVIEW ── */}
       <div style={{
         margin: "0 16px 14px",
         background: "#0d1117", border: "1px solid #21262d",
@@ -1497,12 +1502,12 @@ const ResultCard = React.memo(function ResultCard({ r, priorOccurrences, lastSee
   const severity = getCardSeverity(r);
   if (severity === "unassessable") return <UnassessableCard r={r} />;
   if (severity === "standard") return <CompliantCard r={r} />;
-  return <ViolationCard r={r} priorOccurrences={priorOccurrences} lastSeenAgo={lastSeenAgo} />;
+  return <ObservationCard r={r} priorOccurrences={priorOccurrences} lastSeenAgo={lastSeenAgo} />;
 });
 
-// ─── Violation density sparkline ──────────────────────────────────────────────
+// ─── Observation density sparkline ────────────────────────────────────────────
 /** Mini 8-bar SVG sparkline — last 2h in 15-min buckets, coloured by worst severity. */
-export function ViolationDensity({ results, airportFilter, compact }: { results: AnalysisResult[]; airportFilter: string; compact?: boolean }) {
+export function ObservationDensity({ results, airportFilter, compact }: { results: AnalysisResult[]; airportFilter: string; compact?: boolean }) {
   const { useMemo: uM } = React;
   const data = uM(() => {
     const now = Date.now();
@@ -1564,9 +1569,27 @@ interface Props {
   results: AnalysisResult[];
   filter: Filter;
   airportFilter: string;
+  isRunning?: boolean;
+  pipelineStatus?: PipelineStatusSummary | null;
+  apiError?: string | null;
 }
 
-export function LiveFeed({ results, filter, airportFilter }: Props) {
+function emptyMessage(
+  results: AnalysisResult[],
+  isRunning?: boolean,
+  pipelineStatus?: PipelineStatusSummary | null,
+  apiError?: string | null,
+): string {
+  if (apiError) return "Unable to load analysis cards. Check the pipeline status above.";
+  if (results.length > 0) return "No results match this filter.";
+  if (!isRunning) return "Start monitoring to collect ATC transcripts.";
+  if (pipelineStatus?.last_gemini_error) return "Gemini is unavailable. Captured transcripts will appear as review cards after the batch fallback persists.";
+  if ((pipelineStatus?.queued_transcripts ?? 0) > 0) return "Transcripts are queued and waiting for the next Gemini batch.";
+  if (pipelineStatus?.last_audio_at) return "Audio is connected. Waiting for a readable ATC transmission.";
+  return "Connecting to live ATC feeds...";
+}
+
+export function LiveFeed({ results, filter, airportFilter, isRunning, pipelineStatus, apiError }: Props) {
   // Build callsign occurrence index (results ordered newest-first)
   // For each result, compute how many OLDER results share the same callsign
   const callsignIndex = React.useMemo(() => {
@@ -1589,9 +1612,25 @@ export function LiveFeed({ results, filter, airportFilter }: Props) {
   return (
     <div>
       {filtered.length === 0 && (
-        <p style={{ color: "#8b949e", textAlign: "center", marginTop: 40 }}>
-          {results.length === 0 ? "Waiting for live ATC data..." : "No results match this filter."}
-        </p>
+        <div style={{
+          color: "#8b949e",
+          textAlign: "center" as const,
+          margin: "40px auto",
+          maxWidth: 460,
+          border: "1px dashed #30363d",
+          borderRadius: 8,
+          padding: "22px 20px",
+          background: "#0d1117",
+        }}>
+          <div style={{ fontSize: 14, color: "#c9d1d9", marginBottom: 6 }}>
+            {emptyMessage(results, isRunning, pipelineStatus, apiError)}
+          </div>
+          {isRunning && results.length === 0 && (
+            <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+              The analyzer batches transcripts before creating cards, so live audio can lead visible results by several minutes.
+            </div>
+          )}
+        </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {filtered.map((r, filteredIdx) => {
