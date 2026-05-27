@@ -14,6 +14,7 @@ import { ConfidenceBadge } from "./ConfidenceBadge";
 import { RegBadge } from "./RegBadge";
 import { HazardBanner } from "./HazardBanner";
 import { StructuredTranscript } from "./StructuredTranscript";
+import { StatusWorkflow } from "./StatusWorkflow";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -47,43 +48,6 @@ const ACTION_COLOR: Record<string, string> = {
 };
 
 // ── Review workflow ───────────────────────────────────────────────────────────
-
-const STATUS_COLOR: Record<ReviewStatus, string> = {
-  new: "#484f58", under_review: "#e3b341", confirmed: "#ff4444",
-  false_positive: "#3fb950",
-};
-
-function StatusWorkflow({ resultId, initial }: { resultId?: number; initial?: string }) {
-  const [status, setStatus] = React.useState<ReviewStatus>((initial || "new") as ReviewStatus);
-  const [saving, setSaving] = React.useState(false);
-  const updateResult = useUpdateResult();
-  const change = async (s: ReviewStatus) => {
-    setStatus(s);
-    if (!resultId) return;
-    setSaving(true);
-    try {
-      await updateResult.mutateAsync({ id: resultId, patch: { status: s } });
-    } finally { setSaving(false); }
-  };
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" as const }}>
-      <span style={{ fontSize: 9, fontWeight: 700, color: "#484f58", letterSpacing: 0.8, marginRight: 2 }}>STATUS</span>
-      {(["new", "under_review", "confirmed", "false_positive"] as ReviewStatus[]).map(s => (
-        <button key={s} onClick={() => change(s)} style={{
-          fontSize: 9, fontWeight: 700, letterSpacing: 0.3,
-          padding: "2px 7px", borderRadius: 4, cursor: "pointer", fontFamily: "inherit",
-          background: status === s ? STATUS_COLOR[s] + "22" : "transparent",
-          border: `1px solid ${status === s ? STATUS_COLOR[s] : "#30363d"}`,
-          color: status === s ? STATUS_COLOR[s] : "#484f58",
-          transition: "all 0.12s",
-        }}>
-          {STATUS_LABEL[s]}
-        </button>
-      ))}
-      {saving && <span style={{ fontSize: 9, color: "#484f58" }}>saving…</span>}
-    </div>
-  );
-}
 
 function ReviewerNotes({ resultId, initial }: { resultId?: number; initial?: string }) {
   const [notes, setNotes] = React.useState(initial ?? "");

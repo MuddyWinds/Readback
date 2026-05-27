@@ -1,0 +1,41 @@
+.container {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-faint);
+  letter-spacing: 0.8px;
+  margin-right: 2px;
+}
+
+.btn {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+  /* defaults for inactive state */
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+}
+
+/* Active state: set --sw-color as the accent for this status */
+.btnActive {
+  background: color-mix(in srgb, var(--sw-color) 13%, transparent);
+  border-color: var(--sw-color);
+  color: var(--sw-color);
+}
+
+.saving {
+  font-size: 9px;
+  color: var(--text-faint);
+}
