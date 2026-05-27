@@ -13,8 +13,9 @@ import time
 import httpx
 from fastapi import APIRouter
 
-from backend.core.state import adsb_snapshots
 from backend.core.airports import airport_geo
+from backend.db.database import AsyncSessionLocal
+from backend.db.models import AnalysisResultDB
 
 router = APIRouter()
 
@@ -47,11 +48,15 @@ def _parse_opensky_states(raw: dict) -> list[dict]:
 
 @router.get("/api/adsb-snapshot/{result_id}")
 async def get_adsb_snapshot(result_id: int):
-    """Return the ADS-B snapshot captured at the time this result was analysed."""
-    snap = adsb_snapshots.get(result_id)
-    if not snap:
+    """Return the ADS-B snapshot captured at the time this result was analysed.
+
+    Reads from the persisted result row, so snapshots survive restarts.
+    """
+    async with AsyncSessionLocal() as session:
+        row = await session.get(AnalysisResultDB, result_id)
+    if not row or not row.adsb_snapshot:
         return {"error": "No snapshot available for this result", "aircraft": []}
-    return snap
+    return row.adsb_snapshot
 
 
 @router.get("/api/adsb/{airport_code}")
