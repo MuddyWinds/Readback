@@ -1,8 +1,8 @@
 /* Outer container — border driven by borderColor prop via --ps-border CSS var */
 .container {
   margin-top: 10px;
-  background: color-mix(in srgb, var(--ps-border) 3%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ps-border) 13%, transparent);
+  background: color-mix(in srgb, var(--ps-border) 3.1373%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ps-border) 13.3333%, transparent);
   border-left: 3px solid var(--ps-border);
   border-radius: 0 6px 6px 0;
   padding: 10px 14px;
@@ -43,8 +43,8 @@
 .phoneticMatch {
   font-size: 9px;
   color: var(--sev-medium);
-  background: color-mix(in srgb, var(--sev-medium) 9%, transparent);
-  border: 1px solid color-mix(in srgb, var(--sev-medium) 27%, transparent);
+  background: color-mix(in srgb, var(--sev-medium) 9.4118%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-medium) 26.6667%, transparent);
   border-radius: 3px;
   padding: 1px 5px;
 }
@@ -131,13 +131,13 @@
 .statValue {
   font-size: 11px;
   font-family: monospace;
-  color: var(--text);
+  color: var(--text-sub);
   font-weight: 600;
 }
 
 .notFoundText {
   font-size: 11px;
-  color: var(--text-faint);
+  color: var(--text-ghost);
   margin: 0;
   font-style: italic;
 }
@@ -159,7 +159,7 @@
 
 .workloadPrefix {
   font-size: 10px;
-  color: var(--text-faint);
+  color: var(--text-ghost);
 }
 
 .workloadValue {
@@ -189,13 +189,13 @@
 }
 
 .conflictSepLoss {
-  background: color-mix(in srgb, var(--sev-critical) 7%, transparent);
-  border: 1px solid color-mix(in srgb, var(--sev-critical) 27%, transparent);
+  background: color-mix(in srgb, var(--sev-critical) 7.0588%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-critical) 26.6667%, transparent);
 }
 
 .conflictProxAlert {
-  background: color-mix(in srgb, var(--sev-high) 6%, transparent);
-  border: 1px solid color-mix(in srgb, var(--sev-high) 19%, transparent);
+  background: color-mix(in srgb, var(--sev-high) 6.2745%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-high) 18.8235%, transparent);
 }
 
 .conflictLevelSepLoss {
@@ -215,12 +215,12 @@
 .conflictCallsigns {
   font-size: 10px;
   font-family: monospace;
-  color: var(--text);
+  color: var(--text-sub);
 }
 
 .conflictDist {
   font-size: 10px;
-  color: var(--text-faint);
+  color: var(--text-ghost);
   margin-left: auto;
   white-space: nowrap;
 }

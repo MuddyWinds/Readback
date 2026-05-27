@@ -1,7 +1,7 @@
 .badge {
   font-size: 10px;
   font-family: monospace;
-  color: var(--text);
+  color: var(--text-sub);
   background: var(--surface-2);
   border: 1px solid var(--border);
   padding: 2px 8px;

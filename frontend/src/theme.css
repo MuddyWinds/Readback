@@ -8,6 +8,8 @@
   --text: #e6edf3;
   --text-dim: #8b949e;
   --text-faint: #484f58;
+  --text-sub: #c9d1d9;     /* mid-gray body/secondary text */
+  --text-ghost: #6e7681;   /* dim secondary label text */
   --accent: #58a6ff;
   --accent-warm: #f78166;
 
@@ -18,6 +20,8 @@
   --sev-high: #ff8800;
   --sev-critical: #ff4444;
   --sev-unassessable: #484f58;
+
+  --accent-success: #2ea043; /* brighter confirm-green (save button) */
 
   /* Severity - card border */
   --sev-standard-border: #238636;

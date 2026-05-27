@@ -30,7 +30,7 @@
 
 /* Active state: set --sw-color as the accent for this status */
 .btnActive {
-  background: color-mix(in srgb, var(--sw-color) 13%, transparent);
+  background: color-mix(in srgb, var(--sw-color) 13.3333%, transparent);
   border-color: var(--sw-color);
   color: var(--sw-color);
 }
