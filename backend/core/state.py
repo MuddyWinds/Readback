@@ -1,6 +1,11 @@
 """
 Shared in-process state referenced by both the batcher and the API layer.
 Kept in one place so there is a single source of truth for each data structure.
+
+Single-process by design: ``monitor_tasks``, ``transcript_queue``, and
+``websocket_clients`` are intentionally process-local - Readback runs as one
+worker. Scaling to multiple workers/processes would require externalizing these
+(e.g. Redis-backed queue and pub/sub), which is explicitly out of scope.
 """
 
 import asyncio
@@ -16,9 +21,6 @@ websocket_clients: list[WebSocket] = []
 
 # Queue of raw transcript dicts waiting for batch Gemini analysis
 transcript_queue: asyncio.Queue = asyncio.Queue()
-
-# ADS-B snapshots captured at analysis time, keyed by AnalysisResultDB.id
-adsb_snapshots: dict[int, dict] = {}
 
 # Lightweight operational telemetry for the dashboard. Kept in-process because
 # it describes the current worker loop rather than historical analysis data.
