@@ -4,8 +4,8 @@ import "leaflet/dist/leaflet.css";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import { useSettings } from "../SettingsContext";
 import { ObservationDensity, AnalysisResult } from "./LiveFeed";
-import { API_BASE } from "../lib/api";
 import { AirportAnalytics } from "./airport/AirportAnalytics";
+import { useAdsb, useMetar, useNotam } from "../lib/queries";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -645,49 +645,20 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
   const [mapHeight, setMapHeight] = useState(280);
   const dragRef = useRef<{ startY: number; startH: number } | null>(null);
 
-  const [metar,     setMetar]     = useState<MetarData | null>(null);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState<string | null>(null);
-  const [rawAdsb,   setRawAdsb]   = useState<RawAircraft[]>([]);
-  const [adsbAge,   setAdsbAge]   = useState<number | null>(null);
-  const [notams,    setNotams]    = useState<any[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [, forceTick] = useState(0);
   const airportResults = useMemo(
     () => results.filter(r => r.airport_code === airportCode),
     [results, airportCode],
   );
+  const metarQuery = useMetar(airportCode);
+  const notamQuery = useNotam(airportCode);
+  const adsb = useAdsb(geo ? airportCode : "", 60_000);
 
-  // METAR
   useEffect(() => {
-    setLoading(true); setError(null); setMetar(null);
-    fetch(`${API_BASE}/api/metar/${airportCode}`)
-      .then(r => r.json())
-      .then((d: MetarData) => { if (d.error) setError(d.error); else setMetar(d); setLoading(false); })
-      .catch(e => { setError(String(e)); setLoading(false); });
-  }, [airportCode]);
-
-  // ADS-B
-  useEffect(() => {
-    if (!geo) return;
-    const refresh = () => {
-      fetch(`${API_BASE}/api/adsb/${airportCode}`)
-        .then(r => r.json())
-        .then(d => { setRawAdsb(d.aircraft ?? []); setAdsbAge(0); })
-        .catch(() => {});
-    };
-    refresh();
-    const ageTimer  = setInterval(() => setAdsbAge(a => (a ?? 0) + 1), 1000);
-    const dataTimer = setInterval(refresh, 60_000);
-    return () => { clearInterval(ageTimer); clearInterval(dataTimer); };
-  }, [airportCode, geo]);
-
-  // NOTAMs
-  useEffect(() => {
-    fetch(`${API_BASE}/api/notam/${airportCode}`)
-      .then(r => r.json())
-      .then(d => setNotams(d.notams ?? []))
-      .catch(() => {});
-  }, [airportCode]);
+    const t = setInterval(() => forceTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   // Drag-to-resize handlers
   useEffect(() => {
@@ -707,6 +678,12 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
     () => buildMonitorIndex(results, airportCode),
     [results, airportCode],
   );
+  const metarData = metarQuery.data as MetarData | undefined;
+  const metar = metarData && !metarData.error ? metarData : null;
+  const loading = metarQuery.isLoading;
+  const error = metarData?.error ?? (metarQuery.error ? String((metarQuery.error as Error).message) : null);
+  const rawAdsb = (adsb.data?.aircraft ?? []) as RawAircraft[];
+  const notams = notamQuery.data?.notams ?? [];
   const aircraft = useMemo(
     () => (geo ? processAdsb(rawAdsb, geo[0], geo[1], monitorIdx) : []),
     [rawAdsb, geo, monitorIdx],
@@ -728,6 +705,7 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
   const altimStr  = metar?.altim != null ? `${hpaToInhg(metar.altim)} inHg` : "—";
   const tempStr   = metar ? `${metar.temp ?? "—"} °C / ${metar.dewp ?? "—"} °C` : "—";
 
+  const adsbAge = adsb.dataUpdatedAt ? Math.round((Date.now() - adsb.dataUpdatedAt) / 1000) : null;
   const ageLabel  = adsbAge == null ? "" : adsbAge < 10 ? "Live" : adsbAge < 120 ? `${adsbAge}s ago` : `${Math.round(adsbAge / 60)}m ago`;
   const airborne    = aircraft.filter(a => a.phase !== "gnd").length;
   const onGround    = aircraft.filter(a => a.phase === "gnd").length;
@@ -797,12 +775,7 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
                     </span>
                   )}
                   <button
-                    onClick={() => {
-                      fetch(`${API_BASE}/api/adsb/${airportCode}`)
-                        .then(r => r.json())
-                        .then(d => { setRawAdsb(d.aircraft ?? []); setAdsbAge(0); })
-                        .catch(() => {});
-                    }}
+                    onClick={() => adsb.refetch()}
                     style={{ background: "none", border: "1px solid #30363d", color: "#6e7681", cursor: "pointer", fontSize: 11, padding: "1px 6px", borderRadius: 3 }}
                   >
                     ↻

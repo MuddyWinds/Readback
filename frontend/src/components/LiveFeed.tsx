@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useSettings } from "../SettingsContext";
-import { API_BASE } from "../lib/api";
 import { getCardSeverity, SEV_ORDER, type Severity } from "../lib/severity";
+import { useAdsb, useAdsbSnapshot, useHazards, useUpdateResult } from "../lib/queries";
 
 export interface SpeakerSegment { role: "ATC" | "PILOT" | "UNKNOWN"; text: string; }
 
@@ -404,15 +404,13 @@ const STATUS_COLOR: Record<ReviewStatus, string> = {
 function StatusWorkflow({ resultId, initial }: { resultId?: number; initial?: string }) {
   const [status, setStatus] = React.useState<ReviewStatus>((initial || "new") as ReviewStatus);
   const [saving, setSaving] = React.useState(false);
+  const updateResult = useUpdateResult();
   const change = async (s: ReviewStatus) => {
     setStatus(s);
     if (!resultId) return;
     setSaving(true);
     try {
-      await fetch(`${API_BASE}/api/results/${resultId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: s }),
-      });
+      await updateResult.mutateAsync({ id: resultId, patch: { status: s } });
     } finally { setSaving(false); }
   };
   return (
@@ -439,15 +437,17 @@ function ReviewerNotes({ resultId, initial }: { resultId?: number; initial?: str
   const [notes, setNotes] = React.useState(initial ?? "");
   const [editing, setEditing] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const updateResult = useUpdateResult();
   const save = async () => {
     setSaving(true);
-    if (resultId) {
-      await fetch(`${API_BASE}/api/results/${resultId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reviewer_notes: notes }),
-      });
+    try {
+      if (resultId) {
+        await updateResult.mutateAsync({ id: resultId, patch: { reviewer_notes: notes } });
+      }
+      setEditing(false);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false); setEditing(false);
   };
   return (
     <div>
@@ -642,18 +642,6 @@ function CompliantCard({ r }: { r: AnalysisResult }) {
   );
 }
 
-// ── Module-level hazard cache (shared across all cards) ───────────────────────
-const _hazardCache = new Map<string, { data: any; ts: number }>();
-const _HAZARD_TTL  = 5 * 60 * 1000;
-
-function fetchHazards(airportCode: string): Promise<any> {
-  const cached = _hazardCache.get(airportCode);
-  if (cached && Date.now() - cached.ts < _HAZARD_TTL) return Promise.resolve(cached.data);
-  return fetch(`${API_BASE}/api/hazards/${airportCode}`)
-    .then(r => r.json())
-    .then(d => { _hazardCache.set(airportCode, { data: d, ts: Date.now() }); return d; });
-}
-
 function isActiveAt(from: string | null, to: string | null, ts: string): boolean {
   const t = new Date(ts.endsWith("Z") ? ts : ts + "Z").getTime();
   const f = from ? new Date(from).getTime() : 0;
@@ -663,8 +651,7 @@ function isActiveAt(from: string | null, to: string | null, ts: string): boolean
 
 /** Banner shown on ObservationCard when met hazards were active at observation time. */
 function HazardBanner({ airport, timestamp }: { airport: string; timestamp: string }) {
-  const [hazards, setHazards] = useState<any | null>(null);
-  useEffect(() => { fetchHazards(airport).then(setHazards).catch(() => {}); }, [airport]);
+  const { data: hazards } = useHazards(airport);
   if (!hazards) return null;
 
   const activeSigmets = (hazards.sigmets ?? []).filter((s: any) => isActiveAt(s.from, s.to, timestamp));
@@ -758,31 +745,17 @@ function PositionSnapshot({
   r, callsign, confidence, borderColor,
 }: { r: AnalysisResult; callsign: string | null; confidence: "high" | "low"; borderColor: string }) {
   const { geo } = useSettings();
-  const [aircraft,   setAircraft]   = useState<AdsbAircraft[] | null>(null);
-  const [loading,    setLoading]    = useState(false);
-  const [err,        setErr]        = useState<string | null>(null);
-  const [dataSource, setDataSource] = useState<"snapshot" | "live" | null>(null);
-
-  useEffect(() => {
-    setLoading(true); setErr(null);
-    const tryLive = () => {
-      fetch(`${API_BASE}/api/adsb/${r.airport_code}`)
-        .then(res => res.json())
-        .then(d => { setAircraft(d.aircraft ?? []); setDataSource("live"); setLoading(false); })
-        .catch(() => { setErr("Could not fetch ADS-B data"); setLoading(false); });
-    };
-    if (r.id) {
-      fetch(`${API_BASE}/api/adsb-snapshot/${r.id}`)
-        .then(res => res.json())
-        .then(d => {
-          if (d.error || !d.aircraft) { tryLive(); return; }
-          setAircraft(d.aircraft); setDataSource("snapshot"); setLoading(false);
-        })
-        .catch(tryLive);
-    } else {
-      tryLive();
-    }
-  }, [r.id, r.airport_code]);
+  const snapshot = useAdsbSnapshot(r.id);
+  const snapshotData = snapshot.data;
+  const shouldFetchLive =
+    !r.id || snapshot.isError || Boolean(snapshotData?.error) || (snapshot.isSuccess && !snapshotData?.aircraft);
+  const live = useAdsb(shouldFetchLive ? r.airport_code : "");
+  const aircraft = (shouldFetchLive ? live.data?.aircraft : snapshotData?.aircraft) as AdsbAircraft[] | null | undefined;
+  const loading = (r.id && snapshot.isLoading) || (shouldFetchLive && live.isLoading);
+  const err = shouldFetchLive && live.isError ? "Could not fetch ADS-B data" : null;
+  const dataSource: "snapshot" | "live" | null = aircraft
+    ? (shouldFetchLive ? "live" : "snapshot")
+    : null;
 
   const matched = aircraft?.find(a =>
     callsign && a.callsign && a.callsign.replace(/\s/g, "") === callsign.replace(/\s/g, "")
