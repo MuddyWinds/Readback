@@ -1,0 +1,171 @@
+/* Raw transcript fallback */
+.rawTranscript {
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--text-dim);
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+/* Structured transcript container */
+.segList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.segRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* Speaker role badges */
+.roleChip {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  border-radius: 3px;
+  padding: 2px 5px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-family: monospace;
+}
+
+.roleAtc {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 27%, transparent);
+}
+
+.rolePilot {
+  color: var(--sev-standard);
+  background: color-mix(in srgb, var(--sev-standard) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-standard) 27%, transparent);
+}
+
+.roleUnknown {
+  color: var(--text-faint);
+  background: color-mix(in srgb, var(--text-faint) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-faint) 27%, transparent);
+}
+
+.segText {
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+
+/* Readback blocks */
+.readbackLowConf {
+  margin-top: 6px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 7px 12px;
+}
+
+.readbackLowConfText {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.readbackBlock {
+  margin-top: 6px;
+  border-radius: 0 6px 6px 0;
+  padding: 8px 12px;
+}
+
+.readbackAsr {
+  background: color-mix(in srgb, var(--sev-medium) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-medium) 27%, transparent);
+  border-left: 3px solid var(--sev-medium);
+}
+
+.readbackDiscrep {
+  background: color-mix(in srgb, var(--sev-critical) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-critical) 27%, transparent);
+  border-left: 3px solid var(--sev-critical);
+}
+
+.readbackHeading {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.readbackHeadingAsr {
+  color: var(--sev-medium);
+}
+
+.readbackHeadingDiscrep {
+  color: var(--sev-critical);
+}
+
+.readbackRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.readbackRowLast {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.readbackAtcLabel {
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 700;
+  min-width: 50px;
+}
+
+.readbackPilotLabel {
+  font-size: 10px;
+  color: var(--sev-standard);
+  font-weight: 700;
+  min-width: 50px;
+}
+
+.readbackInstruction {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--text);
+}
+
+.readbackValueAsr {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--sev-medium);
+}
+
+.readbackValueDiscrep {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--sev-high);
+}
+
+.readbackDiscrepText {
+  font-size: 11px;
+}
+
+.readbackDiscrepTextAsr {
+  color: var(--sev-medium);
+}
+
+.readbackDiscrepTextDiscrep {
+  color: var(--sev-high);
+}
+
+.readbackAsrNote {
+  font-size: 10px;
+  color: var(--text-faint);
+  margin-top: 4px;
+  font-style: italic;
+}

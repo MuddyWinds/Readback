@@ -4,7 +4,7 @@ import { useSettings } from "../../SettingsContext";
 import { getCardSeverity, SEV_ORDER } from "../../lib/severity";
 import type { AnalysisResult, Enrichment, Observation, Severity, Filter } from "../../lib/types";
 import { useAdsb, useAdsbSnapshot, useUpdateResult } from "../../lib/queries";
-import { extractCallsign, isAsrAmbiguous, extractActions, parseBullets } from "../../lib/transcript";
+import { extractCallsign, extractActions, parseBullets } from "../../lib/transcript";
 import { detectConflicts, AdsbAircraft } from "../../lib/conflicts";
 import { buildReportText } from "../../lib/report";
 import { useWatchList } from "../../hooks/useWatchList";
@@ -13,6 +13,7 @@ import { SectionLabel } from "./SectionLabel";
 import { ConfidenceBadge } from "./ConfidenceBadge";
 import { RegBadge } from "./RegBadge";
 import { HazardBanner } from "./HazardBanner";
+import { StructuredTranscript } from "./StructuredTranscript";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -44,100 +45,6 @@ const ACTION_COLOR: Record<string, string> = {
   "GO AROUND": "#ff7b72", HOLD: "#e3b341", EMERGENCY: "#ff4444", TURN: "#a5d6ff",
   SPEED: "#ffa657", "FREQ CHANGE": "#8b949e", PUSHBACK: "#bc8cff", TAXI: "#c9d1d9",
 };
-
-/** Structured transcript: speaker-labelled turns, readback comparison. */
-function StructuredTranscript({
-  enrichment, rawTranscript, borderColor, assessableConfidence,
-}: { enrichment: Enrichment | null | undefined; rawTranscript: string; borderColor: string; assessableConfidence?: number }) {
-  const segs = enrichment?.speaker_segments;
-  const hasStructure = segs && segs.length > 0 && segs.some(s => s.role !== "UNKNOWN");
-
-  if (!hasStructure) {
-    return (
-      <div style={{
-        background: "#0d1117", borderRadius: 6, padding: "12px 14px",
-        fontSize: 12, fontFamily: "'SF Mono', 'Fira Code', monospace",
-        color: "#8b949e", lineHeight: 1.75, whiteSpace: "pre-wrap" as const,
-      }}>
-        {rawTranscript}
-      </div>
-    );
-  }
-
-  const roleColor = { ATC: "#58a6ff", PILOT: "#3fb950", UNKNOWN: "#6e7681" };
-  const roleLabel = { ATC: "ATC", PILOT: "PIL", UNKNOWN: "???" };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {segs!.map((seg, i) => (
-        <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-          <span style={{
-            fontSize: 9, fontWeight: 700, letterSpacing: 0.8,
-            color: roleColor[seg.role],
-            background: roleColor[seg.role] + "18",
-            border: `1px solid ${roleColor[seg.role]}44`,
-            borderRadius: 3, padding: "2px 5px",
-            flexShrink: 0, marginTop: 1, fontFamily: "monospace",
-          }}>
-            {roleLabel[seg.role]}
-          </span>
-          <span style={{
-            fontSize: 12, fontFamily: "'SF Mono','Fira Code',monospace",
-            color: "#8b949e", lineHeight: 1.7,
-          }}>
-            {seg.text}
-          </span>
-        </div>
-      ))}
-
-      {/* Readback comparison block */}
-      {enrichment?.readback_correct === false && enrichment.readback_discrepancy && (() => {
-        const lowConfidence = (assessableConfidence ?? 1) < 0.6;
-        const asrAmbig = isAsrAmbiguous(enrichment.atc_instruction, enrichment.pilot_readback);
-        if (lowConfidence) {
-          return (
-            <div style={{ marginTop: 6, background: "#21262d", borderRadius: 6, padding: "7px 12px" }}>
-              <span style={{ fontSize: 10, color: "#484f58", fontStyle: "italic" }}>
-                ⚠ Transcript quality insufficient to verify readback — manual review required.
-              </span>
-            </div>
-          );
-        }
-        return (
-          <div style={{
-            marginTop: 6,
-            background: asrAmbig ? "#e3b34112" : "#ff444412",
-            border: `1px solid ${asrAmbig ? "#e3b34144" : "#ff444444"}`,
-            borderLeft: `3px solid ${asrAmbig ? "#e3b341" : "#ff4444"}`,
-            borderRadius: "0 6px 6px 0", padding: "8px 12px",
-          }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: asrAmbig ? "#e3b341" : "#ff4444", letterSpacing: 1, marginBottom: 4 }}>
-              {asrAmbig ? "POSSIBLE ASR ARTEFACT — VERIFY MANUALLY" : "READBACK DISCREPANCY DETECTED"}
-            </div>
-            {enrichment.atc_instruction && (
-              <div style={{ display: "flex", gap: 6, marginBottom: 3 }}>
-                <span style={{ fontSize: 10, color: "#58a6ff", fontWeight: 700, minWidth: 50 }}>ATC:</span>
-                <span style={{ fontSize: 11, fontFamily: "monospace", color: "#c9d1d9" }}>{enrichment.atc_instruction}</span>
-              </div>
-            )}
-            {enrichment.pilot_readback && (
-              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-                <span style={{ fontSize: 10, color: "#3fb950", fontWeight: 700, minWidth: 50 }}>Pilot:</span>
-                <span style={{ fontSize: 11, fontFamily: "monospace", color: asrAmbig ? "#e3b341" : "#ff8800" }}>{enrichment.pilot_readback}</span>
-              </div>
-            )}
-            <div style={{ fontSize: 11, color: asrAmbig ? "#e3b341" : "#ff8800" }}>{enrichment.readback_discrepancy}</div>
-            {asrAmbig && (
-              <div style={{ fontSize: 10, color: "#484f58", marginTop: 4, fontStyle: "italic" }}>
-                Values normalise to the same number after removing ASR phonetic substitutions — likely not a true error.
-              </div>
-            )}
-          </div>
-        );
-      })()}
-    </div>
-  );
-}
 
 // ── Review workflow ───────────────────────────────────────────────────────────
 
