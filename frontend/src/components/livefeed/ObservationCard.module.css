@@ -72,11 +72,11 @@
   color: var(--text-dim);
 }
 
-/* --accent set per-chip via inline style */
+/* --chip-accent set per-chip via inline style */
 .actionChip {
   background: var(--surface);
-  border: 1px solid var(--accent);
-  color: var(--accent);
+  border: 1px solid var(--chip-accent);
+  color: var(--chip-accent);
   padding: 1px 7px;
   border-radius: 4px;
   font-size: 10px;

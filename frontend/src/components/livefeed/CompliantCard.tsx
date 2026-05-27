@@ -31,7 +31,7 @@ export function CompliantCard({ r }: { r: AnalysisResult }) {
           <span
             key={a}
             className={styles.actionChip}
-            style={{ ["--accent" as any]: `var(${ACTION_TOKEN[a] ?? "--text-dim"})` }}
+            style={{ ["--chip-accent" as any]: `var(${ACTION_TOKEN[a] ?? "--text-dim"})` }}
           >
             {a}
           </span>

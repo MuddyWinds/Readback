@@ -43,11 +43,11 @@
   flex-shrink: 0;
 }
 
-/* --accent is set per-chip via inline style to the resolved action token */
+/* --chip-accent is set per-chip via inline style to the resolved action token */
 .actionChip {
   background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--accent) 26.6667%, transparent);
-  color: color-mix(in srgb, var(--accent) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chip-accent) 26.6667%, transparent);
+  color: color-mix(in srgb, var(--chip-accent) 60%, transparent);
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 10px;

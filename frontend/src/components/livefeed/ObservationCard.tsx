@@ -88,7 +88,7 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo }: Props) {
             <span
               key={a}
               className={styles.actionChip}
-              style={{ ["--accent" as any]: `var(${ACTION_TOKEN[a] ?? "--text-dim"})` }}
+              style={{ ["--chip-accent" as any]: `var(${ACTION_TOKEN[a] ?? "--text-dim"})` }}
             >
               {a}
             </span>
