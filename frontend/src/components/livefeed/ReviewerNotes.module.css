@@ -38,7 +38,7 @@
 
 .saveBtn {
   font-size: 11px;
-  color: #fff;
+  color: white;
   background: var(--sev-standard-border);
   border: 1px solid var(--accent-success);
   border-radius: 4px;
