@@ -9,6 +9,7 @@ import { truncateAtChapter } from "../../lib/regs";
 import { isActiveAt, detectConflicts, AdsbAircraft } from "../../lib/conflicts";
 import { buildReportText } from "../../lib/report";
 import { useWatchList } from "../../hooks/useWatchList";
+import { SEV_LABEL, SEV_ICON, ACTION_REQUIRED, HFACS_PLAIN, STATUS_LABEL, ReviewStatus } from "./constants";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -31,29 +32,9 @@ const SEV_BG: Record<Severity, string> = {
   standard: "#0d1117", low: "#0d1527", medium: "#1f1a0d", high: "#1a1005", critical: "#1f0d0d",
   unassessable: "#0d1117",
 };
-const SEV_LABEL: Record<Severity, string> = {
-  standard: "STANDARD", low: "LOW", medium: "MEDIUM", high: "HIGH", critical: "CRITICAL",
-  unassessable: "UNASSESSABLE",
-};
-const SEV_ICON: Record<string, string> = {
-  critical: "🚨", high: "⚠️", medium: "📋", low: "📝", unassessable: "◌",
-};
-const ACTION_REQUIRED: Record<string, string> = {
-  critical: "Treat as a high-priority study item. Verify the transcript, review the context, and avoid drawing operational conclusions from this tool alone.",
-  high:     "Verify the transcript and supporting context before using this as a training or research example.",
-  medium:   "Save for review and compare against standard phraseology when studying the session.",
-  low:      "Log as a low-priority learning note. No operational action is implied.",
-};
 const SEV_COLOR: Record<string, string> = {
   critical: "#ff4444", high: "#ff8800", medium: "#e3b341", low: "#44aaff", unassessable: "#484f58",
 };
-const HFACS_PLAIN: Record<string, string> = {
-  "Unsafe Act":               "Front-line action or communication choice",
-  "Precondition":             "Environmental or physiological condition that enabled the error",
-  "Unsafe Supervision":       "Supervisory or task-management context",
-  "Organizational Influence": "Policy, culture, or resource context",
-};
-
 
 const ACTION_COLOR: Record<string, string> = {
   CLIMB: "#3fb950", DESCEND: "#58a6ff", TAKEOFF: "#d2a8ff", LANDING: "#79c0ff",
@@ -224,11 +205,6 @@ function RegBadge({ regulation }: { regulation: string }) {
 
 // ── Review workflow ───────────────────────────────────────────────────────────
 
-type ReviewStatus = "new" | "under_review" | "confirmed" | "false_positive";
-const STATUS_LABEL: Record<ReviewStatus, string> = {
-  new: "NEW", under_review: "REVIEWING", confirmed: "CONFIRMED",
-  false_positive: "FALSE +VE",
-};
 const STATUS_COLOR: Record<ReviewStatus, string> = {
   new: "#484f58", under_review: "#e3b341", confirmed: "#ff4444",
   false_positive: "#3fb950",
