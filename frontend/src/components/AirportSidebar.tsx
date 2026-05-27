@@ -4,8 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import { useSettings } from "../SettingsContext";
 import { ObservationDensity, AnalysisResult } from "./LiveFeed";
-
-const API_BASE = "http://localhost:8000";
+import { API_BASE } from "../lib/api";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

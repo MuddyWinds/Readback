@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useSettings } from "../SettingsContext";
+import { API_BASE } from "../lib/api";
 
 export interface SpeakerSegment { role: "ATC" | "PILOT" | "UNKNOWN"; text: string; }
 
@@ -420,7 +421,7 @@ function StatusWorkflow({ resultId, initial }: { resultId?: number; initial?: st
     if (!resultId) return;
     setSaving(true);
     try {
-      await fetch(`http://localhost:8000/api/results/${resultId}`, {
+      await fetch(`${API_BASE}/api/results/${resultId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: s }),
       });
@@ -453,7 +454,7 @@ function ReviewerNotes({ resultId, initial }: { resultId?: number; initial?: str
   const save = async () => {
     setSaving(true);
     if (resultId) {
-      await fetch(`http://localhost:8000/api/results/${resultId}`, {
+      await fetch(`${API_BASE}/api/results/${resultId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reviewer_notes: notes }),
       });
@@ -660,7 +661,7 @@ const _HAZARD_TTL  = 5 * 60 * 1000;
 function fetchHazards(airportCode: string): Promise<any> {
   const cached = _hazardCache.get(airportCode);
   if (cached && Date.now() - cached.ts < _HAZARD_TTL) return Promise.resolve(cached.data);
-  return fetch(`http://localhost:8000/api/hazards/${airportCode}`)
+  return fetch(`${API_BASE}/api/hazards/${airportCode}`)
     .then(r => r.json())
     .then(d => { _hazardCache.set(airportCode, { data: d, ts: Date.now() }); return d; });
 }
@@ -777,13 +778,13 @@ function PositionSnapshot({
   useEffect(() => {
     setLoading(true); setErr(null);
     const tryLive = () => {
-      fetch(`http://localhost:8000/api/adsb/${r.airport_code}`)
+      fetch(`${API_BASE}/api/adsb/${r.airport_code}`)
         .then(res => res.json())
         .then(d => { setAircraft(d.aircraft ?? []); setDataSource("live"); setLoading(false); })
         .catch(() => { setErr("Could not fetch ADS-B data"); setLoading(false); });
     };
     if (r.id) {
-      fetch(`http://localhost:8000/api/adsb-snapshot/${r.id}`)
+      fetch(`${API_BASE}/api/adsb-snapshot/${r.id}`)
         .then(res => res.json())
         .then(d => {
           if (d.error || !d.aircraft) { tryLive(); return; }

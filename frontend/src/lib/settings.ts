@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000";
+import { API_BASE } from "./api";
 
 export interface Runway { ident: string; heading_deg: number; }
 
