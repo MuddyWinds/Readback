@@ -50,7 +50,7 @@ async def test_fresh_db_applies_all_steps_and_records(tmp_path):
         await engine.dispose()
 
     assert versions == {v for v, _, _ in MIGRATIONS}
-    assert {"enrichment", "status", "reviewer_notes"} <= cols
+    assert {"enrichment", "status", "reviewer_notes", "adsb_snapshot"} <= cols
 
 
 # Schema already carrying every migrated column (e.g. produced by the old

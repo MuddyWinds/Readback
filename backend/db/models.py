@@ -33,6 +33,7 @@ class AnalysisResultDB(Base):
     enrichment = Column(JSON, nullable=True)  # speaker_segments, readback comparison, callsign clarity
     status = Column(String(20), default="new")  # new/under_review/confirmed/false_positive
     reviewer_notes = Column(Text, nullable=True)
+    adsb_snapshot = Column(JSON, nullable=True)  # ADS-B aircraft captured at analysis time
 
 
 class AppSettingsDB(Base):

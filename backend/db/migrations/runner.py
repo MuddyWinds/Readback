@@ -56,6 +56,11 @@ MIGRATIONS: list[tuple[str, str, Callable]] = [
         "add analysis_results.reviewer_notes",
         lambda c: _add_column_if_missing(c, "analysis_results", "reviewer_notes", "TEXT"),
     ),
+    (
+        "0004_adsb_snapshot_column",
+        "add analysis_results.adsb_snapshot",
+        lambda c: _add_column_if_missing(c, "analysis_results", "adsb_snapshot", "JSON"),
+    ),
 ]
 
 
