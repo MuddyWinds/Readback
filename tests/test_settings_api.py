@@ -80,3 +80,62 @@ def test_verify_feed_rejects_disallowed_host_without_network(monkeypatch):
     body = TestClient(app).post("/api/settings/verify-feed", json={"url": "http://evil.example.com/x"}).json()
     assert body["ok"] is False
     assert "liveatc" in body["reason"].lower()
+
+
+def test_verify_feed_picks_audio_first(monkeypatch):
+    settings_api, app = _client(monkeypatch)
+
+    async def fake_probe(url):
+        return (206, "audio/mpeg")
+
+    monkeypatch.setattr(settings_api, "_probe", fake_probe)
+
+    body = TestClient(app).post("/api/settings/verify-feed", json={
+        "url": "https://www.liveatc.net/hlisten.php?mount=vhhh5&icao=vhhh"
+    }).json()
+    assert body["ok"] is True
+    assert body["stream_url"] == "http://audio.liveatc.net/vhhh5"
+    assert body["suggested_code"] == "VHHH"
+
+
+def test_verify_feed_falls_back_to_feeds(monkeypatch):
+    settings_api, app = _client(monkeypatch)
+
+    async def fake_probe(url):
+        if "audio.liveatc.net" in url:
+            raise RuntimeError("audio down")
+        return (200, "audio/mpeg")
+
+    monkeypatch.setattr(settings_api, "_probe", fake_probe)
+
+    body = TestClient(app).post("/api/settings/verify-feed", json={
+        "url": "https://www.liveatc.net/hlisten.php?mount=vhhh5&icao=vhhh"
+    }).json()
+    assert body["ok"] is True
+    assert body["stream_url"] == "http://feeds.liveatc.net/vhhh5"
+
+
+def test_verify_feed_all_candidates_fail(monkeypatch):
+    settings_api, app = _client(monkeypatch)
+
+    async def fake_probe(url):
+        raise RuntimeError("nope")
+
+    monkeypatch.setattr(settings_api, "_probe", fake_probe)
+
+    body = TestClient(app).post("/api/settings/verify-feed", json={
+        "url": "http://audio.liveatc.net/vhhh5"
+    }).json()
+    assert body["ok"] is False
+    assert body["stream_url"] is None
+
+
+def test_put_message_mentions_verify_for_bad_host(monkeypatch):
+    settings_api, app = _client(monkeypatch)
+    resp = TestClient(app).put("/api/settings", json={
+        "gemini_api_key": "k",
+        "feeds": [{"url": "http://evil.example.com/x", "airport_code": "KJFK"}],
+        "runtime": {},
+    })
+    assert resp.status_code == 400
+    assert "liveatc" in resp.json()["detail"].lower()

@@ -6,7 +6,8 @@ import httpx
 from fastapi import APIRouter, HTTPException
 
 from backend.core.airports import suggest_airport_code
-from backend.core.feed_allowlist import is_allowed_feed_url
+from backend.core.feed_allowlist import is_allowed_feed_url, is_allowed_input_url
+from backend.core.feed_url import normalize_feed_url
 from backend.core.settings_store import load_settings, save_settings
 from backend.models.settings_schemas import AppSettings, VerifyFeedRequest
 
@@ -34,7 +35,11 @@ async def put_settings(payload: AppSettings):
         if not is_allowed_feed_url(f.url):
             raise HTTPException(
                 status_code=400,
-                detail=f"Feed URL must be on audio.liveatc.net or feeds.liveatc.net: {f.url}",
+                detail=(
+                    "Feed URL must be a normalized LiveATC stream URL on "
+                    "audio.liveatc.net or feeds.liveatc.net - use Verify to convert "
+                    f"a listen-page link: {f.url}"
+                ),
             )
         if not f.airport_code.strip():
             raise HTTPException(status_code=400, detail="Each feed needs an airport code")
@@ -42,27 +47,50 @@ async def put_settings(payload: AppSettings):
     return saved.model_dump()
 
 
+async def _probe(url: str) -> tuple[int, str]:
+    """Range-GET a candidate stream URL; return (status, content_type). Raises on network error."""
+    async with httpx.AsyncClient(timeout=6) as client:
+        async with client.stream("GET", url, headers={"Range": "bytes=0-2047"}) as resp:
+            async for _chunk in resp.aiter_bytes():
+                break
+            return resp.status_code, resp.headers.get("content-type", "")
+
+
 @router.post("/api/settings/verify-feed")
 async def verify_feed(payload: VerifyFeedRequest):
-    url = payload.url
-    if not is_allowed_feed_url(url):
-        return {"ok": False, "reason": "URL must be on audio.liveatc.net or feeds.liveatc.net"}
+    raw = payload.url
+    if not is_allowed_input_url(raw):
+        return {
+            "ok": False, "stream_url": None,
+            "reason": "Enter a LiveATC stream URL (audio/feeds.liveatc.net) "
+                      "or a listen-page link (liveatc.net/hlisten.php?mount=...)",
+        }
 
-    try:
-        async with httpx.AsyncClient(timeout=6) as client:
-            async with client.stream("GET", url, headers={"Range": "bytes=0-2047"}) as resp:
-                status = resp.status_code
-                content_type = resp.headers.get("content-type", "")
-                async for _chunk in resp.aiter_bytes():
-                    break
-    except Exception as exc:
-        return {"ok": False, "reason": f"Unreachable: {exc}", "suggested_code": suggest_airport_code(url)}
+    normalized = normalize_feed_url(raw)
+    if not normalized.candidates:
+        return {
+            "ok": False, "stream_url": None,
+            "reason": "Could not find a stream mount in that LiveATC link",
+            "suggested_code": normalized.suggested_icao,
+        }
 
-    ok = status in (200, 206) and _looks_like_audio(content_type)
+    last_reason = "Verification failed"
+    for candidate in normalized.candidates:
+        try:
+            status, content_type = await _probe(candidate)
+        except Exception as exc:
+            last_reason = f"Unreachable: {exc}"
+            continue
+        if status in (200, 206) and _looks_like_audio(content_type):
+            return {
+                "ok": True, "stream_url": candidate, "status": status,
+                "content_type": content_type,
+                "suggested_code": normalized.suggested_icao or suggest_airport_code(candidate),
+                "reason": None,
+            }
+        last_reason = f"Unexpected response ({status}, {content_type or 'no content-type'})"
+
     return {
-        "ok": ok,
-        "status": status,
-        "content_type": content_type,
-        "suggested_code": suggest_airport_code(url),
-        "reason": None if ok else f"Unexpected response ({status}, {content_type or 'no content-type'})",
+        "ok": False, "stream_url": None, "reason": last_reason,
+        "suggested_code": normalized.suggested_icao,
     }
