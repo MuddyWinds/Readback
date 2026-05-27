@@ -75,7 +75,6 @@ LiveATC Stream (MP3)
    React Dashboard
    ├── AirportSidebar      select/manage monitored airports
    ├── LiveFeed            real-time transcript + observation stream
-   ├── StatsPanel          aggregate phraseology statistics
    ├── PhraseologyNote /   per-observation detail + HFACS category
    │   Event rendering
    ├── SituationRoom       unified ops view with weather + NOTAMs
@@ -235,6 +234,22 @@ uvicorn backend.main:app --reload --port 8000
 cd frontend
 npm install && npm start
 ```
+
+### Frontend backend origin
+
+By default the frontend talks to the **same origin it is served from**, so a
+production build behind a reverse proxy needs no configuration. For local dev
+the CRA server runs on `:3000` and the backend on `:8000`, so
+`frontend/.env.development` points at `http://localhost:8000` - which works
+because `:3000` is already in the backend CORS allowlist.
+
+A **production split-origin** deploy (frontend and backend on different hosts)
+is *not* fully supported by this plan: setting `REACT_APP_API_BASE` /
+`REACT_APP_WS_URL` at build time points the browser at the other host, but the
+backend (`backend/main.py`) currently allows CORS only from
+`http://localhost:3000`, so cross-origin browser fetches would be blocked.
+Supporting that requires making the backend allowlist configurable - a separate,
+backend-side change. Until then, deploy same-origin with a reverse proxy.
 
 ## Running Tests
 
