@@ -5,9 +5,11 @@ import { SettingsPage } from "./components/SettingsPage";
 import { SituationRoom } from "./components/SituationRoom";
 import { useSettings } from "./SettingsContext";
 import { useWindowWidth } from "./hooks/useWindowWidth";
-
-const API_BASE = "http://localhost:8000";
-const WS_URL = "ws://localhost:8000/ws/live";
+import { API_BASE, fetchJson } from "./lib/api";
+import { DateFilter } from "./lib/format";
+import { PipelineStatus } from "./lib/types";
+import { useMonitorStatus, usePipelineStatus, useResults } from "./lib/queries";
+import { useLiveSocket } from "./hooks/useLiveSocket";
 
 const SEV_COLOR: Record<string, string> = {
   standard: "#3fb950", low: "#44aaff", medium: "#e3b341", high: "#ff8800", critical: "#ff4444",
@@ -24,30 +26,6 @@ const FILTER_BUTTONS: { key: Filter; label: string }[] = [
   { key: "unassessable", label: "Unassessable" },
 ];
 
-type DateFilter = "today" | "7d" | "30d" | "ytd" | "all";
-type WsState = "connecting" | "connected" | "reconnecting" | "offline";
-
-interface FeedStatus {
-  airport_code: string;
-  stage: string;
-  detail?: string | null;
-  updated_at: string;
-}
-
-interface PipelineStatus {
-  last_audio_at: string | null;
-  last_transcript_at: string | null;
-  last_batch_started_at: string | null;
-  last_batch_completed_at: string | null;
-  next_batch_at: string | null;
-  last_error: string | null;
-  last_gemini_error: string | null;
-  last_persisted_count: number;
-  queued_transcripts: number;
-  batch_interval_seconds: number;
-  feed_status: Record<string, FeedStatus>;
-}
-
 const DATE_FILTERS: { key: DateFilter; label: string }[] = [
   { key: "today", label: "Today" },
   { key: "7d",    label: "Last 7 days" },
@@ -55,27 +33,6 @@ const DATE_FILTERS: { key: DateFilter; label: string }[] = [
   { key: "ytd",   label: "YTD" },
   { key: "all",   label: "All time" },
 ];
-
-function getStartDate(f: DateFilter): string | null {
-  const now = new Date();
-  if (f === "today") {
-    const d = new Date(now); d.setHours(0, 0, 0, 0); return d.toISOString();
-  }
-  if (f === "7d")  return new Date(now.getTime() - 7  * 86400000).toISOString();
-  if (f === "30d") return new Date(now.getTime() - 30 * 86400000).toISOString();
-  if (f === "ytd") return new Date(now.getFullYear(), 0, 1).toISOString();
-  return null;
-}
-
-function parseTs(ts: string): Date {
-  return new Date(ts.endsWith("Z") ? ts : ts + "Z");
-}
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-  return response.json();
-}
 
 type StageDotColor = "#484f58" | "#3fb950" | "#e3b341" | "#ff4444" | "#8b949e";
 
@@ -286,16 +243,13 @@ export default function App() {
     })),
     [settings]
   );
-  const [results, setResults]           = useState<AnalysisResult[]>([]);
   const [activeFeeds, setActiveFeeds]   = useState<Set<string>>(new Set());
   const [tab, setTab]                   = useState<"live" | "situation" | "settings">("live");
   const [filter, setFilter]             = useState<Filter>("all");
   const [airportFilter, setAirportFilter] = useState<string>("all");
   const [dateFilter, setDateFilter]     = useState<DateFilter>("all");
   const [activeAudio, setActiveAudio]   = useState<string | null>(null);
-  const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
-  const [apiError, setApiError]         = useState<string | null>(null);
-  const [wsState, setWsState]           = useState<WsState>("connecting");
+  const [actionError, setActionError]   = useState<string | null>(null);
   const [starting, setStarting]         = useState(false);
   const [stopping, setStopping]         = useState(false);
   // Sidebar: which airport's panel is open in Live Feed (null = hidden)
@@ -303,11 +257,24 @@ export default function App() {
   // Situation Room airport overlay (separate from live sidebar)
   const [srAirport, setSrAirport] = useState<string | null>(null);
 
-  const wsRef    = useRef<WebSocket | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  // WS handler reads filter via ref so updates take effect without reconnecting.
-  const dateFilterRef = useRef<DateFilter>(dateFilter);
-  useEffect(() => { dateFilterRef.current = dateFilter; }, [dateFilter]);
+
+  const { data: queryResults, error: resultsError } = useResults(dateFilter);
+  const { data: pipelineStatus = null, error: pipelineError } = usePipelineStatus();
+  const { data: monitorStatus, error: monitorError } = useMonitorStatus();
+  const results: AnalysisResult[] = queryResults ?? [];
+
+  useLiveSocket(dateFilter);
+
+  const apiError =
+    actionError
+    ?? (resultsError ? `Unable to load analysis cards: ${(resultsError as Error).message}` : null)
+    ?? (pipelineError ? `Unable to load pipeline status: ${(pipelineError as Error).message}` : null)
+    ?? (monitorError ? `Unable to load monitor status: ${(monitorError as Error).message}` : null);
+
+  useEffect(() => {
+    if (monitorStatus) setActiveFeeds(new Set(Object.keys(monitorStatus.feeds || {})));
+  }, [monitorStatus]);
 
   useEffect(() => {
     if (!settingsLoading && needsSetup) setTab("settings");
@@ -317,78 +284,6 @@ export default function App() {
     if (!audioRef.current) audioRef.current = new Audio();
     return audioRef.current;
   };
-
-  // Fetch historical results when date filter changes
-  useEffect(() => {
-    const sd = getStartDate(dateFilter);
-    const url = sd
-      ? `${API_BASE}/api/results?start_date=${encodeURIComponent(sd)}`
-      : `${API_BASE}/api/results`;
-    fetchJson<AnalysisResult[]>(url)
-      .then(data => { setResults(data); setApiError(null); })
-      .catch(err => setApiError(`Unable to load analysis cards: ${err.message}`));
-  }, [dateFilter]);
-
-  // Fetch active feed status on mount
-  useEffect(() => {
-    fetchJson<{ feeds?: Record<string, boolean> }>(`${API_BASE}/api/monitor/status`)
-      .then(s => { setActiveFeeds(new Set(Object.keys(s.feeds || {}))); setApiError(null); })
-      .catch(err => setApiError(`Unable to load monitor status: ${err.message}`));
-  }, []);
-
-  // Poll operational pipeline status for queue/batch/feed health.
-  useEffect(() => {
-    let alive = true;
-    const load = () => {
-      fetchJson<PipelineStatus>(`${API_BASE}/api/pipeline/status`)
-        .then(data => { if (alive) { setPipelineStatus(data); setApiError(null); } })
-        .catch(err => { if (alive) setApiError(`Unable to load pipeline status: ${err.message}`); });
-    };
-    load();
-    const timer = setInterval(load, 5000);
-    return () => { alive = false; clearInterval(timer); };
-  }, []);
-
-  // WebSocket live updates
-  useEffect(() => {
-    let alive = true;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-    function connect() {
-      if (!alive) return;
-      setWsState(wsRef.current ? "reconnecting" : "connecting");
-      const ws = new WebSocket(WS_URL);
-      wsRef.current = ws;
-      ws.onopen = () => setWsState("connected");
-      ws.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
-        if (msg.type === "analysis") {
-          setResults(prev => {
-            const sd = getStartDate(dateFilterRef.current);
-            if (sd && parseTs(msg.data.timestamp) < new Date(sd)) return prev;
-            return [msg.data, ...prev].slice(0, 500);
-          });
-        } else if (msg.type === "pipeline") {
-          setPipelineStatus(msg.data);
-        }
-      };
-      ws.onclose = () => {
-        if (alive) {
-          setWsState("reconnecting");
-          retryTimer = setTimeout(connect, 3000);
-        }
-      };
-      ws.onerror = () => ws.close();
-    }
-
-    connect();
-    return () => {
-      alive = false;
-      setWsState("offline");
-      if (retryTimer) clearTimeout(retryTimer);
-      wsRef.current?.close();
-    };
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -401,7 +296,7 @@ export default function App() {
 
   const handleStart = async () => {
     setStarting(true);
-    setApiError(null);
+    setActionError(null);
     const next = new Set(activeFeeds);
     const failures: string[] = [];
     for (const feed of feeds) {
@@ -416,7 +311,7 @@ export default function App() {
         failures.push(`${feed.code}: ${err.message}`);
       }
     }
-    if (failures.length > 0) setApiError(`Some feeds failed to start: ${failures.join("; ")}`);
+    if (failures.length > 0) setActionError(`Some feeds failed to start: ${failures.join("; ")}`);
     setStarting(false);
   };
 
@@ -430,7 +325,7 @@ export default function App() {
 
   const handleStop = async () => {
     setStopping(true);
-    setApiError(null);
+    setActionError(null);
     try {
       await fetchJson(`${API_BASE}/api/monitor/stop`, { method: "POST" });
       setActiveFeeds(new Set());
@@ -438,7 +333,7 @@ export default function App() {
       setSidebarAirport(null);
       stopAudio();
     } catch (err: any) {
-      setApiError(`Unable to stop feeds: ${err.message}`);
+      setActionError(`Unable to stop feeds: ${err.message}`);
     } finally {
       setStopping(false);
     }
