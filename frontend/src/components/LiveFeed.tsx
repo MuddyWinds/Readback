@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useSettings } from "../SettingsContext";
 import { API_BASE } from "../lib/api";
+import { getCardSeverity, SEV_ORDER, type Severity } from "../lib/severity";
 
 export interface SpeakerSegment { role: "ATC" | "PILOT" | "UNKNOWN"; text: string; }
 
@@ -46,26 +47,13 @@ export interface AnalysisResult {
 
 export type Filter = "all" | "standard" | "low" | "medium" | "high" | "critical" | "unassessable";
 export type GroupBy = "none" | "airport";
-export type Severity = "standard" | "low" | "medium" | "high" | "critical" | "unassessable";
+export { getCardSeverity, SEV_ORDER, type Severity } from "../lib/severity";
 
 interface PipelineStatusSummary {
   queued_transcripts: number;
   next_batch_at: string | null;
   last_audio_at: string | null;
   last_gemini_error: string | null;
-}
-
-const SEV_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
-
-export function getCardSeverity(r: AnalysisResult): Severity {
-  if (r.assessable === false) return "unassessable";
-  if (!r.observations || r.observations.length === 0) return "standard";
-  let maxRank = 0, maxSev = "low";
-  for (const v of r.observations) {
-    const rank = SEV_ORDER[v.significance] ?? 0;
-    if (rank > maxRank) { maxRank = rank; maxSev = v.significance; }
-  }
-  return maxSev as Severity;
 }
 
 const SEV_BORDER: Record<Severity, string> = {

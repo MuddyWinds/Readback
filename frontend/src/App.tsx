@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { LiveFeed, AnalysisResult, Filter, getCardSeverity } from "./components/LiveFeed";
+import { LiveFeed, AnalysisResult, Filter } from "./components/LiveFeed";
 import { AirportSidebar } from "./components/AirportSidebar";
 import { SettingsPage } from "./components/SettingsPage";
 import { SituationRoom } from "./components/SituationRoom";
@@ -10,6 +10,7 @@ import { DateFilter } from "./lib/format";
 import { PipelineStatus } from "./lib/types";
 import { useMonitorStatus, usePipelineStatus, useResults } from "./lib/queries";
 import { useLiveSocket } from "./hooks/useLiveSocket";
+import { severityCounts } from "./lib/selectors";
 
 const SEV_COLOR: Record<string, string> = {
   standard: "#3fb950", low: "#44aaff", medium: "#e3b341", high: "#ff8800", critical: "#ff4444",
@@ -367,18 +368,10 @@ export default function App() {
   const isRunning  = activeFeeds.size > 0;
 
   // Filter counts scoped to current airportFilter so badge numbers match what's visible
-  const visibleResults = airportFilter === "all"
-    ? results
-    : results.filter(r => r.airport_code === airportFilter);
-
-  const sevCounts = useMemo<Record<Filter, number>>(() => {
-    const counts = { all: 0, standard: 0, low: 0, medium: 0, high: 0, critical: 0, unassessable: 0 };
-    for (const r of visibleResults) {
-      counts.all++;
-      counts[getCardSeverity(r) as Filter]++;
-    }
-    return counts;
-  }, [visibleResults]);
+  const sevCounts = useMemo<Record<Filter, number>>(
+    () => severityCounts(results, airportFilter),
+    [results, airportFilter],
+  );
 
   // ── Styles ──────────────────────────────────────────────────────────────────
 
