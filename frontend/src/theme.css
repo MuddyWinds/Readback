@@ -32,3 +32,9 @@
   --radius: 6px;
   --radius-lg: 10px;
 }
+
+@keyframes resultFlash {
+  0% { box-shadow: 0 0 0 2px var(--accent); }
+  100% { box-shadow: 0 0 0 2px transparent; }
+}
+.result-flash { animation: resultFlash 1.5s ease; border-radius: var(--radius); }

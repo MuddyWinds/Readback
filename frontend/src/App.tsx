@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LiveFeed, AnalysisResult, Filter } from "./components/LiveFeed";
 import { AirportSidebar } from "./components/AirportSidebar";
 import { SettingsPage } from "./components/SettingsPage";
@@ -9,6 +9,8 @@ import { DateFilter } from "./lib/format";
 import { PipelineStatus } from "./lib/types";
 import { useMonitorStatus, usePipelineStatus, useResults } from "./lib/queries";
 import { useLiveSocket } from "./hooks/useLiveSocket";
+import { useEventAlerts } from "./hooks/useEventAlerts";
+import { resolveNavTarget } from "./lib/alerts";
 import { severityCounts } from "./lib/selectors";
 
 const SEV_COLOR: Record<string, string> = {
@@ -255,6 +257,21 @@ export default function App() {
   // Sidebar: which airport's panel is open in Live Feed (null = hidden)
   const [sidebarAirport, setSidebarAirport] = useState<string | null>(null);
 
+  // Toast click → navigate: id of a result card to scroll to + flash once the
+  // filter/airport/sidebar state has applied and the card mounts.
+  const [pendingScrollId, setPendingScrollId] = useState<number | null>(null);
+  const filterRef = useRef(filter);
+  useEffect(() => { filterRef.current = filter; }, [filter]);
+
+  const navigateToResult = useCallback((result: AnalysisResult) => {
+    const t = resolveNavTarget(result, filterRef.current);
+    setTab("live");
+    setAirportFilter(t.airportFilter);
+    setFilter(t.severityFilter);
+    setSidebarAirport(t.sidebarAirport);
+    setPendingScrollId(t.resultId ?? null);
+  }, []);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: queryResults, error: resultsError } = useResults(dateFilter);
@@ -262,7 +279,31 @@ export default function App() {
   const { data: monitorStatus, error: monitorError } = useMonitorStatus();
   const results: AnalysisResult[] = queryResults ?? [];
 
-  useLiveSocket(dateFilter);
+  const onAnalysisAlert = useEventAlerts(navigateToResult);
+  useLiveSocket(dateFilter, undefined, onAnalysisAlert);
+
+  // Scroll to + flash the target card once it mounts. The card may not be in
+  // the DOM on the first frame after the filter/airport/sidebar change, so we
+  // retry for ~10 frames; pendingScrollId clears only once found or exhausted.
+  useEffect(() => {
+    if (pendingScrollId == null) return;
+    let raf = 0;
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.getElementById(`result-${pendingScrollId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("result-flash");
+        setTimeout(() => el.classList.remove("result-flash"), 1500);
+        setPendingScrollId(null);
+        return;
+      }
+      if (++attempts < 10) raf = requestAnimationFrame(tryScroll); // ~10 frames, then give up
+      else setPendingScrollId(null);
+    };
+    raf = requestAnimationFrame(tryScroll);
+    return () => cancelAnimationFrame(raf);
+  }, [pendingScrollId]);
 
   const apiError =
     actionError
