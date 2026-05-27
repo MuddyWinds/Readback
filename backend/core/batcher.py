@@ -18,7 +18,6 @@ from backend.config import settings
 from backend.core.airports import airport_geo
 from backend.core.settings_store import current_runtime
 from backend.core.state import (
-    adsb_snapshots,
     broadcast,
     mark_feed,
     pipeline_status,
@@ -150,8 +149,8 @@ async def _persist_batch(
             session.add(result_row)
             await session.flush()
 
-            if result_row.id and result.airport_code in batch_adsb:
-                adsb_snapshots[result_row.id] = {
+            if result.airport_code in batch_adsb:
+                result_row.adsb_snapshot = {
                     "airport": result.airport_code,
                     "captured_at": result.timestamp.isoformat(),
                     "aircraft": batch_adsb[result.airport_code],
