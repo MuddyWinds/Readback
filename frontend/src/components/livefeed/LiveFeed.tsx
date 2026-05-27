@@ -10,6 +10,7 @@ import { isActiveAt, detectConflicts, AdsbAircraft } from "../../lib/conflicts";
 import { buildReportText } from "../../lib/report";
 import { useWatchList } from "../../hooks/useWatchList";
 import { SEV_LABEL, SEV_ICON, ACTION_REQUIRED, HFACS_PLAIN, STATUS_LABEL, ReviewStatus } from "./constants";
+import { SectionLabel } from "./SectionLabel";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -41,17 +42,6 @@ const ACTION_COLOR: Record<string, string> = {
   "GO AROUND": "#ff7b72", HOLD: "#e3b341", EMERGENCY: "#ff4444", TURN: "#a5d6ff",
   SPEED: "#ffa657", "FREQ CHANGE": "#8b949e", PUSHBACK: "#bc8cff", TAXI: "#c9d1d9",
 };
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontSize: 10, fontWeight: 700, color: "#484f58",
-      letterSpacing: 1.3, textTransform: "uppercase" as const, marginBottom: 8,
-    }}>
-      {children}
-    </div>
-  );
-}
 
 /** Semantic confidence label — replaces bare "AI 73%" with meaningful tier. */
 function ConfidenceBadge({ score }: { score: number }) {
