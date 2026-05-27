@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     LIVEATC_FEED_URL: str = "http://feeds.liveatc.net/ksfo"
     CHUNK_DURATION_SECONDS: int = 30
 
+    # Comma-separated CORS origins for the browser frontend. Default is the CRA
+    # dev server; set this (e.g. "https://readback.example.com") to deploy.
+    ALLOWED_ORIGINS: str = "http://localhost:3000"
+
     # Speech-to-text resource limits (PR1 — energy/CPU)
     WHISPER_CPU_THREADS: int = 0   # threads per transcription; 0 = CTranslate2 default
     STT_CONCURRENCY: int = 1       # max simultaneous transcriptions across all feeds
@@ -18,6 +22,10 @@ class Settings(BaseSettings):
     # faster-whisper's built-in Silero VAD. Off until verified on real LiveATC
     # samples — ATC clips are short, noisy and squelch-heavy.
     WHISPER_VAD_FILTER: bool = False
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
     class Config:
         env_file = ".env"

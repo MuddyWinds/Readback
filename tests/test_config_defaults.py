@@ -16,3 +16,17 @@ def test_silence_gate_is_disabled_by_default_until_feed_calibrated(monkeypatch):
     config = _load_config(monkeypatch)
 
     assert config.settings.STT_RMS_THRESHOLD == pytest.approx(0.0)
+
+
+def test_allowed_origins_defaults_to_localhost_frontend(monkeypatch):
+    config = _load_config(monkeypatch)
+    assert config.settings.allowed_origins_list == ["http://localhost:3000"]
+
+
+def test_allowed_origins_splits_comma_separated_value(monkeypatch):
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://app.example.com, https://admin.example.com")
+    config = _load_config(monkeypatch)
+    assert config.settings.allowed_origins_list == [
+        "https://app.example.com",
+        "https://admin.example.com",
+    ]

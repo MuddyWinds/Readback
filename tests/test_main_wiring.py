@@ -23,3 +23,10 @@ def test_cors_scoped_to_localhost_frontend(monkeypatch):
     main = _load_main(monkeypatch)
     cors = [m for m in main.app.user_middleware if "CORSMiddleware" in str(m.cls)][0]
     assert cors.kwargs["allow_origins"] == ["http://localhost:3000"]
+
+
+def test_cors_reads_allowed_origins_env(monkeypatch):
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://app.example.com,https://admin.example.com")
+    main = _load_main(monkeypatch)
+    cors = [m for m in main.app.user_middleware if "CORSMiddleware" in str(m.cls)][0]
+    assert cors.kwargs["allow_origins"] == ["https://app.example.com", "https://admin.example.com"]
