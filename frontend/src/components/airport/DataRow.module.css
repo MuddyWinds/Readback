@@ -1,0 +1,23 @@
+.row {
+  align-items: center;
+  border-bottom: 1px solid var(--border-dim, #21262d);
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.label {
+  color: var(--text-dim, #8b949e);
+  font-size: 11px;
+}
+
+.value {
+  color: var(--text, #e6edf3);
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.warn {
+  color: var(--sev-high, #ff8800);
+}

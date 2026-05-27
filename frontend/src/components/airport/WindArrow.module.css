@@ -1,0 +1,11 @@
+.arrow {
+  display: block;
+}
+
+.stroke {
+  stroke: var(--accent, #58a6ff);
+}
+
+.fill {
+  fill: var(--accent, #58a6ff);
+}
