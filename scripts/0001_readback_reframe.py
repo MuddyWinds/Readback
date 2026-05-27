@@ -4,7 +4,7 @@ One-shot migration: ATC Compliance Monitor -> Readback reframe.
 Renames columns on analysis_results and rewrites the observations JSON
 so each finding carries `kind`, `note_type`, and `significance`.
 
-Usage:  python3 -m backend.db.migrations.0001_readback_reframe [path/to/atcmonitor.db]
+Usage:  python3 scripts/0001_readback_reframe.py [path/to/atcmonitor.db]
 Idempotent: exits early if already migrated.
 """
 
