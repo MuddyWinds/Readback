@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Background workers:
   run_batcher()  — drains transcript_queue every BATCH_INTERVAL_SECONDS,
@@ -8,12 +10,22 @@ Background workers:
 
 import asyncio
 import traceback
-from datetime import datetime
+from datetime import timedelta
 
 import httpx
 
 from backend.config import settings
-from backend.core.state import adsb_snapshots, broadcast, transcript_queue
+from backend.core.airports import airport_geo
+from backend.core.settings_store import current_runtime
+from backend.core.state import (
+    adsb_snapshots,
+    broadcast,
+    mark_feed,
+    pipeline_status,
+    transcript_queue,
+    utc_iso,
+    utc_now_naive,
+)
 from backend.db.database import AsyncSessionLocal
 from backend.db.models import AnalysisResultDB, TranscriptChunkDB
 from backend.analysis.phraseology import analyze_batch
@@ -22,16 +34,8 @@ from backend.ingestion.silence_gate import should_transcribe
 from backend.ingestion.transcriber import get_stt_executor, transcribe
 from backend.models.schemas import AnalysisResult
 
-BATCH_INTERVAL_SECONDS = 240  # flush to Gemini every 4 minutes
-
-# Airport reference coordinates used for ADS-B bounding-box queries
-AIRPORT_GEO: dict[str, tuple[float, float]] = {
-    "KJFK": (40.64, -73.78),
-    "KATL": (33.64, -84.43),
-    "VHHH": (22.31, 113.92),
-    "KLAX": (33.94, -118.41),
-    "KORD": (41.97, -87.91),
-}
+BATCH_INTERVAL_SECONDS = 300  # flush to Gemini every 5 minutes
+IDLE_POLL_SECONDS = 30        # while waiting for first transcripts, check more often
 
 _NOTABLE_KEYWORDS = [
     "mayday", "pan pan", "emergency", "declare",
@@ -49,12 +53,43 @@ def _needs_analysis(transcript: str) -> bool:
     return any(kw in t for kw in _NOTABLE_KEYWORDS)
 
 
+def _batch_interval() -> int:
+    return current_runtime().batch_interval_seconds or BATCH_INTERVAL_SECONDS
+
+
+def _set_next_batch(seconds: int | None = None) -> None:
+    seconds = seconds if seconds is not None else _batch_interval()
+    pipeline_status["next_batch_at"] = (utc_now_naive() + timedelta(seconds=seconds)).isoformat() + "Z"
+
+
+def _gemini_failure_pairs(items: list[dict], exc: Exception) -> list[tuple[dict, AnalysisResult]]:
+    summary = (
+        "Analysis temporarily unavailable: Gemini returned an error while this "
+        f"transcript batch was being analyzed ({exc}). The transcript was captured "
+        "and preserved for manual review."
+    )
+    return [
+        (it, AnalysisResult(
+            timestamp=it["timestamp"],
+            airport_code=it["airport_code"],
+            transcript=it["transcript"],
+            assessable=False,
+            assessable_confidence=0.0,
+            is_standard=True,
+            observations=[],
+            summary=summary,
+            confidence_score=0.0,
+        ))
+        for it in items
+    ]
+
+
 async def _fetch_adsb_snapshot(airports: set[str]) -> dict[str, list]:
     """Fetch ADS-B states for every airport in the batch concurrently."""
     results: dict[str, list] = {}
 
     async def fetch_one(code: str) -> None:
-        geo = AIRPORT_GEO.get(code)
+        geo = airport_geo(code)
         if not geo:
             return
         lat, lon = geo
@@ -86,7 +121,7 @@ async def _persist_batch(
     pairs: list[tuple[dict, AnalysisResult]],
     batch_adsb: dict[str, list],
 ) -> None:
-    """Write all results to SQLite and broadcast each one via WebSocket."""
+    """Write all results to the configured database and broadcast each one via WebSocket."""
     async with AsyncSessionLocal() as session:
         for item, result in pairs:
             chunk_row = TranscriptChunkDB(
@@ -132,10 +167,13 @@ async def _persist_batch(
 
 async def run_batcher() -> None:
     """Every BATCH_INTERVAL_SECONDS, drain the transcript queue and run one Gemini call."""
-    print(f"[Batcher] Started — flushing every {BATCH_INTERVAL_SECONDS}s", flush=True)
+    print(f"[Batcher] Started — flushing every {_batch_interval()}s", flush=True)
+    _set_next_batch(30)
     await asyncio.sleep(30)  # let feeds warm up
 
     while True:
+        pipeline_status["last_error"] = None
+        pipeline_status["last_batch_started_at"] = utc_iso()
         items: list[dict] = []
         while not transcript_queue.empty():
             items.append(transcript_queue.get_nowait())
@@ -148,7 +186,11 @@ async def run_batcher() -> None:
 
         if not items:
             print("[Batcher] No transcripts queued — skipping", flush=True)
-            await asyncio.sleep(BATCH_INTERVAL_SECONDS)
+            pipeline_status["last_batch_completed_at"] = utc_iso()
+            pipeline_status["last_persisted_count"] = 0
+            _set_next_batch(IDLE_POLL_SECONDS)
+            await broadcast({"type": "pipeline", "data": get_pipeline_snapshot()})
+            await asyncio.sleep(IDLE_POLL_SECONDS)
             continue
 
         stt_bad  = [it for it in items if not it.get("stt_assessable", True)]
@@ -173,18 +215,23 @@ async def run_batcher() -> None:
             try:
                 gemini_results = await analyze_batch(stt_good)
                 pairs.extend(zip(stt_good, gemini_results))
+                pipeline_status["last_gemini_error"] = None
             except Exception as exc:
                 print(f"[Batcher] Gemini batch failed: {exc}", flush=True)
-                await asyncio.sleep(BATCH_INTERVAL_SECONDS)
-                continue
+                pipeline_status["last_gemini_error"] = str(exc)
+                pairs.extend(_gemini_failure_pairs(stt_good, exc))
 
         batch_adsb = await _fetch_adsb_snapshot({it["airport_code"] for it in items})
 
         print(f"[Batcher] Persisting {len(pairs)} result(s)...", flush=True)
         await _persist_batch(pairs, batch_adsb)
+        pipeline_status["last_batch_completed_at"] = utc_iso()
+        pipeline_status["last_persisted_count"] = len(pairs)
+        _set_next_batch()
+        await broadcast({"type": "pipeline", "data": get_pipeline_snapshot()})
         print(f"[Batcher] Done — broadcast {len(pairs)} result(s)", flush=True)
 
-        await asyncio.sleep(BATCH_INTERVAL_SECONDS)
+        await asyncio.sleep(_batch_interval())
 
 
 async def run_monitor(feed_url: str, airport_code: str, start_delay: float = 0) -> None:
@@ -192,17 +239,21 @@ async def run_monitor(feed_url: str, airport_code: str, start_delay: float = 0) 
     if start_delay:
         await asyncio.sleep(start_delay)
     print(f"[{airport_code}] Monitor started: {feed_url}", flush=True)
+    mark_feed(feed_url, airport_code, "starting")
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         async for audio_chunk in stream_audio_chunks(feed_url, settings.CHUNK_DURATION_SECONDS):
+            pipeline_status["last_audio_at"] = utc_iso()
+            mark_feed(feed_url, airport_code, "audio")
             # Framed-RMS pre-gate — skip Whisper entirely on silent chunks.
-            passed, rms_stats = should_transcribe(audio_chunk, settings.STT_RMS_THRESHOLD)
+            passed, rms_stats = should_transcribe(audio_chunk, current_runtime().stt_rms_threshold)
             if not passed:
                 print(
                     f"[{airport_code}] Silence-gated, skipping "
                     f"(max_rms={rms_stats['max_rms']:.4f}, p95={rms_stats['p95_rms']:.4f})",
                     flush=True,
                 )
+                mark_feed(feed_url, airport_code, "silent", f"max_rms={rms_stats['max_rms']:.4f}")
                 continue
 
             print(
@@ -210,6 +261,7 @@ async def run_monitor(feed_url: str, airport_code: str, start_delay: float = 0) 
                 f"max_rms={rms_stats['max_rms']:.4f}), transcribing...",
                 flush=True,
             )
+            mark_feed(feed_url, airport_code, "transcribing")
             # Bounded STT pool — caps concurrent Whisper jobs at STT_CONCURRENCY
             result = await loop.run_in_executor(get_stt_executor(), transcribe, audio_chunk)
             transcript = result["text"]
@@ -219,29 +271,45 @@ async def run_monitor(feed_url: str, airport_code: str, start_delay: float = 0) 
                 await transcript_queue.put({
                     "airport_code": airport_code,
                     "transcript": transcript or "[audio not assessable]",
-                    "timestamp": datetime.utcnow(),
+                    "timestamp": utc_now_naive(),
                     "stt_assessable": False,
                     "stt_reason": result["reason"],
                     "assessable_confidence": max(0.0, 1.0 + result["avg_logprob"]),
                 })
+                pipeline_status["last_transcript_at"] = utc_iso()
+                mark_feed(feed_url, airport_code, "queued_unassessable", result["reason"])
                 continue
 
             if not transcript or len(transcript.split()) < 5:
                 print(f"[{airport_code}] Transcript too short, skipping", flush=True)
+                mark_feed(feed_url, airport_code, "too_short")
                 continue
 
             print(f"[{airport_code}] Queued: {transcript[:80]}", flush=True)
             await transcript_queue.put({
                 "airport_code": airport_code,
                 "transcript": transcript,
-                "timestamp": datetime.utcnow(),
+                "timestamp": utc_now_naive(),
                 "stt_assessable": True,
                 "stt_reason": None,
                 "assessable_confidence": 1.0,
             })
+            pipeline_status["last_transcript_at"] = utc_iso()
+            mark_feed(feed_url, airport_code, "queued", f"{transcript[:80]}")
 
     except asyncio.CancelledError:
         print(f"[{airport_code}] Monitor stopped.", flush=True)
+        mark_feed(feed_url, airport_code, "stopped")
     except Exception as exc:
         print(f"[{airport_code}] ERROR: {exc}", flush=True)
+        pipeline_status["last_error"] = f"{airport_code}: {exc}"
+        mark_feed(feed_url, airport_code, "error", str(exc))
         traceback.print_exc()
+
+
+def get_pipeline_snapshot() -> dict:
+    return {
+        **pipeline_status,
+        "queued_transcripts": transcript_queue.qsize(),
+        "batch_interval_seconds": _batch_interval(),
+    }

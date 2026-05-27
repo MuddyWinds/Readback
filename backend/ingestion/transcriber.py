@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Loads a faster-whisper model once and exposes a transcribe() function.
 Returns transcript text alongside Whisper confidence metrics so the caller
@@ -10,6 +12,7 @@ import numpy as np
 from faster_whisper import WhisperModel
 
 from backend.config import settings
+from backend.core.settings_store import current_runtime
 
 _model: WhisperModel | None = None
 _stt_executor: ThreadPoolExecutor | None = None
@@ -22,9 +25,10 @@ AVG_LOGPROB_THRESHOLD    = -0.85  # model very uncertain about its output
 def get_model() -> WhisperModel:
     global _model
     if _model is None:
-        print(f"[Transcriber] Loading faster-whisper model: {settings.WHISPER_MODEL}")
+        model_name = current_runtime().whisper_model or settings.WHISPER_MODEL
+        print(f"[Transcriber] Loading faster-whisper model: {model_name}")
         _model = WhisperModel(
-            settings.WHISPER_MODEL,
+            model_name,
             device="cpu",
             compute_type="int8",
             cpu_threads=settings.WHISPER_CPU_THREADS,
@@ -42,8 +46,9 @@ def get_stt_executor() -> ThreadPoolExecutor:
     """
     global _stt_executor
     if _stt_executor is None:
+        concurrency = current_runtime().stt_concurrency or settings.STT_CONCURRENCY
         _stt_executor = ThreadPoolExecutor(
-            max_workers=max(1, settings.STT_CONCURRENCY),
+            max_workers=max(1, concurrency),
             thread_name_prefix="stt",
         )
     return _stt_executor

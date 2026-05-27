@@ -7,6 +7,7 @@ import asyncio
 import subprocess
 import numpy as np
 from typing import AsyncGenerator
+from contextlib import suppress
 
 SAMPLE_RATE = 16000  # Whisper expects 16kHz
 
@@ -21,7 +22,12 @@ async def stream_audio_chunks(
     bytes_per_chunk = SAMPLE_RATE * chunk_seconds * 4  # float32 = 4 bytes
 
     import shutil
-    ffmpeg_bin = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
+    ffmpeg_bin = shutil.which("ffmpeg")
+    if not ffmpeg_bin:
+        raise RuntimeError(
+            "ffmpeg not found on PATH — install ffmpeg "
+            "(macOS: `brew install ffmpeg`, Ubuntu: `apt install ffmpeg`)"
+        )
     cmd = [
         ffmpeg_bin,
         "-reconnect", "1",
@@ -54,5 +60,7 @@ async def stream_audio_chunks(
                 audio = np.frombuffer(raw, dtype=np.float32)
                 yield audio
     finally:
-        process.kill()
-        await process.wait()
+        with suppress(ProcessLookupError):
+            process.kill()
+        with suppress(ProcessLookupError):
+            await process.wait()

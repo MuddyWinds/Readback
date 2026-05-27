@@ -14,7 +14,7 @@ import httpx
 from fastapi import APIRouter
 
 from backend.core.state import adsb_snapshots
-from backend.core.batcher import AIRPORT_GEO
+from backend.core.airports import airport_geo
 
 router = APIRouter()
 
@@ -57,7 +57,7 @@ async def get_adsb_snapshot(result_id: int):
 @router.get("/api/adsb/{airport_code}")
 async def get_adsb(airport_code: str):
     code = airport_code.upper()
-    geo  = AIRPORT_GEO.get(code)
+    geo = airport_geo(code)
     if not geo:
         return {"error": f"Unknown airport {code}", "aircraft": []}
 
@@ -165,7 +165,7 @@ async def get_hazards(airport_code: str):
     if cached and (time.time() - cached["fetched_at"]) < _SHORT_TTL:
         return cached["data"]
 
-    geo = AIRPORT_GEO.get(code)
+    geo = airport_geo(code)
     if not geo:
         return {"error": f"Unknown airport {code}", "sigmets": [], "airmets": [], "pireps": []}
 

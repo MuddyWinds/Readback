@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 """Results endpoints: read history, update investigation status/notes, stats."""
 
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -35,12 +38,26 @@ def _row_to_dict(r: AnalysisResultDB) -> dict:
     }
 
 
+def _row_to_analysis_result(r: AnalysisResultDB) -> AnalysisResult:
+    return AnalysisResult(
+        timestamp=r.timestamp,
+        airport_code=r.airport_code,
+        transcript=r.transcript,
+        assessable=r.assessable if r.assessable is not None else True,
+        assessable_confidence=r.assessable_confidence if r.assessable_confidence is not None else 1.0,
+        is_standard=r.is_standard,
+        observations=[Observation(**v) for v in (r.observations or [])],
+        summary=r.summary,
+        confidence_score=r.confidence_score,
+    )
+
+
 @router.get("/api/results")
 async def get_results(
     limit: int = 500,
     offset: int = 0,
-    airport: str | None = None,
-    start_date: str | None = None,
+    airport: Optional[str] = None,
+    start_date: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     query = select(AnalysisResultDB).order_by(desc(AnalysisResultDB.timestamp))
@@ -54,8 +71,8 @@ async def get_results(
 
 
 class ResultUpdate(BaseModel):
-    status: str | None = None
-    reviewer_notes: str | None = None
+    status: Optional[str] = None
+    reviewer_notes: Optional[str] = None
 
 
 @router.patch("/api/results/{result_id}")
@@ -79,8 +96,8 @@ async def update_result(
 
 @router.get("/api/stats")
 async def get_stats(
-    airport: str | None = None,
-    start_date: str | None = None,
+    airport: Optional[str] = None,
+    start_date: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     query = select(AnalysisResultDB).order_by(desc(AnalysisResultDB.timestamp)).limit(2000)
@@ -90,18 +107,7 @@ async def get_stats(
         dt = datetime.fromisoformat(start_date.replace("Z", ""))
         query = query.where(AnalysisResultDB.timestamp >= dt)
     rows = await db.execute(query)
-    results = [
-        AnalysisResult(
-            timestamp=r.timestamp,
-            airport_code=r.airport_code,
-            transcript=r.transcript,
-            is_standard=r.is_standard,
-            observations=[Observation(**v) for v in (r.observations or [])],
-            summary=r.summary,
-            confidence_score=r.confidence_score,
-        )
-        for r in rows.scalars().all()
-    ]
+    results = [_row_to_analysis_result(r) for r in rows.scalars().all()]
     return build_stats(results)
 
 

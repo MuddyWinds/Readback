@@ -176,6 +176,14 @@ cd frontend
 npm install && npm start
 ```
 
+## Running Tests
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pytest
+```
+
 ---
 
 ## API Reference

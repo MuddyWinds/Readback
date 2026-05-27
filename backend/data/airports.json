@@ -1,0 +1,55 @@
+{
+  "KJFK": {
+    "name": "New York JFK",
+    "lat": 40.64,
+    "lon": -73.78,
+    "runways": [
+      {"ident": "04L", "heading_deg": 40},
+      {"ident": "22R", "heading_deg": 220},
+      {"ident": "13L", "heading_deg": 130},
+      {"ident": "31R", "heading_deg": 310}
+    ]
+  },
+  "KATL": {
+    "name": "Atlanta",
+    "lat": 33.64,
+    "lon": -84.43,
+    "runways": [
+      {"ident": "08L", "heading_deg": 80},
+      {"ident": "26R", "heading_deg": 260},
+      {"ident": "10", "heading_deg": 100},
+      {"ident": "28", "heading_deg": 280}
+    ]
+  },
+  "VHHH": {
+    "name": "Hong Kong",
+    "lat": 22.31,
+    "lon": 113.92,
+    "runways": [
+      {"ident": "07L", "heading_deg": 70},
+      {"ident": "25R", "heading_deg": 250}
+    ]
+  },
+  "KLAX": {
+    "name": "Los Angeles",
+    "lat": 33.94,
+    "lon": -118.41,
+    "runways": [
+      {"ident": "07L", "heading_deg": 70},
+      {"ident": "25R", "heading_deg": 250},
+      {"ident": "06L", "heading_deg": 60},
+      {"ident": "24R", "heading_deg": 240}
+    ]
+  },
+  "KORD": {
+    "name": "Chicago O'Hare",
+    "lat": 41.97,
+    "lon": -87.91,
+    "runways": [
+      {"ident": "10L", "heading_deg": 100},
+      {"ident": "28R", "heading_deg": 280},
+      {"ident": "09L", "heading_deg": 90},
+      {"ident": "27R", "heading_deg": 270}
+    ]
+  }
+}

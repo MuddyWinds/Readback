@@ -6,6 +6,7 @@ import {
 import { AnalysisResult, getCardSeverity } from "./LiveFeed";
 import { formatDistanceToNow } from "date-fns";
 import { useWindowWidth } from "../hooks/useWindowWidth";
+import { useSettings } from "../SettingsContext";
 // @ts-ignore
 import landJSON from "world-atlas/land-110m.json";
 import { feature } from "topojson-client";
@@ -13,14 +14,6 @@ import { feature } from "topojson-client";
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 interface Airport { code: string; name: string; lat: number; lon: number; }
-
-const AIRPORTS: Airport[] = [
-  { code: "KJFK", name: "New York JFK",   lat:  40.64, lon:  -73.78 },
-  { code: "KATL", name: "Atlanta",         lat:  33.64, lon:  -84.43 },
-  { code: "VHHH", name: "Hong Kong",       lat:  22.31, lon:  113.92 },
-  { code: "KLAX", name: "Los Angeles",     lat:  33.94, lon: -118.41 },
-  { code: "KORD", name: "Chicago O'Hare",  lat:  41.97, lon:  -87.91 },
-];
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#ff4444", high: "#ff8800", medium: "#e3b341",
@@ -32,10 +25,10 @@ const SEV_ORDER: Record<string, number> = {
 const SEVERITIES = ["critical", "high", "medium", "low"] as const;
 
 const HFACS_INFO: Record<string, { color: string; desc: string }> = {
-  "Unsafe Act":               { color: "#ff4444", desc: "Direct crew error / violation" },
+  "Unsafe Act":               { color: "#ff4444", desc: "Front-line action or communication choice" },
   "Precondition":             { color: "#ff8800", desc: "Environmental / physiological factor" },
-  "Unsafe Supervision":       { color: "#e3b341", desc: "Supervisory failure" },
-  "Organizational Influence": { color: "#44aaff", desc: "Policy / culture at root" },
+  "Unsafe Supervision":       { color: "#e3b341", desc: "Supervisory or task-management context" },
+  "Organizational Influence": { color: "#44aaff", desc: "Policy, culture, or resource context" },
 };
 
 // ── Shared UI primitives ──────────────────────────────────────────────────────
@@ -83,10 +76,10 @@ interface AirportStat {
   hfacs: Record<string, number>;
 }
 
-function useAirportStats(results: AnalysisResult[]) {
+function useAirportStats(results: AnalysisResult[], airports: Airport[]) {
   return useMemo(() => {
     const map: Record<string, AirportStat> = {};
-    for (const ap of AIRPORTS)
+    for (const ap of airports)
       map[ap.code] = { total: 0, standard: 0, critical: 0, high: 0, medium: 0, low: 0, violationTypes: {}, hfacs: {} };
     results.forEach(r => {
       const s = map[r.airport_code];
@@ -101,7 +94,7 @@ function useAirportStats(results: AnalysisResult[]) {
       });
     });
     return map;
-  }, [results]);
+  }, [results, airports]);
 }
 
 function riskScore(s: AirportStat): number {
@@ -125,8 +118,8 @@ function useSessionStatus(results: AnalysisResult[]) {
     const ch = critical + high;
     let label: string, color: string, message: string;
     if      (compRate === null)           { label = "NO DATA";  color = "#484f58"; message = "No assessable transmissions yet"; }
-    else if (ch > 3 || compRate < 75)     { label = "CRITICAL"; color = "#ff4444"; message = `${ch} high-priority observation${ch !== 1 ? "s" : ""} — escalate immediately`; }
-    else if (ch > 0 || compRate < 90)     { label = "ELEVATED"; color = "#ff8800"; message = `${ch} high-priority observation${ch !== 1 ? "s" : ""} — document before end of shift`; }
+    else if (ch > 3 || compRate < 75)     { label = "CRITICAL"; color = "#ff4444"; message = `${ch} high-priority observation${ch !== 1 ? "s" : ""} — verify transcript and context`; }
+    else if (ch > 0 || compRate < 90)     { label = "ELEVATED"; color = "#ff8800"; message = `${ch} high-priority observation${ch !== 1 ? "s" : ""} — review before using for study`; }
     else if (compRate < 95)               { label = "NOMINAL";  color = "#e3b341"; message = "Minor deviations — continue monitoring"; }
     else                                  { label = "CLEAR";    color = "#3fb950"; message = "No significant observations this session"; }
     return { label, color, message, compRate, critical, high, total: assessable.length, violations: nonStandard.length };
@@ -154,7 +147,7 @@ function useHourlyData(results: AnalysisResult[]) {
 }
 
 /** All deep-analysis intelligence derived from results in one memoised hook. */
-function useViolationIntelligence(results: AnalysisResult[]) {
+function useObservationIntelligence(results: AnalysisResult[]) {
   return useMemo(() => {
     const allObservations = results.flatMap(r => r.observations ?? []);
 
@@ -181,7 +174,7 @@ function useViolationIntelligence(results: AnalysisResult[]) {
     });
     const sortedRegs = Object.entries(regCounts).sort((a, b) => b[1] - a[1]).slice(0, 6) as [string, number][];
 
-    // Repeat offenders (callsigns with ≥2 non-compliant appearances)
+    // Repeat callsigns (callsigns with >=2 non-standard appearances)
     const csData: Record<string, { count: number; maxSev: string; lastTs: number }> = {};
     results.forEach(r => {
       if (r.is_standard || r.assessable === false) return;
@@ -195,7 +188,7 @@ function useViolationIntelligence(results: AnalysisResult[]) {
       if ((SEV_ORDER[sev] ?? 0) > (SEV_ORDER[csData[cs].maxSev] ?? 0)) csData[cs].maxSev = sev;
       if (ts > csData[cs].lastTs) csData[cs].lastTs = ts;
     });
-    const repeatOffenders = Object.entries(csData)
+    const repeatCallsigns = Object.entries(csData)
       .filter(([, d]) => d.count >= 2)
       .sort((a, b) => {
         const d = (SEV_ORDER[b[1].maxSev] ?? 0) - (SEV_ORDER[a[1].maxSev] ?? 0);
@@ -225,7 +218,7 @@ function useViolationIntelligence(results: AnalysisResult[]) {
     const spikeRatio = prior30 > 0 ? last30 / prior30 : (last30 >= 3 ? 3 : 0);
 
     return {
-      hfacsCounts, sortedTypes, sortedRegs, repeatOffenders, readback,
+      hfacsCounts, sortedTypes, sortedRegs, repeatCallsigns, readback,
       spike: { last30, prior30, ratio: spikeRatio, isSpike: spikeRatio >= 2 && last30 >= 2 },
     };
   }, [results]);
@@ -263,10 +256,17 @@ function greatCircleArc(a: Vec3, b: Vec3, steps: number): Vec3[] {
 }
 const GLOBE_DOTS = makeDots(1400); // 1400 sufficient for visual quality; 2200 was unnecessary
 
-// Pre-compute great-circle arc world-space points (rotation applied per-frame, not re-interpolated)
-const GLOBE_ARCS: Vec3[][] = (
-  [[AIRPORTS[0], AIRPORTS[2]], [AIRPORTS[1], AIRPORTS[3]], [AIRPORTS[2], AIRPORTS[4]]] as [Airport, Airport][]
-).map(([a, b]) => greatCircleArc(latLonToXYZ(a.lat, a.lon), latLonToXYZ(b.lat, b.lon), 40));
+function buildArcs(airports: Airport[]): Vec3[][] {
+  const arcs: Vec3[][] = [];
+  for (let i = 0; i + 1 < airports.length; i++) {
+    arcs.push(greatCircleArc(
+      latLonToXYZ(airports[i].lat, airports[i].lon),
+      latLonToXYZ(airports[i + 1].lat, airports[i + 1].lon),
+      40,
+    ));
+  }
+  return arcs;
+}
 
 function buildLandMask(dots: Vec3[]): boolean[] {
   const W = 360, H = 180;
@@ -303,10 +303,11 @@ const LAND_MASK = buildLandMask(GLOBE_DOTS);
 // ── Globe component ───────────────────────────────────────────────────────────
 
 function Globe({
-  results, activeAirports, onAirportClick,
+  results, activeAirports, airports, onAirportClick,
 }: {
   results: AnalysisResult[];
   activeAirports: Set<string>;
+  airports: Airport[];
   onAirportClick?: (code: string) => void;
 }) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
@@ -319,6 +320,7 @@ function Globe({
   const gradSizeRef = useRef<number>(0); // invalidate when canvas size changes
   // Store last-rendered canvas positions for hit testing
   const apPosRef    = useRef<Record<string, { px: number; py: number }>>({});
+  const arcs = useMemo(() => buildArcs(airports), [airports]);
 
   const airportSeverity = useMemo(() => {
     const map: Record<string, string> = {};
@@ -377,7 +379,7 @@ function Globe({
       }
 
       // Use pre-computed world-space arc points — only rotate+project per frame
-      for (const arcPts of GLOBE_ARCS) {
+      for (const arcPts of arcs) {
         ctx.beginPath();
         let first = true;
         for (const pt of arcPts) {
@@ -391,7 +393,7 @@ function Globe({
 
       const pulse = 0.5 + 0.5 * Math.sin(pulseRef.current);
       const newPos: Record<string, { px: number; py: number }> = {};
-      for (const ap of AIRPORTS) {
+      for (const ap of airports) {
         const rot3 = rotateY(latLonToXYZ(ap.lat, ap.lon), rot);
         const { px, py, visible } = project(rot3, cx, cy, R);
         if (!visible) continue;
@@ -423,7 +425,7 @@ function Globe({
     };
     rafRef.current = requestAnimationFrame(draw);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [airportSeverity, activeAirports]);
+  }, [airportSeverity, activeAirports, airports, arcs, onAirportClick]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -524,7 +526,7 @@ function SessionStatusStrip({
 
 // ── Spike alert ───────────────────────────────────────────────────────────────
 
-function SpikeAlert({ spike }: { spike: ReturnType<typeof useViolationIntelligence>["spike"] }) {
+function SpikeAlert({ spike }: { spike: ReturnType<typeof useObservationIntelligence>["spike"] }) {
   if (!spike.isSpike) return null;
   return (
     <div style={{
@@ -638,9 +640,9 @@ function ActivityChart({ data }: { data: ReturnType<typeof useHourlyData> }) {
 // ── Airport risk matrix ───────────────────────────────────────────────────────
 
 function RiskMatrix({
-  airportStats, activeAirports,
-}: { airportStats: Record<string, AirportStat>; activeAirports: Set<string> }) {
-  const maxVal = Math.max(1, ...AIRPORTS.flatMap(ap => SEVERITIES.map(c => airportStats[ap.code]?.[c] ?? 0)));
+  airportStats, activeAirports, airports,
+}: { airportStats: Record<string, AirportStat>; activeAirports: Set<string>; airports: Airport[] }) {
+  const maxVal = Math.max(1, ...airports.flatMap(ap => SEVERITIES.map(c => airportStats[ap.code]?.[c] ?? 0)));
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
@@ -663,7 +665,7 @@ function RiskMatrix({
           </tr>
         </thead>
         <tbody>
-          {AIRPORTS.map(ap => {
+          {airports.map(ap => {
             const s = airportStats[ap.code];
             const score = riskScore(s);
             const assessable = s.total > 0 ? s.total : 1;
@@ -724,10 +726,10 @@ function RiskMatrix({
 
 // ── Temporal heatmap (hour × airport) ────────────────────────────────────────
 
-function TemporalHeatmap({ results }: { results: AnalysisResult[] }) {
+function TemporalHeatmap({ results, airports }: { results: AnalysisResult[]; airports: Airport[] }) {
   const grid = useMemo(() => {
     const g: Record<string, number[]> = {};
-    for (const ap of AIRPORTS) g[ap.code] = Array(24).fill(0);
+    for (const ap of airports) g[ap.code] = Array(24).fill(0);
     results.forEach(r => {
       if (!g[r.airport_code]) return;
       const sev = getCardSeverity(r);
@@ -737,7 +739,7 @@ function TemporalHeatmap({ results }: { results: AnalysisResult[] }) {
       g[r.airport_code][h] += weight;
     });
     return g;
-  }, [results]);
+  }, [results, airports]);
 
   const maxVal = Math.max(1, ...Object.values(grid).flatMap(row => row));
   const hours  = Array.from({ length: 24 }, (_, i) => i);
@@ -753,7 +755,7 @@ function TemporalHeatmap({ results }: { results: AnalysisResult[] }) {
           </div>
         ))}
         {/* rows */}
-        {AIRPORTS.map(ap => (
+        {airports.map(ap => (
           <React.Fragment key={ap.code}>
             <div style={{ fontSize: 9, fontFamily: "monospace", color: "#6e7681", display: "flex", alignItems: "center" }}>
               {ap.code}
@@ -873,7 +875,7 @@ function ViolationTypeChart({ types }: { types: [string, number][] }) {
 
 // ── Readback quality index ────────────────────────────────────────────────────
 
-function ReadbackQualityPanel({ readback }: { readback: ReturnType<typeof useViolationIntelligence>["readback"] }) {
+function ReadbackQualityPanel({ readback }: { readback: ReturnType<typeof useObservationIntelligence>["readback"] }) {
   const { correct, discrepancy, unknown, total } = readback;
   if (total === 0) return <EmptyState label="No enriched readback data yet." />;
   const items = [
@@ -918,15 +920,15 @@ function ReadbackQualityPanel({ readback }: { readback: ReturnType<typeof useVio
   );
 }
 
-// ── Repeat offenders leaderboard ──────────────────────────────────────────────
+// ── Repeat callsigns leaderboard ──────────────────────────────────────────────
 
-function RepeatOffendersTable({ offenders }: { offenders: ReturnType<typeof useViolationIntelligence>["repeatOffenders"] }) {
-  if (offenders.length === 0) {
+function RepeatCallsignsTable({ callsigns }: { callsigns: ReturnType<typeof useObservationIntelligence>["repeatCallsigns"] }) {
+  if (callsigns.length === 0) {
     return <EmptyState label="No callsign has appeared in multiple non-standard transmissions yet." />;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
-      {offenders.map((o, i) => {
+      {callsigns.map((o, i) => {
         const color = SEV_COLOR[o.maxSev] ?? "#888";
         const ago   = o.lastTs ? formatDistanceToNow(new Date(o.lastTs), { addSuffix: true }) : "—";
         return (
@@ -996,15 +998,16 @@ function TopRegulations({ regs }: { regs: [string, number][] }) {
 // ── Airport detail cards (kept for at-a-glance reference) ────────────────────
 
 function AirportDetailCards({
-  airportStats, activeAirports, onAirportClick,
+  airportStats, activeAirports, airports, onAirportClick,
 }: {
   airportStats:    Record<string, AirportStat>;
   activeAirports:  Set<string>;
+  airports:        Airport[];
   onAirportClick?: (code: string) => void;
 }) {
   return (
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
-      {AIRPORTS.map(ap => {
+      {airports.map(ap => {
         const s        = airportStats[ap.code];
         const score    = riskScore(s);
         const topViol  = topEntry(s.violationTypes);
@@ -1098,15 +1101,23 @@ interface Props {
 
 export function SituationRoom({ results, activeAirports, onAirportClick }: Props) {
   const { bp }   = useWindowWidth();
+  const { settings } = useSettings();
   const isMobile = bp === "mobile";
   const isTablet = bp === "tablet";
   const isSmall  = isMobile || isTablet;
   const isLarge  = bp === "large";
 
-  const airportStats = useAirportStats(results);
+  const airports: Airport[] = useMemo(
+    () => (settings?.feeds ?? [])
+      .filter(f => f.lat != null && f.lon != null)
+      .map(f => ({ code: f.airport_code, name: f.name || f.label || f.airport_code, lat: f.lat!, lon: f.lon! })),
+    [settings]
+  );
+
+  const airportStats = useAirportStats(results, airports);
   const status       = useSessionStatus(results);
   const hourlyData   = useHourlyData(results);
-  const intel        = useViolationIntelligence(results);
+  const intel        = useObservationIntelligence(results);
   const violCount    = results.filter(r => {
     const s = getCardSeverity(r); return s !== "standard" && s !== "unassessable";
   }).length;
@@ -1125,7 +1136,7 @@ export function SituationRoom({ results, activeAirports, onAirportClick }: Props
         </div>
       } />
       <div style={{ position: "relative", flex: 1, minHeight: isSmall ? 240 : 320, background: "#0a0f0a" }}>
-        <Globe results={results} activeAirports={activeAirports} onAirportClick={onAirportClick} />
+        <Globe results={results} activeAirports={activeAirports} airports={airports} onAirportClick={onAirportClick} />
       </div>
     </div>
   );
@@ -1162,7 +1173,7 @@ export function SituationRoom({ results, activeAirports, onAirportClick }: Props
         </span>
       } />
       <div style={{ padding: "12px 16px" }}>
-        <RiskMatrix airportStats={airportStats} activeAirports={activeAirports} />
+        <RiskMatrix airportStats={airportStats} activeAirports={activeAirports} airports={airports} />
       </div>
     </div>
   );
@@ -1175,7 +1186,7 @@ export function SituationRoom({ results, activeAirports, onAirportClick }: Props
         </span>
       } />
       <div style={{ padding: "12px 16px" }}>
-        <TemporalHeatmap results={results} />
+        <TemporalHeatmap results={results} airports={airports} />
       </div>
     </div>
   );
@@ -1215,17 +1226,17 @@ export function SituationRoom({ results, activeAirports, onAirportClick }: Props
     </div>
   );
 
-  const offendersPanel = (
+  const repeatCallsignsPanel = (
     <div style={{ ...cardStyle }}>
-      <CardHead label="Repeat Offenders" badge={
-        intel.repeatOffenders.length > 0 ? (
+      <CardHead label="Repeat Callsigns" badge={
+        intel.repeatCallsigns.length > 0 ? (
           <span style={{ fontSize: 9, fontWeight: 700, color: "#ff8800", background: "#ff880018", border: "1px solid #ff880033", borderRadius: 8, padding: "1px 6px" }}>
-            {intel.repeatOffenders.length} callsign{intel.repeatOffenders.length !== 1 ? "s" : ""}
+            {intel.repeatCallsigns.length} callsign{intel.repeatCallsigns.length !== 1 ? "s" : ""}
           </span>
         ) : undefined
       } />
       <div style={{ padding: "8px 16px 14px" }}>
-        <RepeatOffendersTable offenders={intel.repeatOffenders} />
+        <RepeatCallsignsTable callsigns={intel.repeatCallsigns} />
       </div>
     </div>
   );
@@ -1248,7 +1259,7 @@ export function SituationRoom({ results, activeAirports, onAirportClick }: Props
       <div style={{ fontSize: 10, fontWeight: 700, color: "#484f58", letterSpacing: 1.3, textTransform: "uppercase" as const, marginBottom: 10 }}>
         Airport Detail Cards
       </div>
-      <AirportDetailCards airportStats={airportStats} activeAirports={activeAirports} onAirportClick={onAirportClick} />
+      <AirportDetailCards airportStats={airportStats} activeAirports={activeAirports} airports={airports} onAirportClick={onAirportClick} />
     </div>
   );
 
@@ -1314,12 +1325,12 @@ export function SituationRoom({ results, activeAirports, onAirportClick }: Props
         </div>
       )}
 
-      {/* Row 6: Repeat offenders + Top regulations */}
+      {/* Row 6: Repeat callsigns + Top regulations */}
       {isSmall ? (
-        <>{offendersPanel}{regsPanel}</>
+        <>{repeatCallsignsPanel}{regsPanel}</>
       ) : (
         <div style={{ display: "flex", gap: 14 }}>
-          <div style={{ flex: "1 1 55%" }}>{offendersPanel}</div>
+          <div style={{ flex: "1 1 55%" }}>{repeatCallsignsPanel}</div>
           <div style={{ flex: "1 1 45%" }}>{regsPanel}</div>
         </div>
       )}

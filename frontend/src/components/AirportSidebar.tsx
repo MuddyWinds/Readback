@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState, useMemo } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useWindowWidth } from "../hooks/useWindowWidth";
-import { ViolationDensity, AnalysisResult } from "./LiveFeed";
+import { useSettings } from "../SettingsContext";
+import { ObservationDensity, AnalysisResult } from "./LiveFeed";
 
 const API_BASE = "http://localhost:8000";
 
@@ -55,7 +56,7 @@ interface AircraftInfo {
   phase:       "arr" | "dep" | "gnd" | "enr";
   // Phraseology linkage — populated after cross-referencing with results
   monitored:   boolean;
-  compliant:   boolean | null;   // null = not assessed
+  standard:    boolean | null;   // null = not assessed
   lastEvent:   string | null;    // note_type or "Standard"
   resultId:    number | null;
 }
@@ -68,11 +69,6 @@ const CAT_COLOR: Record<string, string> = {
 const CAT_LABEL: Record<string, string> = {
   VFR: "Visual Flight Rules", MVFR: "Marginal VFR",
   IFR: "Instrument Flight Rules", LIFR: "Low IFR",
-};
-
-const AIRPORT_GEO: Record<string, [number, number]> = {
-  KJFK: [40.64, -73.78], KATL: [33.64, -84.43],
-  VHHH: [22.31, 113.92], KLAX: [33.94, -118.41], KORD: [41.97, -87.91],
 };
 
 const PHASE_COLOR: Record<string, string> = {
@@ -126,8 +122,8 @@ function detectPhase(
 function buildMonitorIndex(
   results: AnalysisResult[],
   airportCode: string,
-): Map<string, { compliant: boolean | null; lastEvent: string | null; resultId: number | null }> {
-  const idx = new Map<string, { compliant: boolean | null; lastEvent: string | null; resultId: number | null }>();
+): Map<string, { standard: boolean | null; lastEvent: string | null; resultId: number | null }> {
+  const idx = new Map<string, { standard: boolean | null; lastEvent: string | null; resultId: number | null }>();
   // Walk newest-first so the latest event wins
   const airportResults = results
     .filter(r => r.airport_code === airportCode)
@@ -144,7 +140,7 @@ function buildMonitorIndex(
     if (idx.has(cs)) continue; // keep newest
     const topObservation = (r.observations ?? [])[0];
     idx.set(cs, {
-      compliant:  r.assessable === false ? null : (r.is_standard ?? null),
+      standard:  r.assessable === false ? null : (r.is_standard ?? null),
       lastEvent:  topObservation?.note_type ?? (r.is_standard ? "Standard" : null),
       resultId:   r.id ?? null,
     });
@@ -156,7 +152,7 @@ function processAdsb(
   raw:         RawAircraft[],
   apLat:       number,
   apLon:       number,
-  monitorIdx:  Map<string, { compliant: boolean | null; lastEvent: string | null; resultId: number | null }>,
+  monitorIdx:  Map<string, { standard: boolean | null; lastEvent: string | null; resultId: number | null }>,
 ): AircraftInfo[] {
   return raw
     .filter(a => a.latitude != null && a.longitude != null)
@@ -176,7 +172,7 @@ function processAdsb(
         distNm:    calcDistNm(lat, lon, apLat, apLon),
         phase:     detectPhase(a.on_ground, altFt, a.heading, lat, lon, apLat, apLon),
         monitored: !!match,
-        compliant: match?.compliant ?? null,
+        standard: match?.standard ?? null,
         lastEvent: match?.lastEvent ?? null,
         resultId:  match?.resultId ?? null,
       };
@@ -188,22 +184,12 @@ function processAdsb(
     });
 }
 
-function activeRunway(windDir: number | null, airportCode: string): string | null {
-  if (windDir == null) return null;
-  // Runway headings: aircraft land into the wind
-  const runways: Record<string, [string, number][]> = {
-    KJFK: [["04L",40],["22R",220],["13L",130],["31R",310]],
-    KATL: [["08L",80],["26R",260],["10",100],["28",280]],
-    VHHH: [["07L",70],["25R",250]],
-    KLAX: [["07L",70],["25R",250],["06L",60],["24R",240]],
-    KORD: [["10L",100],["28R",280],["09L",90],["27R",270]],
-  };
-  const opts = runways[airportCode];
-  if (!opts) return null;
+function activeRunway(windDir: number | null, runways: { ident: string; heading_deg: number }[]): string | null {
+  if (windDir == null || runways.length === 0) return null;
   let best: { id: string; diff: number } | null = null;
-  for (const [id, hdg] of opts) {
-    const diff = angularDiff(hdg, windDir);
-    if (!best || diff < best.diff) best = { id, diff };
+  for (const { ident, heading_deg } of runways) {
+    const diff = angularDiff(heading_deg, windDir);
+    if (!best || diff < best.diff) best = { id: ident, diff };
   }
   return best?.id ?? null;
 }
@@ -216,17 +202,17 @@ function deriveCeiling(clouds: { cover: string; base: number }[] | null): number
 
 function hpaToInhg(hpa: number): string { return (hpa * 0.02953).toFixed(2); }
 
-/** Compliance-aware colour for monitored aircraft. */
+/** Phraseology-aware colour for monitored aircraft. */
 function monitoredColor(ac: AircraftInfo): string {
-  if (ac.compliant === false) return "#ff4444"; // violation
-  if (ac.compliant === true)  return "#3fb950"; // compliant
+  if (ac.standard === false) return "#ff4444"; // non-standard observation
+  if (ac.standard === true)  return "#3fb950"; // standard
   return "#e3b341";                              // unassessed
 }
 
 /** Build an SVG-based Leaflet divIcon for an aircraft target. */
 function makeAircraftIcon(ac: AircraftInfo, hovered: boolean): L.DivIcon {
   const isMonitored = ac.monitored;
-  // Monitored: colour by compliance status; background: dim grey
+  // Monitored: colour by phraseology status; background: dim grey
   const color = isMonitored ? monitoredColor(ac) : "#3a4048";
   const hdg   = ac.heading ?? 0;
 
@@ -528,8 +514,8 @@ function AircraftList({
     const altStr    = ac.altFt != null
       ? (ac.altFt >= 18000 ? `FL${Math.round(ac.altFt / 100)}` : `${ac.altFt.toLocaleString()}ft`)
       : (ac.onGround ? "GND" : "—");
-    const compLabel = ac.compliant === false ? "NON-STANDARD"
-      : ac.compliant === true ? "STANDARD" : "UNASSESSED";
+    const compLabel = ac.standard === false ? "NON-STANDARD"
+      : ac.standard === true ? "STANDARD" : "UNASSESSED";
 
     return (
       <div
@@ -560,7 +546,7 @@ function AircraftList({
         {/* Row 2: last event + position data */}
         <div style={{ display: "flex", gap: 8, paddingLeft: 11 }}>
           {ac.lastEvent && (
-            <span style={{ fontSize: 9, color: ac.compliant === false ? "#ff8800" : "#6e7681", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+            <span style={{ fontSize: 9, color: ac.standard === false ? "#ff8800" : "#6e7681", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
               {ac.lastEvent}
             </span>
           )}
@@ -643,7 +629,16 @@ function WindArrow({ deg, size = 28 }: { deg: number; size?: number }) {
 
 export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
   const { bp }  = useWindowWidth();
+  const { settings } = useSettings();
   const isSmall = bp === "mobile" || bp === "tablet";
+  const feed = useMemo(
+    () => (settings?.feeds ?? []).find(f => f.airport_code === airportCode),
+    [settings, airportCode],
+  );
+  const geo: [number, number] | null = useMemo(
+    () => feed && feed.lat != null && feed.lon != null ? [feed.lat, feed.lon] : null,
+    [feed],
+  );
 
   const [scopeOpen, setScopeOpen] = useState(!isSmall);
   // Resizable map height (drag handle)
@@ -669,7 +664,7 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
 
   // ADS-B
   useEffect(() => {
-    if (!AIRPORT_GEO[airportCode]) return;
+    if (!geo) return;
     const refresh = () => {
       fetch(`${API_BASE}/api/adsb/${airportCode}`)
         .then(r => r.json())
@@ -680,7 +675,7 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
     const ageTimer  = setInterval(() => setAdsbAge(a => (a ?? 0) + 1), 1000);
     const dataTimer = setInterval(refresh, 60_000);
     return () => { clearInterval(ageTimer); clearInterval(dataTimer); };
-  }, [airportCode]);
+  }, [airportCode, geo]);
 
   // NOTAMs
   useEffect(() => {
@@ -704,16 +699,15 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
   }, []);
 
   // Derived
-  const geo         = AIRPORT_GEO[airportCode];
   const monitorIdx  = useMemo(
     () => buildMonitorIndex(results, airportCode),
     [results, airportCode],
   );
   const aircraft = useMemo(
     () => (geo ? processAdsb(rawAdsb, geo[0], geo[1], monitorIdx) : []),
-    [rawAdsb, airportCode, monitorIdx],
+    [rawAdsb, geo, monitorIdx],
   );
-  const activeRwy = activeRunway(metar?.wdir ?? null, airportCode);
+  const activeRwy = activeRunway(metar?.wdir ?? null, feed?.runways ?? []);
 
   const catColor  = metar?.fltCat ? (CAT_COLOR[metar.fltCat] ?? "#8b949e") : "#484f58";
   const catLabel  = metar?.fltCat ? (CAT_LABEL[metar.fltCat] ?? metar.fltCat) : null;
@@ -749,7 +743,7 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <ViolationDensity results={results} airportFilter={airportCode} compact />
+          <ObservationDensity results={results} airportFilter={airportCode} compact />
           <button onClick={onClose} style={{ background: "none", border: "1px solid #30363d", color: "#6e7681", cursor: "pointer", fontSize: 12, padding: "2px 8px", borderRadius: 4, lineHeight: 1 }}>✕</button>
         </div>
       </div>
@@ -905,13 +899,13 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
           }
         </div>
 
-        {/* ── 24h Violation Summary ── */}
+        {/* ── 24h Observation Summary ── */}
         {(() => {
           const cutoff  = Date.now() - 24 * 3_600_000;
           const recent  = results.filter(r => r.airport_code === airportCode && new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z").getTime() >= cutoff);
           const total   = recent.length;
           if (total === 0) return null;
-          const compliant  = recent.filter(r => r.is_standard && r.assessable !== false).length;
+          const standard  = recent.filter(r => r.is_standard && r.assessable !== false).length;
           const unassess   = recent.filter(r => r.assessable === false).length;
           const bySev: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0 };
           const typeCounts: Record<string, number> = {};
@@ -920,7 +914,7 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
             typeCounts[v.note_type] = (typeCounts[v.note_type] ?? 0) + 1;
           }));
           const topType   = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
-          const compRate  = total > unassess ? Math.round((compliant / (total - unassess)) * 100) : null;
+          const compRate  = total > unassess ? Math.round((standard / (total - unassess)) * 100) : null;
           const rateColor = compRate == null ? "#484f58" : compRate >= 90 ? "#3fb950" : compRate >= 70 ? "#e3b341" : "#ff4444";
           const sevColors: Record<string, string> = { critical: "#ff4444", high: "#ff8800", medium: "#e3b341", low: "#44aaff" };
           return (
