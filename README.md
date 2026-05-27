@@ -153,8 +153,13 @@ feeds are configured yet). Add one or more LiveATC feed URLs — each with an ai
 code — and save. Then switch to the **Live** tab and click **▶ Start All** to begin
 monitoring every configured feed at once.
 
-The five airports below come with ADS-B correlation out of the box; any other LiveATC
-MP3 URL works too.
+You can paste either a LiveATC **stream URL** (`audio.liveatc.net/<mount>`) or the
+**listen-page link** from your browser (e.g.
+`https://www.liveatc.net/hlisten.php?mount=vhhh5&icao=vhhh`) - click **Verify** and it is
+converted to a working stream URL with the airport code filled in. Coordinates, runways,
+the map marker, ADS-B correlation, hazards, and weather then resolve automatically for
+**any operational fixed-wing ICAO airport worldwide** - the airports listed below are just
+convenient starting points.
 
 Or drive it via API:
 
@@ -270,7 +275,8 @@ python3 -m venv .venv
 
 Browse available feeds at [liveatc.net/feedindex.php](https://www.liveatc.net/feedindex.php).
 
-Supported airports with full ADS-B correlation out of the box:
+Example feeds to get you started - any operational fixed-wing ICAO airport resolves the
+same way (map marker, ADS-B, hazards, runway overlay):
 
 | ICAO | Airport |
 |---|---|
