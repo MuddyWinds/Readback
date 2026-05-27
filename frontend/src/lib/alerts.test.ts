@@ -1,6 +1,6 @@
 import { expect, test } from "@jest/globals";
 import { shouldAlert, resolveNavTarget } from "./alerts";
-import { AnalysisResult } from "../components/LiveFeed";
+import type { AnalysisResult } from "./types";
 
 function r(over: Partial<AnalysisResult> = {}): AnalysisResult {
   return { id: 7, timestamp: "2026-05-20T01:00:00Z", airport_code: "KJFK", transcript: "t",

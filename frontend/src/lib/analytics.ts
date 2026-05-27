@@ -1,4 +1,4 @@
-import type { AnalysisResult } from "../components/LiveFeed";
+import type { AnalysisResult } from "./types";
 import { getCardSeverity } from "./severity";
 
 function tsMs(r: AnalysisResult): number {

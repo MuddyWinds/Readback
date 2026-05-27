@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { AnalysisResult } from "../components/LiveFeed";
+import type { AnalysisResult } from "./types";
 import { API_BASE, fetchJson } from "./api";
 import { DateFilter, getStartDate } from "./format";
 import { PipelineStatus } from "./types";

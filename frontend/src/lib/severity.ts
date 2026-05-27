@@ -1,6 +1,5 @@
-import type { AnalysisResult } from "../components/LiveFeed";
-
-export type Severity = "standard" | "low" | "medium" | "high" | "critical" | "unassessable";
+import type { AnalysisResult, Severity } from "./types";
+export type { Severity } from "./types"; // back-compat for `import { Severity } from "./severity"`
 
 export const SEV_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 

@@ -1,7 +1,7 @@
-import type { AnalysisResult } from "../components/LiveFeed";
-import { getCardSeverity, Severity } from "./severity";
+import type { AnalysisResult, Filter } from "./types";
+import { getCardSeverity } from "./severity";
 
-export type Filter = "all" | Severity;
+export type { Filter } from "./types"; // re-export so `import { Filter } from "./selectors"` still resolves
 
 export function severityCounts(
   results: AnalysisResult[],

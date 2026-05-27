@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 
-import { AnalysisResult } from "../components/LiveFeed";
+import type { AnalysisResult } from "../lib/types";
 import { WS_URL } from "../lib/api";
 import { DateFilter } from "../lib/format";
 import { applyAnalysis } from "../lib/results-reducer";

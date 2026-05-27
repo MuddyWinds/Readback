@@ -3,7 +3,7 @@ import { useNotifications } from "../components/notifications/NotificationProvid
 import { useSettings } from "../SettingsContext";
 import { getCardSeverity } from "../lib/severity";
 import { shouldAlert, AlertFloor } from "../lib/alerts";
-import { AnalysisResult } from "../components/LiveFeed";
+import type { AnalysisResult } from "../lib/types";
 
 /**
  * Returns an onAnalysis(data) callback for useLiveSocket. When `data` meets the

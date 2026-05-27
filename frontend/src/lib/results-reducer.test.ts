@@ -1,7 +1,7 @@
 import { expect, test } from "@jest/globals";
 
 import { applyAnalysis } from "./results-reducer";
-import { AnalysisResult } from "../components/LiveFeed";
+import type { AnalysisResult } from "./types";
 
 function makeResult(over: Partial<AnalysisResult> = {}): AnalysisResult {
   return {

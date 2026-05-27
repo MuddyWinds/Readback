@@ -1,4 +1,4 @@
-import { AnalysisResult } from "../components/LiveFeed";
+import type { AnalysisResult } from "./types";
 import { DateFilter, getStartDate, parseTs } from "./format";
 
 const RESULTS_CAP = 500;

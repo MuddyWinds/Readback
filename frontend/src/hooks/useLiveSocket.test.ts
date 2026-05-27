@@ -2,7 +2,7 @@ import { expect, test } from "@jest/globals";
 import { QueryClient } from "@tanstack/react-query";
 
 import { handleSocketMessage } from "./useLiveSocket";
-import { AnalysisResult } from "../components/LiveFeed";
+import type { AnalysisResult } from "../lib/types";
 
 function makeResult(over: Partial<AnalysisResult> = {}): AnalysisResult {
   return {

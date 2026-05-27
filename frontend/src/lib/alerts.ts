@@ -1,6 +1,5 @@
-import { AnalysisResult } from "../components/LiveFeed";
-import { getCardSeverity, Severity, SEV_ORDER } from "./severity";
-import { Filter } from "./selectors";
+import type { AnalysisResult, Severity, Filter } from "./types";
+import { getCardSeverity, SEV_ORDER } from "./severity";
 
 export type AlertFloor = "low" | "medium" | "high" | "critical";
 

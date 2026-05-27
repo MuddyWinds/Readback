@@ -1,53 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useSettings } from "../../SettingsContext";
-import { getCardSeverity, SEV_ORDER, type Severity } from "../../lib/severity";
+import { getCardSeverity, SEV_ORDER } from "../../lib/severity";
+import type { AnalysisResult, Enrichment, Observation, Severity, Filter } from "../../lib/types";
 import { useAdsb, useAdsbSnapshot, useHazards, useUpdateResult } from "../../lib/queries";
 
-export interface SpeakerSegment { role: "ATC" | "PILOT" | "UNKNOWN"; text: string; }
-
-export interface Enrichment {
-  speaker_segments:     SpeakerSegment[];
-  atc_instruction:      string | null;
-  pilot_readback:       string | null;
-  readback_correct:     boolean | null;
-  readback_discrepancy: string | null;
-  callsign_detected:    string | null;
-  callsign_clarity:     number; // 0-100
-}
-
-export type ObservationKind = "phraseology_note" | "situational_event";
-
-export interface Observation {
-  kind: ObservationKind;
-  note_type: string;
-  hfacs_level: string;
-  significance: "low" | "medium" | "high" | "critical";
-  description: string;
-  safety_pathway?: string | null;
-  relevant_regulation?: string | null;
-  transcript_excerpt?: string | null;
-}
-
-export interface AnalysisResult {
-  id?: number;
-  timestamp: string;
-  airport_code: string;
-  transcript: string;
-  assessable?: boolean;
-  assessable_confidence?: number;
-  is_standard: boolean;
-  observations: Observation[];
-  summary: string;
-  confidence_score: number;
-  enrichment?: Enrichment | null;
-  status?: string;
-  reviewer_notes?: string;
-}
-
-export type Filter = "all" | "standard" | "low" | "medium" | "high" | "critical" | "unassessable";
-export type GroupBy = "none" | "airport";
-export { getCardSeverity, SEV_ORDER, type Severity } from "../../lib/severity";
+export type {
+  SpeakerSegment, Enrichment, ObservationKind, Observation,
+  AnalysisResult, Severity, Filter, GroupBy,
+} from "../../lib/types";
+export { getCardSeverity, SEV_ORDER } from "../../lib/severity";
 
 interface PipelineStatusSummary {
   queued_transcripts: number;

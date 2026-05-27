@@ -1,6 +1,6 @@
 import { expect, test } from "@jest/globals";
 import { complianceRate, hfacsCounts, detectSpike, topNoteTypes } from "./analytics";
-import { AnalysisResult } from "../components/LiveFeed";
+import type { AnalysisResult } from "./types";
 
 function r(over: Partial<AnalysisResult> = {}): AnalysisResult {
   return {

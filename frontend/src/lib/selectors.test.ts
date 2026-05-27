@@ -1,6 +1,6 @@
 import { expect, test } from "@jest/globals";
 import { severityCounts } from "./selectors";
-import { AnalysisResult } from "../components/LiveFeed";
+import type { AnalysisResult } from "./types";
 
 function r(code: string, sev: "standard" | "high"): AnalysisResult {
   const observations = sev === "high"
