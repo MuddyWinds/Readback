@@ -14,6 +14,7 @@ import { StructuredTranscript } from "./StructuredTranscript";
 import { StatusWorkflow } from "./StatusWorkflow";
 import { ReviewerNotes } from "./ReviewerNotes";
 import { PositionSnapshot } from "./PositionSnapshot";
+import { CompliantCard } from "./CompliantCard";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -45,111 +46,6 @@ const ACTION_COLOR: Record<string, string> = {
   "GO AROUND": "#ff7b72", HOLD: "#e3b341", EMERGENCY: "#ff4444", TURN: "#a5d6ff",
   SPEED: "#ffa657", "FREQ CHANGE": "#8b949e", PUSHBACK: "#bc8cff", TAXI: "#c9d1d9",
 };
-
-// ── Review workflow ───────────────────────────────────────────────────────────
-
-// ─── Standard card — minimal horizontal bar, expands on click ────────────────
-function CompliantCard({ r }: { r: AnalysisResult }) {
-  const [expanded, setExpanded] = useState(false);
-  const { callsign } = extractCallsign(r.transcript);
-  const actions = extractActions(r.transcript);
-
-  return (
-    <div
-      id={r.id ? `result-${r.id}` : undefined}
-      style={{
-        background: "#0d1117",
-        border: "1px solid #23863650",
-        borderLeft: "3px solid #23863688",
-        borderRadius: 8,
-        overflow: "hidden",
-        cursor: "pointer",
-      }}
-      onClick={() => setExpanded(v => !v)}
-    >
-      {/* Single-line header — all info in one row */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 8,
-        padding: "9px 14px", flexWrap: "wrap",
-      }}>
-        <span style={{
-          background: "#238636", color: "#fff",
-          padding: "2px 9px", borderRadius: 12,
-          fontSize: 10, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0,
-        }}>
-          STANDARD
-        </span>
-        <span style={{
-          background: "#161b22", color: "#8b949e",
-          padding: "2px 7px", borderRadius: 4, fontSize: 11, fontWeight: 700, flexShrink: 0,
-        }}>
-          {r.airport_code}
-        </span>
-        {callsign && (
-          <span style={{ fontSize: 11, color: "#6e7681", fontFamily: "monospace", flexShrink: 0 }}>
-            {callsign}
-          </span>
-        )}
-        {actions.map(a => (
-          <span key={a} style={{
-            background: "#161b22",
-            border: `1px solid ${ACTION_COLOR[a] ?? "#555"}44`,
-            color: `${ACTION_COLOR[a] ?? "#ccc"}99`,
-            padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600, flexShrink: 0,
-          }}>
-            {a}
-          </span>
-        ))}
-        {/* Spacer */}
-        <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: "#30363d", whiteSpace: "nowrap" }}>
-          {formatDistanceToNow(new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z"), { addSuffix: true })}
-        </span>
-        <span style={{ fontSize: 10, color: "#30363d" }}>{expanded ? "▲" : "▼"}</span>
-      </div>
-
-      {/* Expanded: analysis, structured transcript, investigation */}
-      {expanded && (
-        <div
-          style={{ borderTop: "1px solid #23863622" }}
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Analysis */}
-          {r.summary && (
-            <div style={{ padding: "10px 14px 0" }}>
-              <SectionLabel>Analysis</SectionLabel>
-              <p style={{ fontSize: 12, color: "#c9d1d9", margin: 0, lineHeight: 1.75 }}>
-                {r.summary}
-              </p>
-            </div>
-          )}
-
-          {/* Structured transcript */}
-          <div style={{ padding: "10px 14px 0" }}>
-            <SectionLabel>Transcript</SectionLabel>
-            <StructuredTranscript
-              enrichment={r.enrichment}
-              rawTranscript={r.transcript}
-              borderColor="#238636"
-              assessableConfidence={r.assessable_confidence}
-            />
-          </div>
-
-          {/* Review */}
-          <div style={{
-            margin: "10px 14px 12px",
-            background: "#0d1117", border: "1px solid #21262d",
-            borderRadius: 6, padding: "10px 12px",
-            display: "flex", flexDirection: "column" as const, gap: 12,
-          }}>
-            <StatusWorkflow resultId={r.id} initial={r.status} />
-            <ReviewerNotes resultId={r.id} initial={r.reviewer_notes} />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Observation card — full detail ──────────────────────────────────────────
 function ObservationCard({ r, priorOccurrences, lastSeenAgo }: {
