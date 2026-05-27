@@ -4,7 +4,7 @@ import { useSettings } from "../../SettingsContext";
 import { getCardSeverity, SEV_ORDER } from "../../lib/severity";
 import type { AnalysisResult, Enrichment, Observation, Severity, Filter } from "../../lib/types";
 import { useAdsb, useAdsbSnapshot, useHazards, useUpdateResult } from "../../lib/queries";
-import { phoneticExpand, extractCallsign, normalizeNumeric, isAsrAmbiguous, extractActions, parseBullets } from "../../lib/transcript";
+import { extractCallsign, isAsrAmbiguous, extractActions, parseBullets } from "../../lib/transcript";
 import { truncateAtChapter } from "../../lib/regs";
 import { isActiveAt, detectConflicts, AdsbAircraft } from "../../lib/conflicts";
 import { buildReportText } from "../../lib/report";
