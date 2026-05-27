@@ -1,0 +1,26 @@
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.reliable {
+  color: var(--sev-standard);
+  background: color-mix(in srgb, var(--sev-standard) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-standard) 27%, transparent);
+}
+
+.verify {
+  color: var(--sev-medium);
+  background: color-mix(in srgb, var(--sev-medium) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-medium) 27%, transparent);
+}
+
+.unreliable {
+  color: var(--sev-critical);
+  background: color-mix(in srgb, var(--sev-critical) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-critical) 27%, transparent);
+}

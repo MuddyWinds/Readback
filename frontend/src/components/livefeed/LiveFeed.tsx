@@ -11,6 +11,7 @@ import { buildReportText } from "../../lib/report";
 import { useWatchList } from "../../hooks/useWatchList";
 import { SEV_LABEL, SEV_ICON, ACTION_REQUIRED, HFACS_PLAIN, STATUS_LABEL, ReviewStatus } from "./constants";
 import { SectionLabel } from "./SectionLabel";
+import { ConfidenceBadge } from "./ConfidenceBadge";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -42,33 +43,6 @@ const ACTION_COLOR: Record<string, string> = {
   "GO AROUND": "#ff7b72", HOLD: "#e3b341", EMERGENCY: "#ff4444", TURN: "#a5d6ff",
   SPEED: "#ffa657", "FREQ CHANGE": "#8b949e", PUSHBACK: "#bc8cff", TAXI: "#c9d1d9",
 };
-
-/** Semantic confidence label — replaces bare "AI 73%" with meaningful tier. */
-function ConfidenceBadge({ score }: { score: number }) {
-  const pct = Math.round(score * 100);
-  const tier =
-    pct >= 75 ? { label: "RELIABLE",   color: "#3fb950", bg: "#3fb95018" } :
-    pct >= 50 ? { label: "VERIFY",     color: "#e3b341", bg: "#e3b34118" } :
-                { label: "UNRELIABLE", color: "#ff4444", bg: "#ff444418" };
-  return (
-    <span
-      title={`AI confidence: ${pct}% — ${
-        pct >= 75 ? "verdict is well-supported" :
-        pct >= 50 ? "manually verify this transcript before acting" :
-                    "low confidence — treat as indicative only"
-      }`}
-      style={{
-        fontSize: 10, fontWeight: 700,
-        color: tier.color, background: tier.bg,
-        border: `1px solid ${tier.color}44`,
-        borderRadius: 4, padding: "1px 6px",
-        whiteSpace: "nowrap", cursor: "help",
-      }}
-    >
-      {pct >= 75 ? "" : "⚠ "}{tier.label} {pct}%
-    </span>
-  );
-}
 
 /** Structured transcript: speaker-labelled turns, readback comparison. */
 function StructuredTranscript({
