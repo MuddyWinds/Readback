@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AppSettings, FeedConfig, saveSettings, suggestAirportCode, verifyFeed } from "../lib/settings";
+import { AppSettings, FeedConfig, saveSettings, suggestAirportCode, verifiedFeedFields, verifyFeed } from "../lib/settings";
 import { useSettings } from "../SettingsContext";
 
 const MAX_FEEDS = 5;
@@ -56,7 +56,7 @@ export function SettingsPage() {
     updateFeed(i, {
       _verify: res.ok ? "ok" : "fail",
       _verifyMsg: res.ok ? "Reachable, looks like audio" : (res.reason ?? "Verification failed"),
-      ...(res.suggested_code && !feeds[i]._persisted ? { airport_code: res.suggested_code } : {}),
+      ...verifiedFeedFields(res, feeds[i]._persisted),
     });
   };
 

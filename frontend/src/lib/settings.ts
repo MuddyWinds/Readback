@@ -27,10 +27,21 @@ export interface AppSettings {
 
 export interface VerifyFeedResult {
   ok: boolean;
+  stream_url?: string | null;
   status?: number;
   content_type?: string;
   suggested_code?: string;
   reason?: string | null;
+}
+
+export function verifiedFeedFields(
+  res: VerifyFeedResult,
+  isPersisted: boolean,
+): { url?: string; airport_code?: string } {
+  return {
+    ...(res.ok && res.stream_url ? { url: res.stream_url } : {}),
+    ...(res.suggested_code && !isPersisted ? { airport_code: res.suggested_code } : {}),
+  };
 }
 
 export async function fetchSettings(): Promise<AppSettings> {
