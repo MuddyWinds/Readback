@@ -32,7 +32,8 @@ export function SettingsPage() {
   const [key, setKey] = useState(settings?.gemini_api_key ?? "");
   const [revealKey, setRevealKey] = useState(false);
   const [runtime, setRuntime] = useState(settings?.runtime ?? {
-    batch_interval_seconds: 300, stt_rms_threshold: 0, whisper_model: "base", stt_concurrency: 1,
+    batch_interval_seconds: 300, stt_rms_threshold: 0, whisper_model: "base",
+    stt_concurrency: 1, alert_min_severity: "high" as const,
   });
   const [feeds, setFeeds] = useState<FeedRow[]>(
     (settings?.feeds ?? []).map(f => ({ ...f, _persisted: true, _verify: "idle" as VerifyState }))

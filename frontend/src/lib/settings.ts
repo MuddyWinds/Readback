@@ -17,6 +17,7 @@ export interface RuntimeConfig {
   stt_rms_threshold: number;
   whisper_model: string;
   stt_concurrency: number;
+  alert_min_severity: "low" | "medium" | "high" | "critical";
 }
 
 export interface AppSettings {
