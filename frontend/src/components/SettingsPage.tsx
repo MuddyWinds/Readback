@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AppSettings, FeedConfig, saveSettings, suggestAirportCode, verifiedFeedFields, verifyFeed } from "../lib/settings";
+import { AppSettings, FeedConfig, RuntimeConfig, saveSettings, suggestAirportCode, verifiedFeedFields, verifyFeed } from "../lib/settings";
 import { useSettings } from "../SettingsContext";
 
 const MAX_FEEDS = 5;
@@ -127,6 +127,14 @@ export function SettingsPage() {
             <label style={labelStyle}>STT concurrency - restart required</label>
             <input style={input} type="number" min={1} value={runtime.stt_concurrency}
               onChange={e => setRuntime({ ...runtime, stt_concurrency: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label style={labelStyle}>Alert threshold (toast on / above)</label>
+            <select style={input} value={runtime.alert_min_severity}
+              onChange={e => setRuntime({ ...runtime, alert_min_severity: e.target.value as RuntimeConfig["alert_min_severity"] })}>
+              {(["low", "medium", "high", "critical"] as const).map(s =>
+                <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
+            </select>
           </div>
         </div>
       </div>
