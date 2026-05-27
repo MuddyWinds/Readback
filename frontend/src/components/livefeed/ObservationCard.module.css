@@ -1,0 +1,330 @@
+/* --sev-border and --sev-bg are set per-card via inline style */
+
+.card {
+  background: var(--sev-bg);
+  border: 1px solid var(--sev-border);
+  border-left: 4px solid var(--sev-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.header {
+  padding: 11px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--sev-border) 13.3333%, transparent);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.headerLeft {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sevBadge {
+  background: var(--sev-border);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.airportCode {
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.callsign {
+  font-size: 12px;
+  color: var(--text-sub);
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.watchBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.watchBtnActive {
+  color: var(--sev-medium);
+}
+
+.watchBtnInactive {
+  color: var(--sev-unassessable-border);
+}
+
+.obsCount {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* --accent set per-chip via inline style */
+.actionChip {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+.timestamp {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* Watch list highlight */
+.watchHighlight {
+  padding: 4px 16px;
+  background: color-mix(in srgb, var(--sev-medium) 9.4118%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sev-medium) 18.8235%, transparent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.watchLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--sev-medium);
+}
+
+.watchSub {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* Prior occurrence alert */
+.priorAlert {
+  padding: 6px 16px;
+  background: color-mix(in srgb, var(--sev-medium) 6.2745%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sev-medium) 18.8235%, transparent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.priorAlertIcon {
+  font-size: 10px;
+}
+
+.priorAlertText {
+  font-size: 11px;
+  color: var(--sev-medium);
+}
+
+/* What happened section */
+.whatHappened {
+  padding: 14px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--sev-border) 9.4118%, transparent);
+  background: color-mix(in srgb, var(--sev-border) 3.1373%, transparent);
+}
+
+.bulletList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bulletRow {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.bulletDash {
+  color: var(--sev-border);
+  font-size: 13px;
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.bulletText {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.55;
+  font-weight: 400;
+}
+
+/* Evidence section */
+.evidence {
+  padding: 10px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--sev-border) 9.4118%, transparent);
+}
+
+.toggleRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.transcriptToggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.1s;
+}
+
+.toggleIcon {
+  font-family: monospace;
+  font-size: 10px;
+}
+
+.transcriptBlock {
+  margin-top: 10px;
+}
+
+/* Position toggle button — active/inactive states */
+.posToggle {
+  background: none;
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.1s;
+}
+
+.posToggleInactive {
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.posToggleActive {
+  border: 1px solid color-mix(in srgb, var(--sev-border) 40%, transparent);
+  color: var(--sev-border);
+}
+
+/* Analysis section */
+.analysis {
+  padding: 14px 16px 0;
+}
+
+.analysisHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.advisoryIcon {
+  font-size: 11px;
+  color: var(--text-faint);
+  cursor: help;
+  user-select: none;
+  margin-top: -8px;
+  flex-shrink: 0;
+}
+
+.phraseologyGroup {
+  margin-bottom: 18px;
+}
+
+.phraseologyGroupLast {
+  margin-bottom: 0;
+}
+
+.phraseologyLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--sev-low);
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  border-left: 3px solid color-mix(in srgb, var(--sev-low) 26.6667%, transparent);
+  padding-left: 8px;
+  margin-bottom: 10px;
+}
+
+.situationalLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  border-left: 3px solid var(--border);
+  padding-left: 8px;
+  margin-bottom: 10px;
+}
+
+.observationList {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Review guidance section */
+.reviewGuidance {
+  padding: 14px 16px 10px;
+}
+
+.guidanceBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: color-mix(in srgb, var(--sev-border) 9.4118%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-border) 33.3333%, transparent);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.guidanceIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+  padding-top: 1px;
+}
+
+.guidanceContent {
+  flex: 1;
+}
+
+.guidanceLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--sev-border);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.guidanceText {
+  font-size: 13px;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.55;
+  font-weight: 500;
+}

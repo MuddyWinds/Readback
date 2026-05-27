@@ -1,0 +1,36 @@
+.container {
+  margin: 0 16px 14px;
+  background: var(--bg);
+  border: 1px solid var(--surface-2);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.copyRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copyBtn {
+  font-size: 10px;
+  color: var(--text-dim);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pasteNote {
+  font-size: 10px;
+  color: var(--sev-unassessable-border);
+  font-style: italic;
+}

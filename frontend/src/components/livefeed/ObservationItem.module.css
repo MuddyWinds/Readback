@@ -1,0 +1,120 @@
+.row {
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--surface-2);
+}
+
+.rowLast {
+  padding-bottom: 14px;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+/* --accent set per-item via inline style */
+.noteType {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.sigBadge {
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--accent);
+  padding: 1px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.description {
+  font-size: 13px;
+  color: var(--text-sub);
+  line-height: 1.75;
+  white-space: pre-wrap;
+  margin-bottom: 10px;
+}
+
+.hfacsRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hfacsRowWithExcerpt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.hfacsLabel {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-faint);
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+}
+
+.hfacsCode {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.hfacsPlain {
+  font-size: 11px;
+  color: var(--text-ghost);
+}
+
+.safetyPathway {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1.6;
+  padding-left: 2px;
+}
+
+.safetyPathwayWithExcerpt {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1.6;
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+/* --accent set per-item via inline style */
+.excerpt {
+  background: color-mix(in srgb, var(--accent) 5.098%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--action-speed);
+  font-style: italic;
+  line-height: 1.6;
+}
