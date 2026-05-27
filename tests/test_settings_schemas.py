@@ -1,5 +1,8 @@
 """Settings schemas: defaults, feed objects, and runtime split."""
 
+import pytest
+from pydantic import ValidationError
+
 from backend.models.settings_schemas import AppSettings, FeedConfig, RuntimeConfig
 
 
@@ -30,3 +33,24 @@ def test_appsettings_roundtrips_through_dict():
     assert restored.gemini_api_key == "abc"
     assert restored.feeds[0].airport_code == "KATL"
     assert restored.runtime.batch_interval_seconds == 120
+
+
+def test_runtimeconfig_alert_min_severity_defaults_to_high():
+    assert RuntimeConfig().alert_min_severity == "high"
+
+
+def test_runtimeconfig_parses_legacy_blob_without_alert_field():
+    legacy = {
+        "batch_interval_seconds": 120,
+        "stt_rms_threshold": 0.0,
+        "whisper_model": "base",
+        "stt_concurrency": 1,
+    }
+    cfg = RuntimeConfig(**legacy)
+    assert cfg.alert_min_severity == "high"
+    assert cfg.batch_interval_seconds == 120
+
+
+def test_runtimeconfig_rejects_invalid_alert_severity():
+    with pytest.raises(ValidationError):
+        RuntimeConfig(alert_min_severity="urgent")

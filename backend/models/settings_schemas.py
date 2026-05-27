@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,8 @@ class RuntimeConfig(BaseModel):
     stt_rms_threshold: float = 0.0
     whisper_model: str = "base"
     stt_concurrency: int = 1
+    # Floor over the significance ordering at which event-alert toasts fire.
+    alert_min_severity: Literal["low", "medium", "high", "critical"] = "high"
 
 
 class AppSettings(BaseModel):
