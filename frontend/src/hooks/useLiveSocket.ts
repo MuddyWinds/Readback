@@ -22,7 +22,7 @@ export function handleSocketMessage(
   if (msg.type === "analysis") {
     qc.setQueryData<AnalysisResult[]>(
       ["results", dateFilter],
-      (prev) => applyAnalysis(prev, msg, dateFilter),
+      (prev: AnalysisResult[] | undefined) => applyAnalysis(prev, msg, dateFilter),
     );
     onAnalysis?.(msg.data);
   } else if (msg.type === "pipeline") {
