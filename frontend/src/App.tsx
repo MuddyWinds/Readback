@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { LiveFeed, AnalysisResult, Filter } from "./components/LiveFeed";
 import { AirportSidebar } from "./components/AirportSidebar";
 import { SettingsPage } from "./components/SettingsPage";
-import { SituationRoom } from "./components/SituationRoom";
 import { useSettings } from "./SettingsContext";
 import { useWindowWidth } from "./hooks/useWindowWidth";
 import { API_BASE, fetchJson } from "./lib/api";
@@ -245,7 +244,7 @@ export default function App() {
     [settings]
   );
   const [activeFeeds, setActiveFeeds]   = useState<Set<string>>(new Set());
-  const [tab, setTab]                   = useState<"live" | "situation" | "settings">("live");
+  const [tab, setTab]                   = useState<"live" | "settings">("live");
   const [filter, setFilter]             = useState<Filter>("all");
   const [airportFilter, setAirportFilter] = useState<string>("all");
   const [dateFilter, setDateFilter]     = useState<DateFilter>("all");
@@ -255,8 +254,6 @@ export default function App() {
   const [stopping, setStopping]         = useState(false);
   // Sidebar: which airport's panel is open in Live Feed (null = hidden)
   const [sidebarAirport, setSidebarAirport] = useState<string | null>(null);
-  // Situation Room airport overlay (separate from live sidebar)
-  const [srAirport, setSrAirport] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -406,12 +403,6 @@ export default function App() {
   const isTablet  = bp === "tablet";
   const isLarge   = bp === "large";
 
-  // Airports with active feeds for Situation Room markers
-  const activeAirportCodes = useMemo(
-    () => new Set(feeds.filter(f => activeFeeds.has(f.url)).map(f => f.code)),
-    [activeFeeds, feeds]
-  );
-
   // ── Render ───────────────────────────────────────────────────────────────────
 
   // On tablet/mobile, sidebar becomes a bottom drawer instead of a side panel
@@ -525,9 +516,6 @@ export default function App() {
             <button onClick={() => setTab("live")}      style={tabBtnStyle(tab === "live")}>
               {isMobile ? "Feed" : "Live Feed"}
             </button>
-            <button onClick={() => setTab("situation")} style={tabBtnStyle(tab === "situation")}>
-              {isMobile ? "Globe" : "Situation Room"}
-            </button>
             <button onClick={() => setTab("settings")} style={tabBtnStyle(tab === "settings")}>
               {isMobile ? "Setup" : "Settings"}
             </button>
@@ -561,42 +549,6 @@ export default function App() {
           {settings
             ? <SettingsPage key={settings.gemini_api_key + ":" + settings.feeds.length} />
             : <p style={{ color: "#8b949e", padding: 24 }}>Loading settings...</p>}
-        </div>
-      ) : tab === "situation" ? (
-        <div style={{ flex: 1, overflowY: "auto", position: "relative" }}>
-          <SituationRoom
-            results={results}
-            activeAirports={activeAirportCodes}
-            onAirportClick={(code) => setSrAirport(prev => prev === code ? null : code)}
-          />
-
-          {/* Airport detail overlay — slides in from right within Situation Room */}
-          {srAirport && (
-            <>
-              {/* Backdrop */}
-              <div
-                onClick={() => setSrAirport(null)}
-                style={{
-                  position: "fixed", inset: 0, zIndex: 190,
-                  background: "#00000044", backdropFilter: "blur(1px)",
-                }}
-              />
-              {/* Panel */}
-              <div style={{
-                position: "fixed", right: 0, top: 0, bottom: 0,
-                width: isMobile ? "100vw" : isTablet ? 380 : 420,
-                zIndex: 200,
-                boxShadow: "-6px 0 40px #0009",
-                animation: "slideInRight 0.2s ease",
-              }}>
-                <AirportSidebar
-                  airportCode={srAirport}
-                  onClose={() => setSrAirport(null)}
-                  results={results}
-                />
-              </div>
-            </>
-          )}
         </div>
       ) : (
         /* Live Feed — flex layout; sidebar is side panel on desktop, drawer on mobile/tablet */

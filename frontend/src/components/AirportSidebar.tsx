@@ -5,6 +5,7 @@ import { useWindowWidth } from "../hooks/useWindowWidth";
 import { useSettings } from "../SettingsContext";
 import { ObservationDensity, AnalysisResult } from "./LiveFeed";
 import { API_BASE } from "../lib/api";
+import { AirportAnalytics } from "./airport/AirportAnalytics";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -651,6 +652,10 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
   const [adsbAge,   setAdsbAge]   = useState<number | null>(null);
   const [notams,    setNotams]    = useState<any[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const airportResults = useMemo(
+    () => results.filter(r => r.airport_code === airportCode),
+    [results, airportCode],
+  );
 
   // METAR
   useEffect(() => {
@@ -898,51 +903,7 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
           }
         </div>
 
-        {/* ── 24h Observation Summary ── */}
-        {(() => {
-          const cutoff  = Date.now() - 24 * 3_600_000;
-          const recent  = results.filter(r => r.airport_code === airportCode && new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z").getTime() >= cutoff);
-          const total   = recent.length;
-          if (total === 0) return null;
-          const standard  = recent.filter(r => r.is_standard && r.assessable !== false).length;
-          const unassess   = recent.filter(r => r.assessable === false).length;
-          const bySev: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0 };
-          const typeCounts: Record<string, number> = {};
-          recent.forEach(r => (r.observations ?? []).forEach((v) => {
-            if (v.significance in bySev) bySev[v.significance]++;
-            typeCounts[v.note_type] = (typeCounts[v.note_type] ?? 0) + 1;
-          }));
-          const topType   = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
-          const compRate  = total > unassess ? Math.round((standard / (total - unassess)) * 100) : null;
-          const rateColor = compRate == null ? "#484f58" : compRate >= 90 ? "#3fb950" : compRate >= 70 ? "#e3b341" : "#ff4444";
-          const sevColors: Record<string, string> = { critical: "#ff4444", high: "#ff8800", medium: "#e3b341", low: "#44aaff" };
-          return (
-            <div style={{ padding: "14px 16px", borderTop: "1px solid #21262d" }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: "#484f58", letterSpacing: 1.2, textTransform: "uppercase" as const, marginBottom: 10 }}>24h Observation Summary</div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <span style={{ fontSize: 11, color: "#6e7681" }}>Conformance rate</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: rateColor }}>{compRate != null ? `${compRate}%` : "—"}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 11, color: "#6e7681" }}>Transmissions analysed</span>
-                <span style={{ fontSize: 11, fontFamily: "monospace", color: "#c9d1d9" }}>{total - unassess}</span>
-              </div>
-              {Object.entries(bySev).filter(([, n]) => n > 0).map(([sev, n]) => (
-                <div key={sev} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: sevColors[sev], background: sevColors[sev] + "18", border: `1px solid ${sevColors[sev]}44`, borderRadius: 3, padding: "1px 6px" }}>{sev.toUpperCase()}</span>
-                  <span style={{ fontSize: 11, fontFamily: "monospace", color: "#c9d1d9" }}>{n}</span>
-                </div>
-              ))}
-              {topType && (
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #21262d" }}>
-                  <span style={{ fontSize: 10, color: "#484f58" }}>Most frequent: </span>
-                  <span style={{ fontSize: 10, color: "#c9d1d9" }}>{topType[0]}</span>
-                  <span style={{ fontSize: 10, color: "#484f58" }}> ({topType[1]}×)</span>
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        <AirportAnalytics results={airportResults} />
       </div>
     </div>
   );
