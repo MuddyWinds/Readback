@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { SettingsProvider } from "./SettingsContext";
+import { NotificationProvider } from "./components/notifications/NotificationProvider";
 import "./theme.css";
 
 const queryClient = new QueryClient({
@@ -20,7 +21,9 @@ root.render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
-        <App />
+        <NotificationProvider>
+          <App />
+        </NotificationProvider>
       </SettingsProvider>
     </QueryClientProvider>
   </React.StrictMode>
