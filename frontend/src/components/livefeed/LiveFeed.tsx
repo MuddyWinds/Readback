@@ -3,15 +3,16 @@ import { formatDistanceToNow } from "date-fns";
 import { useSettings } from "../../SettingsContext";
 import { getCardSeverity, SEV_ORDER } from "../../lib/severity";
 import type { AnalysisResult, Enrichment, Observation, Severity, Filter } from "../../lib/types";
-import { useAdsb, useAdsbSnapshot, useHazards, useUpdateResult } from "../../lib/queries";
+import { useAdsb, useAdsbSnapshot, useUpdateResult } from "../../lib/queries";
 import { extractCallsign, isAsrAmbiguous, extractActions, parseBullets } from "../../lib/transcript";
-import { isActiveAt, detectConflicts, AdsbAircraft } from "../../lib/conflicts";
+import { detectConflicts, AdsbAircraft } from "../../lib/conflicts";
 import { buildReportText } from "../../lib/report";
 import { useWatchList } from "../../hooks/useWatchList";
 import { SEV_LABEL, SEV_ICON, ACTION_REQUIRED, HFACS_PLAIN, STATUS_LABEL, ReviewStatus } from "./constants";
 import { SectionLabel } from "./SectionLabel";
 import { ConfidenceBadge } from "./ConfidenceBadge";
 import { RegBadge } from "./RegBadge";
+import { HazardBanner } from "./HazardBanner";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -344,60 +345,6 @@ function CompliantCard({ r }: { r: AnalysisResult }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/** Banner shown on ObservationCard when met hazards were active at observation time. */
-function HazardBanner({ airport, timestamp }: { airport: string; timestamp: string }) {
-  const { data: hazards } = useHazards(airport);
-  if (!hazards) return null;
-
-  const activeSigmets = (hazards.sigmets ?? []).filter((s: any) => isActiveAt(s.from, s.to, timestamp));
-  const activeAirmets = (hazards.airmets ?? []).filter((a: any) => isActiveAt(a.from, a.to, timestamp));
-  const recentPireps  = (hazards.pireps  ?? []).filter((p: any) => {
-    if (!p.obs_time || (!p.turb && !p.icing)) return false;
-    return Math.abs(new Date(timestamp.endsWith("Z") ? timestamp : timestamp + "Z").getTime()
-                  - new Date(p.obs_time).getTime()) < 2 * 3_600_000;
-  });
-
-  if (!activeSigmets.length && !activeAirmets.length && !recentPireps.length) return null;
-
-  return (
-    <div style={{
-      padding: "6px 16px", background: "#ff880010",
-      borderBottom: "1px solid #ff880030",
-      display: "flex", flexDirection: "column", gap: 3,
-    }}>
-      {activeSigmets.map((s: any, i: number) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: "#ff4444", background: "#ff444418",
-            border: "1px solid #ff444444", borderRadius: 3, padding: "1px 5px", flexShrink: 0 }}>SIGMET</span>
-          <span style={{ fontSize: 11, color: "#c9d1d9" }}>
-            {s.hazard}{s.severity ? ` (${s.severity})` : ""}
-            {s.alt_low && s.alt_high ? ` · ${Math.round(s.alt_low/100)*100}–${Math.round(s.alt_high/100)*100} ft` : ""}
-          </span>
-          <span style={{ fontSize: 10, color: "#484f58", fontStyle: "italic" }}>active at time of transmission</span>
-        </div>
-      ))}
-      {activeAirmets.map((a: any, i: number) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: "#ff8800", background: "#ff880018",
-            border: "1px solid #ff880044", borderRadius: 3, padding: "1px 5px", flexShrink: 0 }}>AIRMET</span>
-          <span style={{ fontSize: 11, color: "#c9d1d9" }}>{a.hazard}</span>
-          <span style={{ fontSize: 10, color: "#484f58", fontStyle: "italic" }}>active at time of transmission</span>
-        </div>
-      ))}
-      {recentPireps.map((p: any, i: number) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: "#e3b341", background: "#e3b34118",
-            border: "1px solid #e3b34144", borderRadius: 3, padding: "1px 5px", flexShrink: 0 }}>PIREP</span>
-          <span style={{ fontSize: 11, color: "#c9d1d9" }}>
-            {p.turb  ? `Turb: ${p.turb}` : ""}{p.icing ? ` Icing: ${p.icing}` : ""}
-            {p.altitude ? ` @ ${p.altitude} ft` : ""}
-          </span>
-        </div>
-      ))}
     </div>
   );
 }

@@ -1,0 +1,51 @@
+.banner {
+  padding: 6px 16px;
+  background: color-mix(in srgb, var(--sev-high) 6%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sev-high) 19%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.typeLabel {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.sigmetLabel {
+  color: var(--sev-critical);
+  background: color-mix(in srgb, var(--sev-critical) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-critical) 27%, transparent);
+}
+
+.airmetLabel {
+  color: var(--sev-high);
+  background: color-mix(in srgb, var(--sev-high) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-high) 27%, transparent);
+}
+
+.pirepLabel {
+  color: var(--sev-medium);
+  background: color-mix(in srgb, var(--sev-medium) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-medium) 27%, transparent);
+}
+
+.rowText {
+  font-size: 11px;
+  color: var(--text);
+}
+
+.rowNote {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-style: italic;
+}
