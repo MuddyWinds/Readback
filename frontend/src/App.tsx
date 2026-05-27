@@ -1,19 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { LiveFeed, AnalysisResult, Filter, getCardSeverity } from "./components/LiveFeed";
 import { AirportSidebar } from "./components/AirportSidebar";
+import { SettingsPage } from "./components/SettingsPage";
 import { SituationRoom } from "./components/SituationRoom";
+import { useSettings } from "./SettingsContext";
 import { useWindowWidth } from "./hooks/useWindowWidth";
 
 const API_BASE = "http://localhost:8000";
 const WS_URL = "ws://localhost:8000/ws/live";
-
-const KNOWN_FEEDS: { label: string; url: string; code: string }[] = [
-  { label: "New York JFK",            url: "http://audio.liveatc.net/kjfk9_s",            code: "KJFK" },
-  { label: "Atlanta Tower",           url: "http://audio.liveatc.net/katl_twr",           code: "KATL" },
-  { label: "Hong Kong App/Dep",       url: "http://audio.liveatc.net/vhhh5",              code: "VHHH" },
-  { label: "Los Angeles Tower",       url: "http://audio.liveatc.net/klax_twr",           code: "KLAX" },
-  { label: "Chicago O'Hare Approach", url: "http://audio.liveatc.net/kord1n2_app_133625", code: "KORD" },
-];
 
 const SEV_COLOR: Record<string, string> = {
   standard: "#3fb950", low: "#44aaff", medium: "#e3b341", high: "#ff8800", critical: "#ff4444",
@@ -31,6 +25,28 @@ const FILTER_BUTTONS: { key: Filter; label: string }[] = [
 ];
 
 type DateFilter = "today" | "7d" | "30d" | "ytd" | "all";
+type WsState = "connecting" | "connected" | "reconnecting" | "offline";
+
+interface FeedStatus {
+  airport_code: string;
+  stage: string;
+  detail?: string | null;
+  updated_at: string;
+}
+
+interface PipelineStatus {
+  last_audio_at: string | null;
+  last_transcript_at: string | null;
+  last_batch_started_at: string | null;
+  last_batch_completed_at: string | null;
+  next_batch_at: string | null;
+  last_error: string | null;
+  last_gemini_error: string | null;
+  last_persisted_count: number;
+  queued_transcripts: number;
+  batch_interval_seconds: number;
+  feed_status: Record<string, FeedStatus>;
+}
 
 const DATE_FILTERS: { key: DateFilter; label: string }[] = [
   { key: "today", label: "Today" },
@@ -51,21 +67,256 @@ function getStartDate(f: DateFilter): string | null {
   return null;
 }
 
+function parseTs(ts: string): Date {
+  return new Date(ts.endsWith("Z") ? ts : ts + "Z");
+}
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response.json();
+}
+
+type StageDotColor = "#484f58" | "#3fb950" | "#e3b341" | "#ff4444" | "#8b949e";
+
+function stageDotColor(stage: string, active: boolean): StageDotColor {
+  if (!active) return "#484f58";
+  if (stage === "error") return "#ff4444";
+  if (stage === "audio") return "#3fb950";
+  if (stage === "transcribing" || stage.startsWith("queued")) return "#e3b341";
+  if (stage === "silent" || stage === "too_short") return "#8b949e";
+  return "#3fb950";
+}
+
+function stageLabel(stage: string, active: boolean): string {
+  if (!active) return "off";
+  if (stage === "queued_unassessable") return "queued (unassessable)";
+  if (stage.startsWith("queued_")) return "queued (" + stage.slice("queued_".length) + ")";
+  return stage;
+}
+
+function PipelineStatusStrip({
+  status,
+  apiError,
+  feeds,
+  activeFeeds,
+  activeAudio,
+  airportFilter,
+  onAirportSelect,
+  onAudioStop,
+}: {
+  status: PipelineStatus | null;
+  apiError: string | null;
+  feeds: { label: string; url: string; code: string }[];
+  activeFeeds: Set<string>;
+  activeAudio: string | null;
+  airportFilter: string;
+  onAirportSelect: (code: string) => void;
+  onAudioStop: () => void;
+}) {
+  const hardError = apiError;
+  const softError = status?.last_gemini_error || status?.last_error || null;
+
+  let statusLabel: string;
+  let statusColor: string;
+  let statusTextColor: string;
+  let statusTooltip: string | undefined;
+
+  if (hardError) {
+    statusLabel = "API unreachable";
+    statusColor = "#ff4444";
+    statusTextColor = "#ff4444";
+    statusTooltip = hardError;
+  } else if (status?.last_gemini_error) {
+    statusLabel = "Gemini Down";
+    statusColor = "#e3b341";
+    statusTextColor = "#e3b341";
+    statusTooltip = status.last_gemini_error;
+  } else if (softError) {
+    statusLabel = "Pipeline error";
+    statusColor = "#e3b341";
+    statusTextColor = "#e3b341";
+    statusTooltip = softError;
+  } else if (status?.queued_transcripts) {
+    statusLabel = "Batch Queued";
+    statusColor = "#58a6ff";
+    statusTextColor = "#58a6ff";
+  } else {
+    statusLabel = "Listening";
+    statusColor = "#3fb950";
+    statusTextColor = "#3fb950";
+  }
+
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap" as const,
+      maxWidth: "100%",
+      minWidth: 0,
+    }}>
+      {/* Status pill */}
+      <div
+        title={statusTooltip}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 7,
+          background: "#0d1117",
+          border: "1px solid #30363d",
+          borderRadius: 6,
+          padding: "4px 10px",
+          flexShrink: 0,
+          cursor: statusTooltip ? "help" : "default",
+        }}
+      >
+        <span style={{
+          width: 8, height: 8, borderRadius: "50%",
+          background: statusColor,
+          flexShrink: 0,
+        }} />
+        <span style={{
+          fontSize: 12,
+          color: statusTextColor,
+          fontWeight: 500,
+          whiteSpace: "nowrap" as const,
+        }}>{statusLabel}</span>
+      </div>
+
+      {/* Airport pill row */}
+      <div style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        background: "#0d1117",
+        border: "1px solid #21262d",
+        borderRadius: 10,
+        padding: "4px 6px",
+        flexWrap: "wrap" as const,
+        minWidth: 0,
+      }}>
+        {feeds.map(feed => {
+          const active = activeFeeds.has(feed.url);
+          const stage = status?.feed_status?.[feed.url]?.stage ?? (active ? "starting" : "off");
+          const dot = stageDotColor(stage, active);
+          const selected = airportFilter === feed.code;
+          const playing = activeAudio === feed.url;
+          return (
+            <button
+              key={feed.code}
+              type="button"
+              aria-pressed={selected}
+              onClick={(event) => {
+                const target = event.target as Element;
+                if (target.closest("[data-audio-stop]")) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onAudioStop();
+                  return;
+                }
+                onAirportSelect(feed.code);
+              }}
+              title={`${feed.label} — ${stageLabel(stage, active)}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                fontWeight: 500,
+                color: selected ? "#e6edf3" : "#8b949e",
+                background: playing ? "#0d1f12" : selected ? "#21262d" : "transparent",
+                border: "none",
+                borderRadius: 6,
+                padding: "4px 10px",
+                cursor: "pointer",
+                whiteSpace: "nowrap" as const,
+                flexShrink: 0,
+                transition: "background 0.12s, color 0.12s",
+              }}
+            >
+              <span style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: dot,
+                flexShrink: 0,
+              }} />
+              {playing && (
+                <span style={{
+                  color: "#3fb950",
+                  fontSize: 12,
+                  lineHeight: 1,
+                  animation: "pulse 1s infinite",
+                  display: "inline-block",
+                  flexShrink: 0,
+                }}>♪</span>
+              )}
+              <span>{feed.code}</span>
+              {playing && (
+                <span
+                  data-audio-stop
+                  role="button"
+                  aria-label={`Stop ${feed.code} audio`}
+                  title={`Stop ${feed.code} audio`}
+                  style={{
+                    color: "#8b949e",
+                    fontSize: 12,
+                    lineHeight: 1,
+                    marginLeft: 2,
+                    cursor: "pointer",
+                  }}
+                >
+                  ✕
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const { settings, needsSetup, loading: settingsLoading } = useSettings();
+  const feeds = useMemo(
+    () => (settings?.feeds ?? []).map(f => ({
+      label: f.label || f.name || f.airport_code,
+      url: f.url,
+      code: f.airport_code,
+    })),
+    [settings]
+  );
   const [results, setResults]           = useState<AnalysisResult[]>([]);
   const [activeFeeds, setActiveFeeds]   = useState<Set<string>>(new Set());
-  const [tab, setTab]                   = useState<"live" | "situation">("live");
+  const [tab, setTab]                   = useState<"live" | "situation" | "settings">("live");
   const [filter, setFilter]             = useState<Filter>("all");
   const [airportFilter, setAirportFilter] = useState<string>("all");
   const [dateFilter, setDateFilter]     = useState<DateFilter>("all");
   const [activeAudio, setActiveAudio]   = useState<string | null>(null);
+  const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
+  const [apiError, setApiError]         = useState<string | null>(null);
+  const [wsState, setWsState]           = useState<WsState>("connecting");
+  const [starting, setStarting]         = useState(false);
+  const [stopping, setStopping]         = useState(false);
   // Sidebar: which airport's panel is open in Live Feed (null = hidden)
   const [sidebarAirport, setSidebarAirport] = useState<string | null>(null);
   // Situation Room airport overlay (separate from live sidebar)
   const [srAirport, setSrAirport] = useState<string | null>(null);
 
   const wsRef    = useRef<WebSocket | null>(null);
-  const audioRef = useRef<HTMLAudioElement>(new Audio());
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // WS handler reads filter via ref so updates take effect without reconnecting.
+  const dateFilterRef = useRef<DateFilter>(dateFilter);
+  useEffect(() => { dateFilterRef.current = dateFilter; }, [dateFilter]);
+
+  useEffect(() => {
+    if (!settingsLoading && needsSetup) setTab("settings");
+  }, [settingsLoading, needsSetup]);
+
+  const getAudio = () => {
+    if (!audioRef.current) audioRef.current = new Audio();
+    return audioRef.current;
+  };
 
   // Fetch historical results when date filter changes
   useEffect(() => {
@@ -73,15 +324,29 @@ export default function App() {
     const url = sd
       ? `${API_BASE}/api/results?start_date=${encodeURIComponent(sd)}`
       : `${API_BASE}/api/results`;
-    fetch(url).then(r => r.json()).then(setResults).catch(() => {});
+    fetchJson<AnalysisResult[]>(url)
+      .then(data => { setResults(data); setApiError(null); })
+      .catch(err => setApiError(`Unable to load analysis cards: ${err.message}`));
   }, [dateFilter]);
 
   // Fetch active feed status on mount
   useEffect(() => {
-    fetch(`${API_BASE}/api/monitor/status`)
-      .then(r => r.json())
-      .then(s => setActiveFeeds(new Set(Object.keys(s.feeds || {}))))
-      .catch(() => {});
+    fetchJson<{ feeds?: Record<string, boolean> }>(`${API_BASE}/api/monitor/status`)
+      .then(s => { setActiveFeeds(new Set(Object.keys(s.feeds || {}))); setApiError(null); })
+      .catch(err => setApiError(`Unable to load monitor status: ${err.message}`));
+  }, []);
+
+  // Poll operational pipeline status for queue/batch/feed health.
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      fetchJson<PipelineStatus>(`${API_BASE}/api/pipeline/status`)
+        .then(data => { if (alive) { setPipelineStatus(data); setApiError(null); } })
+        .catch(err => { if (alive) setApiError(`Unable to load pipeline status: ${err.message}`); });
+    };
+    load();
+    const timer = setInterval(load, 5000);
+    return () => { alive = false; clearInterval(timer); };
   }, []);
 
   // WebSocket live updates
@@ -91,71 +356,112 @@ export default function App() {
 
     function connect() {
       if (!alive) return;
+      setWsState(wsRef.current ? "reconnecting" : "connecting");
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
+      ws.onopen = () => setWsState("connected");
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
         if (msg.type === "analysis") {
           setResults(prev => {
-            const sd = getStartDate(dateFilter);
-            if (sd && new Date(msg.data.timestamp + "Z") < new Date(sd)) return prev;
+            const sd = getStartDate(dateFilterRef.current);
+            if (sd && parseTs(msg.data.timestamp) < new Date(sd)) return prev;
             return [msg.data, ...prev].slice(0, 500);
           });
+        } else if (msg.type === "pipeline") {
+          setPipelineStatus(msg.data);
         }
       };
-      ws.onclose = () => { if (alive) retryTimer = setTimeout(connect, 3000); };
+      ws.onclose = () => {
+        if (alive) {
+          setWsState("reconnecting");
+          retryTimer = setTimeout(connect, 3000);
+        }
+      };
       ws.onerror = () => ws.close();
     }
 
     connect();
     return () => {
       alive = false;
+      setWsState("offline");
       if (retryTimer) clearTimeout(retryTimer);
       wsRef.current?.close();
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (!audioRef.current) return;
+      audioRef.current.pause();
+      audioRef.current.removeAttribute("src");
+      audioRef.current.load();
+    };
+  }, []);
+
   const handleStart = async () => {
-    for (const feed of KNOWN_FEEDS) {
-      await fetch(
-        `${API_BASE}/api/monitor/start?feed_url=${encodeURIComponent(feed.url)}&airport_code=${feed.code}`,
-        { method: "POST" }
-      );
+    setStarting(true);
+    setApiError(null);
+    const next = new Set(activeFeeds);
+    const failures: string[] = [];
+    for (const feed of feeds) {
+      try {
+        await fetchJson(
+          `${API_BASE}/api/monitor/start?feed_url=${encodeURIComponent(feed.url)}&airport_code=${feed.code}`,
+          { method: "POST" }
+        );
+        next.add(feed.url);
+        setActiveFeeds(new Set(next));
+      } catch (err: any) {
+        failures.push(`${feed.code}: ${err.message}`);
+      }
     }
-    setActiveFeeds(new Set(KNOWN_FEEDS.map(f => f.url)));
+    if (failures.length > 0) setApiError(`Some feeds failed to start: ${failures.join("; ")}`);
+    setStarting(false);
   };
 
   const stopAudio = () => {
-    const audio = audioRef.current;
+    const audio = getAudio();
     audio.pause();
-    audio.src = "";
+    audio.removeAttribute("src");
     audio.load();
     setActiveAudio(null);
   };
 
   const handleStop = async () => {
-    await fetch(`${API_BASE}/api/monitor/stop`, { method: "POST" });
-    setActiveFeeds(new Set());
-    setAirportFilter("all");
-    setSidebarAirport(null);
-    stopAudio();
+    setStopping(true);
+    setApiError(null);
+    try {
+      await fetchJson(`${API_BASE}/api/monitor/stop`, { method: "POST" });
+      setActiveFeeds(new Set());
+      setAirportFilter("all");
+      setSidebarAirport(null);
+      stopAudio();
+    } catch (err: any) {
+      setApiError(`Unable to stop feeds: ${err.message}`);
+    } finally {
+      setStopping(false);
+    }
   };
 
-  // Click airport badge: open sidebar + start audio + filter feed to that airport.
-  // Click same badge again: close sidebar + reset filter (audio keeps playing).
-  const toggleAirport = (f: { url: string; code: string }) => {
-    const isActive = sidebarAirport === f.code;
+  // Click airport chip: open sidebar + start audio + filter feed to that airport.
+  // Click same chip again: close sidebar + reset filter. Audio keeps playing until stopped.
+  const toggleAirport = (code: string) => {
+    const feed = feeds.find(f => f.code === code);
+    if (!feed) return;
+    const isActive = sidebarAirport === code;
+    setTab("live");
     if (isActive) {
       setSidebarAirport(null);
       setAirportFilter("all");
-    } else {
-      setSidebarAirport(f.code);
-      setAirportFilter(f.code);
-      const audio = audioRef.current;
-      audio.src = f.url;
-      audio.play().catch(() => {});
-      setActiveAudio(f.url);
+      return;
     }
+    setSidebarAirport(code);
+    setAirportFilter(code);
+    const audio = getAudio();
+    audio.src = feed.url;
+    audio.play().catch(() => {});
+    setActiveAudio(feed.url);
   };
 
   const closeSidebar = () => {
@@ -164,7 +470,6 @@ export default function App() {
   };
 
   const isRunning  = activeFeeds.size > 0;
-  const activeFeed = KNOWN_FEEDS.find(f => f.url === activeAudio);
 
   // Filter counts scoped to current airportFilter so badge numbers match what's visible
   const visibleResults = airportFilter === "all"
@@ -215,8 +520,8 @@ export default function App() {
 
   // Airports with active feeds for Situation Room markers
   const activeAirportCodes = useMemo(
-    () => new Set(KNOWN_FEEDS.filter(f => activeFeeds.has(f.url)).map(f => f.code)),
-    [activeFeeds]
+    () => new Set(feeds.filter(f => activeFeeds.has(f.url)).map(f => f.code)),
+    [activeFeeds, feeds]
   );
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -226,92 +531,92 @@ export default function App() {
   const sidebarIsDrawer = sidebarOpen && (isMobile || isTablet);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0d1117", color: "#e6edf3", display: "flex", flexDirection: "column" }}>
+    <div style={{
+      minHeight: "100vh",
+      maxWidth: "100vw",
+      overflowX: "hidden",
+      background: "#0d1117",
+      color: "#e6edf3",
+      display: "flex",
+      flexDirection: "column",
+    }}>
 
       {/* ── Header ── */}
       <header style={{
         background: "#161b22", borderBottom: "1px solid #30363d",
         padding: isMobile ? "10px 16px" : "14px 24px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        flexShrink: 0, gap: 8, flexWrap: "wrap" as const,
+        display: "flex", alignItems: "center",
+        flexShrink: 0, gap: isMobile ? 10 : 16, flexWrap: "wrap" as const,
       }}>
-        <div>
+        <div style={{ flex: isMobile ? "1 1 0" : "0 0 210px", minWidth: 0 }}>
           <h1 style={{ fontSize: isMobile ? 14 : 18, fontWeight: 700, letterSpacing: 0.5 }}>
             ✈ Readback
           </h1>
           {!isMobile && <p style={{ fontSize: 12, color: "#8b949e", marginTop: 2 }}>ATC phraseology, read back to you</p>}
         </div>
 
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        {isRunning && (
+          <div style={{
+            order: isMobile ? 3 : 0,
+            flex: isMobile ? "1 1 100%" : "1 1 auto",
+            minWidth: isMobile ? "100%" : 0,
+            margin: 0,
+          }}>
+            <PipelineStatusStrip
+              status={pipelineStatus}
+              apiError={apiError}
+              feeds={feeds}
+              activeFeeds={activeFeeds}
+              activeAudio={activeAudio}
+              airportFilter={airportFilter}
+              onAirportSelect={toggleAirport}
+              onAudioStop={stopAudio}
+            />
+          </div>
+        )}
 
-          {/* Airport badges — click to open sidebar + audio + filter */}
-          {isRunning && (
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              {KNOWN_FEEDS.map(f => {
-                const isActive  = sidebarAirport === f.code;
-                const isPlaying = activeAudio === f.url;
-                return (
-                  <button
-                    key={f.url}
-                    onClick={() => toggleAirport(f)}
-                    title={isActive
-                      ? `Close ${f.label} panel`
-                      : `Open ${f.label} — radar, weather & filter`}
-                    style={{
-                      fontSize: 11, fontWeight: 700,
-                      color:      isActive ? "#0d1117" : "#3fb950",
-                      background: isActive ? "#3fb950" : "#0d1117",
-                      border: `1px solid ${isActive ? "#3fb950" : "#238636"}`,
-                      borderRadius: 4, padding: "3px 8px",
-                      cursor: "pointer",
-                      display: "flex", alignItems: "center", gap: 4,
-                      transition: "all 0.15s",
-                    }}
-                  >
-                    {isPlaying ? "▶ " : ""}{f.code}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Now playing indicator */}
-          {activeFeed && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: 6,
-              fontSize: 11, color: "#3fb950",
-              background: "#0d1f12", border: "1px solid #238636",
-              borderRadius: 6, padding: "3px 10px",
-            }}>
-              <span style={{ animation: "pulse 1s infinite", display: "inline-block" }}>♪</span>
-              {activeFeed.label}
-              <button
-                onClick={stopAudio}
-                style={{
-                  background: "none", border: "none", color: "#8b949e",
-                  cursor: "pointer", fontSize: 12, padding: "0 0 0 4px", lineHeight: 1,
-                }}
-              >✕</button>
-            </div>
-          )}
-
+        <div style={{
+          display: "flex",
+          gap: isMobile ? 6 : 12,
+          alignItems: "center",
+          flexWrap: "wrap" as const,
+          justifyContent: "flex-end",
+          marginLeft: "auto",
+          flex: "0 0 auto",
+        }}>
           {/* Start / Stop */}
           {!isRunning ? (
-            <button onClick={handleStart} style={{
-              background: "#238636", color: "#fff", border: "none",
-              borderRadius: 6, padding: "7px 16px", cursor: "pointer", fontSize: 13, fontWeight: 600,
-            }}>▶ Start All ({KNOWN_FEEDS.length})</button>
+            <button
+              onClick={handleStart}
+              disabled={starting}
+              aria-label="Start all monitored ATC feeds"
+              style={{
+                background: starting ? "#1f6f3b" : "#238636", color: "#fff", border: "none",
+                borderRadius: 6, padding: "7px 16px", cursor: starting ? "wait" : "pointer",
+                fontSize: 13, fontWeight: 600, minHeight: isMobile ? 44 : undefined,
+              }}
+            >
+              {starting ? "Starting..." : `▶ Start All (${feeds.length})`}
+            </button>
           ) : (
-            <button onClick={handleStop} style={{
-              background: "#da3633", color: "#fff", border: "none",
-              borderRadius: 6, padding: "7px 16px", cursor: "pointer", fontSize: 13, fontWeight: 600,
-            }}>■ Stop All</button>
+            <button
+              onClick={handleStop}
+              disabled={stopping}
+              aria-label="Stop all monitored ATC feeds"
+              style={{
+                background: stopping ? "#8f2422" : "#da3633", color: "#fff", border: "none",
+                borderRadius: 6, padding: isMobile ? "7px 12px" : "7px 16px", cursor: stopping ? "wait" : "pointer",
+                fontSize: 13, fontWeight: 600, minHeight: isMobile ? 44 : undefined,
+              }}
+            >
+              {stopping ? "Stopping..." : isMobile ? "■ Stop" : "■ Stop All"}
+            </button>
           )}
 
           {isRunning && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#3fb950" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3fb950", animation: "pulse 1.5s infinite", display: "inline-block" }} />
-              LIVE
+              {!isMobile && "LIVE"}
             </div>
           )}
         </div>
@@ -319,23 +624,38 @@ export default function App() {
 
       {/* ── Tab + period bar ── */}
       <div style={{ borderBottom: "1px solid #30363d", background: "#161b22", flexShrink: 0 }}>
-        <div style={{ padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex" }}>
+        <div style={{
+          padding: isMobile ? "0 16px" : "0 24px",
+          display: "flex",
+          flexDirection: isMobile ? "column" as const : "row" as const,
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          paddingBottom: isMobile ? 8 : 0,
+        }}>
+          <div style={{ display: "flex", alignSelf: isMobile ? "stretch" : undefined }}>
             <button onClick={() => setTab("live")}      style={tabBtnStyle(tab === "live")}>
               {isMobile ? "Feed" : "Live Feed"}
             </button>
             <button onClick={() => setTab("situation")} style={tabBtnStyle(tab === "situation")}>
               {isMobile ? "Globe" : "Situation Room"}
             </button>
+            <button onClick={() => setTab("settings")} style={tabBtnStyle(tab === "settings")}>
+              {isMobile ? "Setup" : "Settings"}
+            </button>
           </div>
           <div style={{
             display: "flex", alignItems: "center", gap: 2,
             background: "#0d1117", border: "1px solid #30363d",
             borderRadius: 6, padding: "3px",
+              alignSelf: isMobile ? "stretch" : undefined,
+              justifyContent: isMobile ? "space-between" : undefined,
+              width: isMobile ? "100%" : undefined,
+              boxSizing: "border-box" as const,
           }}>
-            {DATE_FILTERS.map(({ key, label }) => (
+            {DATE_FILTERS.filter(({ key }) => !(isMobile && key === "ytd")).map(({ key, label }) => (
               <button key={key} onClick={() => setDateFilter(key)} style={periodBtnStyle(dateFilter === key)}>
-                {label}
+                {isMobile ? ({ today: "Today", "7d": "7d", "30d": "30d", ytd: "YTD", all: "All" } as Record<DateFilter, string>)[key] : label}
               </button>
             ))}
           </div>
@@ -343,7 +663,18 @@ export default function App() {
       </div>
 
       {/* ── Content ── */}
-      {tab === "situation" ? (
+      {tab === "settings" ? (
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {needsSetup && (
+            <div style={{ background: "#1f1a0d", borderBottom: "1px solid #e3b34133", color: "#e3b341", padding: "10px 24px", fontSize: 13 }}>
+              Add at least one feed and a Gemini API key to get started.
+            </div>
+          )}
+          {settings
+            ? <SettingsPage key={settings.gemini_api_key + ":" + settings.feeds.length} />
+            : <p style={{ color: "#8b949e", padding: 24 }}>Loading settings...</p>}
+        </div>
+      ) : tab === "situation" ? (
         <div style={{ flex: 1, overflowY: "auto", position: "relative" }}>
           <SituationRoom
             results={results}
@@ -403,6 +734,7 @@ export default function App() {
                 margin:   (sidebarOpen && !sidebarIsDrawer) ? 0 : "0 auto",
                 width: "100%",
                 padding: isMobile ? "12px" : "24px",
+                boxSizing: "border-box" as const,
                 transition: "max-width 0.2s ease, margin 0.2s ease",
               }}>
                 {/* Severity filter bar — wraps on small screens */}
@@ -410,7 +742,9 @@ export default function App() {
                   display: "flex", alignItems: "center", gap: 4, marginBottom: 16,
                   background: "#161b22", border: "1px solid #21262d",
                   borderRadius: 10, padding: isMobile ? "6px 8px" : "8px 12px",
-                  flexWrap: "wrap" as const,
+                  flexWrap: isMobile ? "nowrap" as const : "wrap" as const,
+                  overflowX: isMobile ? "auto" as const : undefined,
+                  WebkitOverflowScrolling: isMobile ? "touch" as const : undefined,
                 }}>
                   {FILTER_BUTTONS.map(({ key, label }) => {
                     const active = filter === key;
@@ -433,20 +767,16 @@ export default function App() {
                       </button>
                     );
                   })}
-                  {/* Airport filter indicator */}
-                  {airportFilter !== "all" && (
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, marginLeft: "auto",
-                      color: "#3fb950", background: "#3fb95018",
-                      border: "1px solid #3fb95044",
-                      borderRadius: 6, padding: "4px 10px",
-                    }}>
-                      {airportFilter} only
-                    </span>
-                  )}
                 </div>
 
-                <LiveFeed results={results} filter={filter} airportFilter={airportFilter} />
+                <LiveFeed
+                    results={results}
+                    filter={filter}
+                    airportFilter={airportFilter}
+                    isRunning={isRunning}
+                    pipelineStatus={pipelineStatus}
+                    apiError={apiError}
+                  />
               </div>
             </div>
 

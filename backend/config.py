@@ -12,9 +12,8 @@ class Settings(BaseSettings):
     WHISPER_CPU_THREADS: int = 0   # threads per transcription; 0 = CTranslate2 default
     STT_CONCURRENCY: int = 1       # max simultaneous transcriptions across all feeds
 
-    # Framed-RMS silence pre-gate (PR1b — tuning-sensitive, ships disabled).
-    # 0.0 = gate disabled: every chunk is transcribed but its RMS is still
-    # logged, so a real threshold can be picked from observed feed data.
+    # Framed-RMS silence pre-gate. 0.0 keeps it disabled until thresholds are
+    # calibrated against real feed samples; set >0.0 to skip low-energy chunks.
     STT_RMS_THRESHOLD: float = 0.0
     # faster-whisper's built-in Silero VAD. Off until verified on real LiveATC
     # samples — ATC clips are short, noisy and squelch-heavy.

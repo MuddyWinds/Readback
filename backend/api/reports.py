@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 """Aircraft-level Gemini study sheet, aggregating all transmissions for a callsign."""
 
 import re
+from typing import Optional
 
 from fastapi import APIRouter
 from sqlalchemy import select
@@ -16,7 +19,7 @@ router = APIRouter()
 _CALLSIGN_RE = re.compile(r'\b([A-Z]{2,3}\d{1,4}[A-Z]?|N\d{4,5}[A-Z]{0,2})\b')
 
 
-def _extract_callsign(text: str) -> str | None:
+def _extract_callsign(text: str) -> Optional[str]:
     m = _CALLSIGN_RE.search(text)
     return m.group(1) if m else None
 

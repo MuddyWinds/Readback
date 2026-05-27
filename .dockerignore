@@ -1,0 +1,36 @@
+# Build context is the repo root — keep only what the backend image needs
+# (requirements.txt + backend/). Everything below is excluded from the context.
+
+# Python envs / caches
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Frontend — not part of the backend image
+frontend/
+
+# Tests and dev-only deps — not needed at runtime
+tests/
+requirements-dev.txt
+
+# Local databases
+*.db
+*.sqlite3
+*.db.*.bak
+*.sqlite3.*.bak
+
+# Secrets — injected at runtime via env_file, never baked into the image
+.env
+
+# VCS / tooling / docs
+.git/
+.gitignore
+.worktrees/
+.DS_Store
+*.md

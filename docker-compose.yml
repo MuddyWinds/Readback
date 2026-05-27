@@ -11,14 +11,18 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql://atc:atc@db:5432/atcmonitor
     depends_on:
       - db
     volumes:
-      - ./backend:/app
+      - ./backend:/app/backend
 
   frontend:
     build: ./frontend

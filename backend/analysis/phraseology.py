@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Sends ATC transcripts to Gemini Flash for phraseology analysis.
 Uses batch analysis: collects transcripts from all airports over a window,
@@ -14,10 +16,11 @@ from datetime import datetime
 from google import genai
 from google.genai import types
 
-from backend.config import settings
+from backend.core.settings_store import current_gemini_key
 from backend.models.schemas import AnalysisResult, Observation, KIND_BY_NOTE_TYPE
 
 _client = None
+_client_key: str | None = None
 _semaphore: asyncio.Semaphore | None = None
 _last_call_time: float = 0.0
 _MIN_INTERVAL = 12.0  # seconds between calls
@@ -29,10 +32,35 @@ def get_semaphore() -> asyncio.Semaphore:
     return _semaphore
 
 def get_client():
-    global _client
-    if _client is None:
-        _client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    global _client, _client_key
+    key = current_gemini_key()
+    if _client is None or key != _client_key:
+        _client = genai.Client(api_key=key)
+        _client_key = key
     return _client
+
+
+def _missing_analysis_result(item: dict, reason: str) -> AnalysisResult:
+    return AnalysisResult(
+        timestamp=item["timestamp"],
+        airport_code=item["airport_code"],
+        transcript=item["transcript"],
+        assessable=False,
+        assessable_confidence=0.0,
+        is_standard=True,
+        observations=[],
+        summary=reason,
+        confidence_score=0.0,
+        enrichment={
+            "speaker_segments": [],
+            "atc_instruction": None,
+            "pilot_readback": None,
+            "readback_correct": None,
+            "readback_discrepancy": None,
+            "callsign_detected": None,
+            "callsign_clarity": 0,
+        },
+    )
 
 
 BATCH_SYSTEM_PROMPT = """You are an expert aviation safety analyst with 20+ years of ATC phraseology
@@ -45,7 +73,7 @@ CRITICAL CONTEXT — READ BEFORE ANALYSING
 1. ONE-SIDED TRANSCRIPTS
    These transcripts may capture only ONE side of a radio exchange
    (controller only, or pilot only). NEVER flag a missing read-back
-   or missing response as a violation — the other side may simply
+   or missing response as an observation — the other side may simply
    not have been recorded. Only flag what you can positively
    observe in the text.
 
@@ -60,11 +88,11 @@ CRITICAL CONTEXT — READ BEFORE ANALYSING
    Apply the "Reasonable Controller Test": would an experienced,
    qualified controller or pilot, hearing this transmission in a
    normal operational context, understand it completely and act
-   correctly without any ambiguity? If YES → compliant,
+   correctly without any ambiguity? If YES → standard,
    regardless of whether exact ICAO wording was used.
 
 ═══════════════════════════════════════════════════════
-WHAT IS NEVER A VIOLATION
+WHAT IS NEVER AN OBSERVATION
 ═══════════════════════════════════════════════════════
 
 Do NOT flag any of the following:
@@ -91,7 +119,7 @@ Do NOT flag any of the following:
     overall intent is clear
   For ambiguous readbacks: set readback_correct: null (cannot determine)
   and briefly describe the phonetic uncertainty in readback_discrepancy.
-  Do NOT raise a violation solely on this basis.
+  Do NOT raise an observation solely on this basis.
 
 ═══════════════════════════════════════════════════════
 MANDATORY READ-BACK ITEMS (ICAO Doc 4444 §4.5.3.1)
@@ -109,16 +137,16 @@ HIGH tier (error = medium severity minimum):
   - SSR/transponder codes (squawk)
   - Speed restrictions
 
-LOWER tier (omission alone is NOT a violation):
+LOWER tier (omission alone is NOT an observation):
   - Frequency changes (unless causing loss of communication)
   - QNH/altimeter settings (error is medium; omission alone is low)
   - Taxi routing (error matters; brevity does not)
 
 ═══════════════════════════════════════════════════════
-VIOLATION DECISION FRAMEWORK
+OBSERVATION DECISION FRAMEWORK
 ═══════════════════════════════════════════════════════
 
-Before flagging any violation, complete this checklist:
+Before flagging any observation, complete this checklist:
 
   ① Is this on the Mandatory Read-back list above?
      → If YES and incorrectly read back: flag it.
@@ -127,7 +155,7 @@ Before flagging any violation, complete this checklist:
 
   ② Does this deviation pass the Reasonable Controller Test?
      → If a competent controller would understand it without
-       ambiguity: mark compliant.
+       ambiguity: mark standard.
 
   ③ Can you write a specific, credible safety_pathway?
      Format: wrong action → mechanism → potential outcome.
@@ -138,7 +166,7 @@ Before flagging any violation, complete this checklist:
      → If you cannot write a valid pathway, do NOT flag.
 
   ④ Isolated vs systematic?
-     → Single informal word: not a violation.
+     → Single informal word: not an observation.
      → Repeated failure on safety-critical items in same
        transcript: medium severity minimum.
 
@@ -158,8 +186,8 @@ medium   — Operational risk if pattern repeats or combines with
 
 low      — Technical deviation only; use sparingly and only when
            you can identify a plausible (not merely hypothetical)
-           risk pathway. When in doubt between low and compliant,
-           choose compliant.
+           risk pathway. When in doubt between low and standard,
+           choose standard.
 
 ═══════════════════════════════════════════════════════
 RESPONSE FORMAT
@@ -203,7 +231,7 @@ Each object schema:
     {"role": "ATC|PILOT|UNKNOWN", "text": "<exact text of this turn>"}
   ],
   "atc_instruction": "<the clearance/instruction the controller issued, or null>",
-  "pilot_readback": "<what the pilot read back verbatim, or null — absence does NOT imply violation>",
+  "pilot_readback": "<what the pilot read back verbatim, or null — absence does NOT imply an observation>",
   "readback_correct": true_or_false_or_null,
   "readback_discrepancy": "<specific description e.g. Pilot read back 6000 ft instead of 8000 ft, or null>",
   "callsign_detected": "<ICAO-format callsign e.g. DAL456, or null>",
@@ -239,7 +267,15 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
 
 {chunks_text}"""
 
+    # Patterns that indicate a transient server-side or parse error worth
+    # retrying — 5xx, Google-internal transient codes, JSON we couldn't parse.
+    transient_markers = (
+        "500", "502", "503", "504",
+        "UNAVAILABLE", "INTERNAL", "DEADLINE_EXCEEDED", "RESOURCE_EXHAUSTED",
+    )
+
     data = None
+    last_exc: Exception | None = None
     for attempt in range(4):
         wait_before = 0.0
         try:
@@ -263,11 +299,19 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
                 data = [data]
             break
         except Exception as e:
+            last_exc = e
             err = str(e)
-            if "429" in err:
+            is_429 = "429" in err
+            is_parse = isinstance(e, json.JSONDecodeError)
+            is_transient = any(marker in err for marker in transient_markers)
+            if is_429:
                 m = re.search(r"retry in (\d+\.?\d*)", err)
                 wait_before = float(m.group(1)) + 5 if m else 65
                 print(f"[Gemini] 429 — waiting {wait_before:.0f}s (attempt {attempt+1}/4)", flush=True)
+            elif is_parse or is_transient:
+                wait_before = 5 * (attempt + 1)  # 5s, 10s, 15s, 20s
+                label = "parse error" if is_parse else "transient error"
+                print(f"[Gemini] {label} — retrying in {wait_before:.0f}s (attempt {attempt+1}/4): {e}", flush=True)
             else:
                 print(f"[Gemini] Error ({type(e).__name__}): {e}", flush=True)
                 raise
@@ -275,12 +319,24 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
             await asyncio.sleep(wait_before)
 
     if data is None:
-        raise RuntimeError("Gemini rate limited after 4 retries — skipping batch")
+        raise RuntimeError(f"Gemini failed after 4 retries: {last_exc}")
+
+    entries_by_index = {}
+    for position, entry in enumerate(data):
+        if not isinstance(entry, dict):
+            continue
+        idx = entry.get("index", position)
+        if isinstance(idx, int) and 0 <= idx < len(items) and idx not in entries_by_index:
+            entries_by_index[idx] = entry
 
     results = []
     for i, item in enumerate(items):
-        entry = next((d for d in data if d.get("index") == i), data[i] if i < len(data) else None)
+        entry = entries_by_index.get(i)
         if entry is None:
+            results.append(_missing_analysis_result(
+                item,
+                f"Gemini analysis missing for transcript index {i}; result marked unassessable to preserve batch alignment.",
+            ))
             continue
 
         assessable = entry.get("assessable", True)
