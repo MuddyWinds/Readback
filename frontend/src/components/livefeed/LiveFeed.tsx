@@ -1,11 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { useSettings } from "../../SettingsContext";
 import { getCardSeverity, SEV_ORDER } from "../../lib/severity";
 import type { AnalysisResult, Enrichment, Observation, Severity, Filter } from "../../lib/types";
-import { useAdsb, useAdsbSnapshot } from "../../lib/queries";
 import { extractCallsign, extractActions, parseBullets } from "../../lib/transcript";
-import { detectConflicts, AdsbAircraft } from "../../lib/conflicts";
 import { buildReportText } from "../../lib/report";
 import { useWatchList } from "../../hooks/useWatchList";
 import { SEV_LABEL, SEV_ICON, ACTION_REQUIRED, HFACS_PLAIN, STATUS_LABEL, ReviewStatus } from "./constants";
@@ -16,6 +13,7 @@ import { HazardBanner } from "./HazardBanner";
 import { StructuredTranscript } from "./StructuredTranscript";
 import { StatusWorkflow } from "./StatusWorkflow";
 import { ReviewerNotes } from "./ReviewerNotes";
+import { PositionSnapshot } from "./PositionSnapshot";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -149,181 +147,6 @@ function CompliantCard({ r }: { r: AnalysisResult }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── ADS-B position snapshot — fetches live data per-airport ──────────────────
-function PositionSnapshot({
-  r, callsign, confidence, borderColor,
-}: { r: AnalysisResult; callsign: string | null; confidence: "high" | "low"; borderColor: string }) {
-  const { geo } = useSettings();
-  const snapshot = useAdsbSnapshot(r.id);
-  const snapshotData = snapshot.data;
-  const shouldFetchLive =
-    !r.id || snapshot.isError || Boolean(snapshotData?.error) || (snapshot.isSuccess && !snapshotData?.aircraft);
-  const live = useAdsb(shouldFetchLive ? r.airport_code : "");
-  const aircraft = (shouldFetchLive ? live.data?.aircraft : snapshotData?.aircraft) as AdsbAircraft[] | null | undefined;
-  const loading = (r.id && snapshot.isLoading) || (shouldFetchLive && live.isLoading);
-  const err = shouldFetchLive && live.isError ? "Could not fetch ADS-B data" : null;
-  const dataSource: "snapshot" | "live" | null = aircraft
-    ? (shouldFetchLive ? "live" : "snapshot")
-    : null;
-
-  const matched = aircraft?.find(a =>
-    callsign && a.callsign && a.callsign.replace(/\s/g, "") === callsign.replace(/\s/g, "")
-  ) ?? null;
-
-  // Derive human-readable flight phase from ADS-B state
-  const flightPhase = (a: AdsbAircraft): { label: string; detail: string } => {
-    const altFt = a.altitude_m != null ? Math.round(a.altitude_m * 3.281) : null;
-    const spdKt = a.velocity_ms != null ? Math.round(a.velocity_ms * 1.944) : null;
-    const hdg   = a.heading != null ? Math.round(a.heading) : null;
-    if (a.on_ground) return { label: "On ground", detail: `Taxiing · ${spdKt != null ? spdKt + " kt" : "—"}` };
-    if (altFt == null) return { label: "Airborne", detail: "Altitude unknown" };
-    if (altFt < 1000)  return { label: "Final approach / low-level", detail: `${altFt.toLocaleString()} ft · ${spdKt ?? "—"} kt` };
-    if (altFt < 5000)  return { label: "Approach / departure", detail: `${altFt.toLocaleString()} ft · ${spdKt ?? "—"} kt · HDG ${hdg ?? "—"}°` };
-    if (altFt < 18000) return { label: "Climb / descent", detail: `${altFt.toLocaleString()} ft · ${spdKt ?? "—"} kt` };
-    return { label: "En-route", detail: `FL${Math.round(altFt / 100)} · ${spdKt ?? "—"} kt` };
-  };
-
-  const distNmFromAirport = (a: AdsbAircraft): number | null => {
-    const g = geo[r.airport_code];
-    if (!g || a.latitude == null || a.longitude == null) return null;
-    const dlat = (a.latitude - g[0]) * 60;
-    const dlon = (a.longitude - g[1]) * 60 * Math.cos(g[0] * Math.PI / 180);
-    return Math.round(Math.sqrt(dlat*dlat + dlon*dlon) * 10) / 10;
-  };
-
-  const fmtAlt = (m: number | null) => m != null ? `${Math.round(m * 3.281).toLocaleString()} ft` : "—";
-  const fmtSpd = (ms: number | null) => ms != null ? `${Math.round(ms * 1.944)} kt` : "—";
-
-  return (
-    <div style={{
-      marginTop: 10,
-      background: `${borderColor}08`,
-      border: `1px solid ${borderColor}22`,
-      borderLeft: `3px solid ${borderColor}`,
-      borderRadius: "0 6px 6px 0",
-      padding: "10px 14px",
-    }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" as const }}>
-        <span style={{ fontSize: 9, fontWeight: 700, color: borderColor, letterSpacing: 1.2, textTransform: "uppercase" as const }}>
-          Traffic Context
-        </span>
-        {callsign ? (
-          <span style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 700, color: "#e6edf3", background: "#21262d", padding: "1px 7px", borderRadius: 4 }}>
-            {callsign}
-          </span>
-        ) : (
-          <span style={{ fontSize: 10, color: "#484f58", fontStyle: "italic" }}>callsign unclear</span>
-        )}
-        {callsign && confidence === "low" && (
-          <span style={{ fontSize: 9, color: "#e3b341", background: "#e3b34118", border: "1px solid #e3b34144", borderRadius: 3, padding: "1px 5px" }}>
-            ⚠ phonetic match
-          </span>
-        )}
-        {dataSource && (
-          <span style={{ fontSize: 9, color: dataSource === "snapshot" ? "#3fb950" : "#8b949e", background: "#21262d", borderRadius: 3, padding: "1px 6px" }}>
-            {dataSource === "snapshot" ? "⏱ at transmission time" : "⚡ current"}
-          </span>
-        )}
-        <span style={{ marginLeft: "auto", fontSize: 10, color: "#484f58", fontFamily: "monospace" }}>
-          {new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z").toISOString().slice(11, 19)}Z
-        </span>
-      </div>
-
-      {loading && <p style={{ fontSize: 11, color: "#484f58", margin: 0 }}>Fetching ADS-B…</p>}
-      {err    && <p style={{ fontSize: 11, color: "#ff8800", margin: 0 }}>{err}</p>}
-
-      {!loading && !err && aircraft && (() => {
-        const airborne  = aircraft.filter(a => !a.on_ground);
-        const conflicts = detectConflicts(aircraft);
-
-        // Workload as mitigating-factor context, not just a badge
-        const workloadColor = airborne.length >= 15 ? "#ff4444" : airborne.length >= 10 ? "#ff8800" : airborne.length >= 5 ? "#e3b341" : "#3fb950";
-        const workloadLabel = airborne.length >= 15 ? "Very high" : airborne.length >= 10 ? "High" : airborne.length >= 5 ? "Moderate" : "Low";
-
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {/* ── Subject aircraft state ── */}
-            {matched ? (
-              <div style={{ background: "#161b22", border: "1px solid #21262d", borderRadius: 6, padding: "8px 12px" }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#e6edf3" }}>
-                    {flightPhase(matched).label}
-                  </span>
-                  <span style={{ fontSize: 10, color: "#8b949e" }}>
-                    {flightPhase(matched).detail}
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" as const }}>
-                  {[
-                    ["Altitude",  fmtAlt(matched.altitude_m)],
-                    ["Speed",     fmtSpd(matched.velocity_ms)],
-                    ["Heading",   matched.heading != null ? `${Math.round(matched.heading)}°` : "—"],
-                    ["Squawk",    matched.squawk ?? "—"],
-                    ["Dist from apt", distNmFromAirport(matched) != null ? `${distNmFromAirport(matched)} nm` : "—"],
-                  ].map(([label, val]) => (
-                    <div key={label}>
-                      <div style={{ fontSize: 9, color: "#484f58", letterSpacing: 0.5 }}>{label}</div>
-                      <div style={{ fontSize: 11, fontFamily: "monospace", color: "#c9d1d9", fontWeight: 600 }}>{val}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : callsign ? (
-              <p style={{ fontSize: 11, color: "#6e7681", margin: 0, fontStyle: "italic" }}>
-                {callsign} not found in ADS-B data — may have landed, departed, or transponder ID differs.
-              </p>
-            ) : (
-              <p style={{ fontSize: 11, color: "#6e7681", margin: 0, fontStyle: "italic" }}>
-                No callsign identified. Cannot correlate with ADS-B.
-              </p>
-            )}
-
-            {/* ── Sector load — mitigating factor context ── */}
-            {airborne.length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div style={{ width: 6, height: 6, borderRadius: "50%", background: workloadColor }} />
-                <span style={{ fontSize: 10, color: "#6e7681" }}>
-                  Sector load:
-                </span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: workloadColor }}>
-                  {workloadLabel}
-                </span>
-                <span style={{ fontSize: 10, color: "#484f58" }}>
-                  ({airborne.length} airborne · {aircraft.filter(a => a.on_ground).length} ground)
-                </span>
-                {airborne.length >= 10 && (
-                  <span style={{ fontSize: 9, color: "#484f58", fontStyle: "italic" }}>— potential mitigating factor</span>
-                )}
-              </div>
-            )}
-
-            {/* ── Separation alerts ── */}
-            {conflicts.map((c, i) => (
-              <div key={i} style={{
-                display: "flex", alignItems: "center", gap: 6,
-                background: c.level === "SEPARATION LOSS" ? "#ff444412" : "#ff880010",
-                border: `1px solid ${c.level === "SEPARATION LOSS" ? "#ff444444" : "#ff880030"}`,
-                borderRadius: 4, padding: "5px 8px",
-              }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: c.level === "SEPARATION LOSS" ? "#ff4444" : "#ff8800", flexShrink: 0 }}>
-                  {c.level}
-                </span>
-                <span style={{ fontSize: 10, fontFamily: "monospace", color: "#c9d1d9" }}>
-                  {c.callA} ↔ {c.callB}
-                </span>
-                <span style={{ fontSize: 10, color: "#6e7681", marginLeft: "auto", whiteSpace: "nowrap" as const }}>
-                  {c.distNm.toFixed(1)} nm · Δ{Math.round(c.altDiffFt)} ft
-                </span>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
     </div>
   );
 }

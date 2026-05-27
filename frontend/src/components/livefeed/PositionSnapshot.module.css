@@ -1,0 +1,226 @@
+/* Outer container — border driven by borderColor prop via --ps-border CSS var */
+.container {
+  margin-top: 10px;
+  background: color-mix(in srgb, var(--ps-border) 3%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ps-border) 13%, transparent);
+  border-left: 3px solid var(--ps-border);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.headerTitle {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ps-border);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.callsignBadge {
+  font-size: 10px;
+  font-family: monospace;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface-2);
+  padding: 1px 7px;
+  border-radius: 4px;
+}
+
+.callsignUnclear {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.phoneticMatch {
+  font-size: 9px;
+  color: var(--sev-medium);
+  background: color-mix(in srgb, var(--sev-medium) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-medium) 27%, transparent);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.dataSourceSnapshot {
+  font-size: 9px;
+  color: var(--sev-standard);
+  background: var(--surface-2);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.dataSourceLive {
+  font-size: 9px;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.timestamp {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-faint);
+  font-family: monospace;
+}
+
+.loadingText {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+.errText {
+  font-size: 11px;
+  color: var(--sev-high);
+  margin: 0;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Aircraft state box */
+.aircraftBox {
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.aircraftPhaseRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.aircraftPhaseLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.aircraftPhaseDetail {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.aircraftStats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.statLabel {
+  font-size: 9px;
+  color: var(--text-faint);
+  letter-spacing: 0.5px;
+}
+
+.statValue {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.notFoundText {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin: 0;
+  font-style: italic;
+}
+
+/* Sector load row — workload color via --wl-color CSS var */
+.workloadRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.workloadDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wl-color);
+  flex-shrink: 0;
+}
+
+.workloadPrefix {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.workloadValue {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--wl-color);
+}
+
+.workloadCounts {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.workloadNote {
+  font-size: 9px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* Conflict alert rows — data-driven via classes */
+.conflictRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 4px;
+  padding: 5px 8px;
+}
+
+.conflictSepLoss {
+  background: color-mix(in srgb, var(--sev-critical) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-critical) 27%, transparent);
+}
+
+.conflictProxAlert {
+  background: color-mix(in srgb, var(--sev-high) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-high) 19%, transparent);
+}
+
+.conflictLevelSepLoss {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--sev-critical);
+  flex-shrink: 0;
+}
+
+.conflictLevelProx {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--sev-high);
+  flex-shrink: 0;
+}
+
+.conflictCallsigns {
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--text);
+}
+
+.conflictDist {
+  font-size: 10px;
+  color: var(--text-faint);
+  margin-left: auto;
+  white-space: nowrap;
+}
