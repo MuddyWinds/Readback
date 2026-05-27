@@ -1,0 +1,131 @@
+.card {
+  background: var(--bg);
+  border: 1px solid var(--surface-2);
+  border-left: 3px solid var(--sev-unassessable-border);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  background: var(--surface-2);
+  color: var(--text-ghost);
+  padding: 2px 9px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.airportCode {
+  background: var(--surface);
+  color: var(--text-ghost);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.confBadge {
+  font-size: 10px;
+  color: var(--text-faint);
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: 4px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+
+.timestamp {
+  font-size: 11px;
+  color: var(--sev-unassessable-border);
+  white-space: nowrap;
+}
+
+.chevron {
+  font-size: 10px;
+  color: var(--sev-unassessable-border);
+}
+
+.expandedBody {
+  border-top: 1px solid var(--surface-2);
+}
+
+.reasonSection {
+  padding: 10px 14px 0;
+}
+
+.reasonLabel {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-faint);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.reasonText {
+  font-size: 12px;
+  color: var(--text-ghost);
+  margin: 0;
+  line-height: 1.7;
+  font-style: italic;
+}
+
+.transcriptSection {
+  padding: 10px 14px 4px;
+}
+
+.transcriptLabel {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-faint);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.transcriptBlock {
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--text-ghost);
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.exclusionNote {
+  padding: 6px 14px 12px;
+}
+
+.exclusionText {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin: 0;
+  font-style: italic;
+}
+
+.review {
+  margin: 0 14px 12px;
+  background: var(--bg);
+  border: 1px solid var(--surface-2);
+  border-radius: 6px;
+  padding: 8px 10px;
+}

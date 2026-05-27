@@ -15,6 +15,7 @@ import { StatusWorkflow } from "./StatusWorkflow";
 import { ReviewerNotes } from "./ReviewerNotes";
 import { PositionSnapshot } from "./PositionSnapshot";
 import { CompliantCard } from "./CompliantCard";
+import { UnassessableCard } from "./UnassessableCard";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -473,117 +474,6 @@ function ObservationCard({ r, priorOccurrences, lastSeenAgo }: {
         </div>
       </div>
 
-    </div>
-  );
-}
-
-// ─── UnassessableCard ─────────────────────────────────────────────────────────
-function UnassessableCard({ r }: { r: AnalysisResult }) {
-  const [expanded, setExpanded] = useState(false);
-  const ago = formatDistanceToNow(
-    new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z"),
-    { addSuffix: true }
-  );
-  const confPct = r.assessable_confidence != null
-    ? Math.round(r.assessable_confidence * 100) : null;
-
-  return (
-    <div
-      id={r.id ? `result-${r.id}` : undefined}
-      style={{
-        background: "#0d1117",
-        border: "1px solid #21262d",
-        borderLeft: "3px solid #3a3f47",
-        borderRadius: 8, overflow: "hidden", cursor: "pointer",
-      }}
-      onClick={() => setExpanded(v => !v)}
-    >
-      {/* Collapsed header — mirrors CompliantCard structure */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 8,
-        padding: "9px 14px", flexWrap: "wrap" as const,
-      }}>
-        <span style={{
-          background: "#21262d", color: "#6e7681",
-          padding: "2px 9px", borderRadius: 12,
-          fontSize: 10, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0,
-        }}>
-          UNASSESSABLE
-        </span>
-        <span style={{
-          background: "#161b22", color: "#6e7681",
-          padding: "2px 7px", borderRadius: 4, fontSize: 11, fontWeight: 700, flexShrink: 0,
-        }}>
-          {r.airport_code}
-        </span>
-        <span style={{ flex: 1 }} />
-        {confPct !== null && (
-          <span style={{
-            fontSize: 10, color: "#484f58",
-            background: "#161b22", border: "1px solid #21262d",
-            borderRadius: 4, padding: "1px 6px", flexShrink: 0,
-          }}>
-            STT {confPct}%
-          </span>
-        )}
-        <span style={{ fontSize: 11, color: "#3a3f47", whiteSpace: "nowrap" as const }}>{ago}</span>
-        <span style={{ fontSize: 10, color: "#3a3f47" }}>{expanded ? "▲" : "▼"}</span>
-      </div>
-
-      {/* Expanded: full reason + transcript for spot-checking */}
-      {expanded && (
-        <div
-          style={{ borderTop: "1px solid #21262d" }}
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Full reason paragraph */}
-          {r.summary && (
-            <div style={{ padding: "10px 14px 0" }}>
-              <div style={{
-                fontSize: 9, fontWeight: 700, color: "#484f58",
-                letterSpacing: 1.2, textTransform: "uppercase" as const, marginBottom: 5,
-              }}>
-                Reason
-              </div>
-              <p style={{
-                fontSize: 12, color: "#6e7681", margin: 0,
-                lineHeight: 1.7, fontStyle: "italic",
-              }}>
-                {r.summary}
-              </p>
-            </div>
-          )}
-
-          <div style={{ padding: "10px 14px 4px" }}>
-            <div style={{
-              fontSize: 9, fontWeight: 700, color: "#484f58",
-              letterSpacing: 1.2, textTransform: "uppercase" as const, marginBottom: 6,
-            }}>
-              Raw Transcript (for manual review)
-            </div>
-            <div style={{
-              background: "#161b22", border: "1px solid #21262d", borderRadius: 6,
-              padding: "10px 14px",
-              fontSize: 12, fontFamily: "'SF Mono', 'Fira Code', monospace",
-              color: "#6e7681", lineHeight: 1.75, whiteSpace: "pre-wrap" as const,
-            }}>
-              {r.transcript || "— no readable text recovered —"}
-            </div>
-          </div>
-          <div style={{ padding: "6px 14px 12px" }}>
-            <p style={{ fontSize: 11, color: "#484f58", margin: 0, fontStyle: "italic" }}>
-              This transmission was excluded from phraseology rate calculations.
-            </p>
-          </div>
-          <div style={{
-            margin: "0 14px 12px",
-            background: "#0d1117", border: "1px solid #21262d",
-            borderRadius: 6, padding: "8px 10px",
-          }}>
-            <StatusWorkflow resultId={r.id} initial={r.status} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
