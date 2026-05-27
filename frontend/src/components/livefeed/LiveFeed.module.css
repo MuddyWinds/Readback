@@ -1,0 +1,27 @@
+.emptyState {
+  color: var(--text-dim);
+  text-align: center;
+  margin: 40px auto;
+  max-width: 460px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 22px 20px;
+  background: var(--bg);
+}
+
+.emptyMessage {
+  font-size: 14px;
+  color: var(--text-sub);
+  margin-bottom: 6px;
+}
+
+.emptyDetail {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

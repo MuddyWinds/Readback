@@ -1,11 +1,12 @@
 import React from "react";
 import { formatDistanceToNow } from "date-fns";
 import { getCardSeverity } from "../../lib/severity";
-import type { AnalysisResult, Enrichment, Observation, Severity, Filter } from "../../lib/types";
+import type { AnalysisResult, Filter } from "../../lib/types";
 import { extractCallsign } from "../../lib/transcript";
 import { CompliantCard } from "./CompliantCard";
 import { UnassessableCard } from "./UnassessableCard";
 import { ObservationCard } from "./ObservationCard";
+import styles from "./LiveFeed.module.css";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -80,28 +81,19 @@ export function LiveFeed({ results, filter, airportFilter, isRunning, pipelineSt
   return (
     <div>
       {filtered.length === 0 && (
-        <div style={{
-          color: "#8b949e",
-          textAlign: "center" as const,
-          margin: "40px auto",
-          maxWidth: 460,
-          border: "1px dashed #30363d",
-          borderRadius: 8,
-          padding: "22px 20px",
-          background: "#0d1117",
-        }}>
-          <div style={{ fontSize: 14, color: "#c9d1d9", marginBottom: 6 }}>
+        <div className={styles.emptyState}>
+          <div className={styles.emptyMessage}>
             {emptyMessage(results, isRunning, pipelineStatus, apiError)}
           </div>
           {isRunning && results.length === 0 && (
-            <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+            <div className={styles.emptyDetail}>
               The analyzer batches transcripts before creating cards, so live audio can lead visible results by several minutes.
             </div>
           )}
         </div>
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {filtered.map((r, filteredIdx) => {
+      <div className={styles.cardList}>
+        {filtered.map(r => {
           // Find global index in results[]
           const globalIdx = results.indexOf(r);
           const cs = r.enrichment?.callsign_detected ?? extractCallsign(r.transcript).callsign;
