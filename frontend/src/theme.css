@@ -22,6 +22,27 @@
   /* Severity - card border */
   --sev-standard-border: #238636;
   --sev-unassessable-border: #3a3f47;
+  --sev-low-border: var(--sev-low);
+  --sev-medium-border: var(--sev-medium);
+  --sev-high-border: var(--sev-high);
+  --sev-critical-border: var(--sev-critical);
+
+  /* Severity - card background */
+  --sev-standard-bg: #0d1117;
+  --sev-low-bg: #0d1527;
+  --sev-medium-bg: #1f1a0d;
+  --sev-high-bg: #1a1005;
+  --sev-critical-bg: #1f0d0d;
+  --sev-unassessable-bg: #0d1117;
+
+  /* Action colors */
+  --action-takeoff: #d2a8ff;
+  --action-landing: #79c0ff;
+  --action-goaround: #ff7b72;
+  --action-turn: #a5d6ff;
+  --action-speed: #ffa657;
+  --action-pushback: #bc8cff;
+  --action-taxi: #c9d1d9;
 
   /* Spacing & radii */
   --space-1: 4px;
