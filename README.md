@@ -20,7 +20,7 @@ Built for aviation enthusiasts, safety researchers, student pilots, and anyone w
 
 - Streams live audio from [LiveATC.net](https://www.liveatc.net) feeds (or any compatible MP3 stream)
 - Transcribes ATC communications using [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (local, no cloud STT cost)
-- Batches transcripts and sends them to **Gemini Flash** for phraseology analysis every 4 minutes
+- Batches transcripts and sends them to **Gemini Flash** for phraseology analysis every 5 minutes (configurable in Settings)
 - Applies the *Reasonable Controller Test* — notes genuine deviations, ignores transcription noise and one-sided readback gaps
 - Classifies observations using **HFACS taxonomy** (Human Factors Analysis and Classification System)
 - Correlates findings with live **ADS-B traffic** from OpenSky Network
@@ -57,7 +57,7 @@ LiveATC Stream (MP3)
  transcript_queue         asyncio queue, shared across airports
         │
         ▼
-   run_batcher()          drains queue every 4 minutes
+   run_batcher()          drains queue every 5 minutes (configurable)
         │                 caps at 15 transcripts per batch
         ▼
   Gemini Flash            single API call covering all airports
@@ -78,14 +78,15 @@ LiveATC Stream (MP3)
    ├── StatsPanel          aggregate phraseology statistics
    ├── PhraseologyNote /   per-observation detail + HFACS category
    │   Event rendering
-   └── SituationRoom       unified ops view with weather + NOTAMs
+   ├── SituationRoom       unified ops view with weather + NOTAMs
+   └── SettingsPage        configure feeds, batch interval, STT model
 ```
 
 ### Key Design Decisions
 
 | Decision | Reason |
 |---|---|
-| Batch Gemini calls (4-min window) | Conserves free-tier daily quota; one call covers all airports |
+| Batch Gemini calls (5-min window) | Conserves free-tier daily quota; one call covers all airports |
 | Local Whisper STT | No per-minute STT cost; runs on CPU with int8 quantisation |
 | Confidence gating before AI call | Avoids sending garbage transcripts to Gemini; saves tokens |
 | ADS-B snapshot at analysis time | Correlates what was *said* with what aircraft were *actually doing* |
@@ -119,15 +120,15 @@ LiveATC Stream (MP3)
 
 ### Prerequisites
 
-- Docker + Docker Compose
-- `ffmpeg` — `brew install ffmpeg` (Mac) or `apt install ffmpeg` (Linux)
+- Docker + Docker Compose (Docker Desktop must be **running** before `docker compose up`)
 - [Gemini API key](https://aistudio.google.com/app/apikey) (free tier works)
+- `ffmpeg` — **only for the local-dev path below**; the Docker image already includes it. Install with `brew install ffmpeg` (Mac) or `apt install ffmpeg` (Linux)
 
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/MuddyWinds/atc-monitor.git
-cd atc-monitor
+git clone https://github.com/MuddyWinds/Readback.git
+cd Readback
 cp .env.example .env
 ```
 
@@ -145,11 +146,17 @@ docker compose up
 
 Open `http://localhost:3000` — the dashboard loads automatically.
 
-### 3. Start monitoring a feed
+### 3. Configure feeds and start monitoring
 
-In the **Airport Sidebar**, select an airport (KJFK, KATL, KLAX, KORD, VHHH) or paste a custom LiveATC URL and click **Start**.
+On first launch the app opens the **Settings** tab automatically (it detects that no
+feeds are configured yet). Add one or more LiveATC feed URLs — each with an airport
+code — and save. Then switch to the **Live** tab and click **▶ Start All** to begin
+monitoring every configured feed at once.
 
-Or via API:
+The five airports below come with ADS-B correlation out of the box; any other LiveATC
+MP3 URL works too.
+
+Or drive it via API:
 
 ```bash
 # Start KSFO tower feed
@@ -158,6 +165,54 @@ curl -X POST "http://localhost:8000/api/monitor/start?feed_url=http://feeds.live
 # Stop monitoring
 curl -X POST "http://localhost:8000/api/monitor/stop?airport_code=KSFO"
 ```
+
+---
+
+## Everyday Use
+
+Once the project is set up, these are the routine commands. **Always make sure Docker
+Desktop is running first.**
+
+```bash
+# Start the whole stack (db + backend + frontend) in the background
+docker compose up -d
+
+# Open the dashboard
+open http://localhost:3000
+
+# See what's running and tail logs
+docker compose ps
+docker compose logs -f            # all services
+docker compose logs -f backend    # one service
+
+# Stop the stack (the Postgres volume is preserved)
+docker compose down
+
+# Restart one service (e.g. after editing backend code)
+docker compose restart backend
+
+# Rebuild after changing dependencies (requirements.txt / package.json)
+docker compose up -d --build
+```
+
+The stack publishes host ports **`3000`** (frontend), **`8000`** (backend) and
+**`5432`** (Postgres).
+
+> **Port conflicts.** If another process already holds one of those ports — e.g. a
+> stray `npm start` from another project on `:3000` — Docker may bind only one IP
+> family and `http://localhost:3000` becomes ambiguous (you can end up looking at the
+> wrong app). Free the port, then let the container rebind:
+>
+> ```bash
+> lsof -nP -iTCP:3000 -sTCP:LISTEN   # find what's holding it
+> kill <PID>                          # stop the stray process
+> docker compose restart frontend     # rebind the container
+> ```
+
+> **Troubleshooting.** If the dashboard shows **"Unable to load analysis cards"** or
+> **"Loading settings…"** that never finishes, the frontend can't reach the backend on
+> `:8000`. Confirm `docker compose ps` lists `readback-backend-1` as `Up` and that
+> nothing else is squatting on port `8000`.
 
 ---
 
@@ -193,14 +248,20 @@ python3 -m venv .venv
 | `POST` | `/api/monitor/start` | Start monitoring a feed |
 | `POST` | `/api/monitor/stop` | Stop monitoring |
 | `GET` | `/api/monitor/status` | Active monitors |
+| `GET` | `/api/pipeline/status` | Pipeline / worker health |
+| `GET` | `/api/airports` | Configured / supported airports |
 | `GET` | `/api/results` | Paginated analysis history |
+| `PATCH` | `/api/results/{result_id}` | Update a single result (e.g. dismiss/annotate) |
 | `GET` | `/api/stats` | Aggregate phraseology statistics |
 | `GET` | `/api/adsb/{airport_code}` | Live ADS-B traffic (60s cache) |
 | `GET` | `/api/adsb-snapshot/{result_id}` | ADS-B state captured at analysis time |
 | `GET` | `/api/metar/{airport_code}` | Current METAR weather |
 | `GET` | `/api/notam/{airport_code}` | Active NOTAMs (5-min cache) |
 | `GET` | `/api/hazards/{airport_code}` | SIGMET / AIRMET / PIREP (5-min cache) |
-| `GET` | `/api/study-sheet/{id}` | Per-aircraft Gemini study sheet |
+| `GET` | `/api/study-sheet/{result_id}` | Per-aircraft Gemini study sheet |
+| `GET` | `/api/settings` | Read current settings (feeds, batch interval, …) |
+| `PUT` | `/api/settings` | Update settings |
+| `POST` | `/api/settings/verify-feed` | Validate a LiveATC feed URL before saving |
 | `WS` | `/ws/live` | Real-time results stream |
 
 ---
@@ -226,7 +287,7 @@ Supported airports with full ADS-B correlation out of the box:
 - **One-sided transcripts** — LiveATC captures one radio side only. The analyser is explicitly told not to flag missing readbacks that may simply be on the other side.
 - **Transcription noise** — Whisper on VHF radio audio is imperfect. Low-confidence segments are filtered out rather than sent for analysis.
 - **Not a safety-critical system** — This is a hobbyist/research tool. Do not use it for operational decisions.
-- **Gemini quota** — The free tier has a daily token limit. The 4-minute batch window and 15-transcript cap are designed to stay within it.
+- **Gemini quota** — The free tier has a daily token limit. The 5-minute batch window and 15-transcript cap are designed to stay within it.
 
 ---
 
@@ -235,7 +296,7 @@ Supported airports with full ADS-B correlation out of the box:
 | Layer | Technology |
 |---|---|
 | Audio ingestion | ffmpeg |
-| Speech-to-text | faster-whisper (Whisper large-v2, int8) |
+| Speech-to-text | faster-whisper (configurable model, default `base`, int8) |
 | Phraseology AI | Google Gemini Flash |
 | Backend | Python / FastAPI / SQLAlchemy (async) |
 | Database | PostgreSQL 16 |
