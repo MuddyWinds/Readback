@@ -3,7 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useSettings } from "../../SettingsContext";
 import { getCardSeverity, SEV_ORDER } from "../../lib/severity";
 import type { AnalysisResult, Enrichment, Observation, Severity, Filter } from "../../lib/types";
-import { useAdsb, useAdsbSnapshot, useUpdateResult } from "../../lib/queries";
+import { useAdsb, useAdsbSnapshot } from "../../lib/queries";
 import { extractCallsign, extractActions, parseBullets } from "../../lib/transcript";
 import { detectConflicts, AdsbAircraft } from "../../lib/conflicts";
 import { buildReportText } from "../../lib/report";
@@ -15,6 +15,7 @@ import { RegBadge } from "./RegBadge";
 import { HazardBanner } from "./HazardBanner";
 import { StructuredTranscript } from "./StructuredTranscript";
 import { StatusWorkflow } from "./StatusWorkflow";
+import { ReviewerNotes } from "./ReviewerNotes";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -48,74 +49,6 @@ const ACTION_COLOR: Record<string, string> = {
 };
 
 // ── Review workflow ───────────────────────────────────────────────────────────
-
-function ReviewerNotes({ resultId, initial }: { resultId?: number; initial?: string }) {
-  const [notes, setNotes] = React.useState(initial ?? "");
-  const [editing, setEditing] = React.useState(false);
-  const [saving, setSaving] = React.useState(false);
-  const updateResult = useUpdateResult();
-  const save = async () => {
-    setSaving(true);
-    try {
-      if (resultId) {
-        await updateResult.mutateAsync({ id: resultId, patch: { reviewer_notes: notes } });
-      }
-      setEditing(false);
-    } finally {
-      setSaving(false);
-    }
-  };
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-        <SectionLabel>Reviewer Notes</SectionLabel>
-        {!editing && (
-          <button onClick={() => setEditing(true)} style={{
-            fontSize: 10, color: "#58a6ff", background: "none", border: "none",
-            cursor: "pointer", padding: 0, marginTop: -8,
-          }}>
-            {notes ? "Edit" : "+ Add note"}
-          </button>
-        )}
-      </div>
-      {editing ? (
-        <div>
-          <textarea
-            value={notes} onChange={e => setNotes(e.target.value)}
-            autoFocus
-            style={{
-              width: "100%", background: "#161b22", border: "1px solid #30363d",
-              borderRadius: 6, color: "#e6edf3", fontSize: 12, padding: "8px 10px",
-              fontFamily: "inherit", lineHeight: 1.6, resize: "vertical" as const,
-              minHeight: 64, boxSizing: "border-box" as const,
-            }}
-            placeholder="Review notes, transcript caveats, study context…"
-          />
-          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-            <button onClick={save} disabled={saving} style={{
-              fontSize: 11, color: "#fff", background: "#238636",
-              border: "1px solid #2ea043", borderRadius: 4,
-              padding: "3px 12px", cursor: "pointer", fontFamily: "inherit",
-            }}>
-              {saving ? "Saving…" : "Save"}
-            </button>
-            <button onClick={() => { setNotes(initial ?? ""); setEditing(false); }} style={{
-              fontSize: 11, color: "#8b949e", background: "none",
-              border: "1px solid #30363d", borderRadius: 4,
-              padding: "3px 10px", cursor: "pointer", fontFamily: "inherit",
-            }}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : notes ? (
-        <p style={{ fontSize: 12, color: "#c9d1d9", margin: 0, lineHeight: 1.65, whiteSpace: "pre-wrap" as const }}>
-          {notes}
-        </p>
-      ) : null}
-    </div>
-  );
-}
 
 // ─── Standard card — minimal horizontal bar, expands on click ────────────────
 function CompliantCard({ r }: { r: AnalysisResult }) {
