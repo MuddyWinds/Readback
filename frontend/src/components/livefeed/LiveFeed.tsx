@@ -5,13 +5,13 @@ import { getCardSeverity, SEV_ORDER } from "../../lib/severity";
 import type { AnalysisResult, Enrichment, Observation, Severity, Filter } from "../../lib/types";
 import { useAdsb, useAdsbSnapshot, useHazards, useUpdateResult } from "../../lib/queries";
 import { extractCallsign, isAsrAmbiguous, extractActions, parseBullets } from "../../lib/transcript";
-import { truncateAtChapter } from "../../lib/regs";
 import { isActiveAt, detectConflicts, AdsbAircraft } from "../../lib/conflicts";
 import { buildReportText } from "../../lib/report";
 import { useWatchList } from "../../hooks/useWatchList";
 import { SEV_LABEL, SEV_ICON, ACTION_REQUIRED, HFACS_PLAIN, STATUS_LABEL, ReviewStatus } from "./constants";
 import { SectionLabel } from "./SectionLabel";
 import { ConfidenceBadge } from "./ConfidenceBadge";
+import { RegBadge } from "./RegBadge";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -135,35 +135,6 @@ function StructuredTranscript({
         );
       })()}
     </div>
-  );
-}
-
-/**
- * Truncate a regulation citation to chapter level for display.
- * Examples:
- *   "ICAO Annex 2, Chapter 3, Section 3.2.1" → "ICAO Annex 2, Chapter 3"
- *   "FAA Order 7110.65, Chapter 2, Section 2-1-3" → "FAA Order 7110.65, Chapter 2"
- *   "14 CFR 91.123" → "14 CFR 91.123"  (already short, shown as-is)
- * Full string always available on hover via title attribute.
- */
-/** Inline regulation badge for a single observation. Truncates at chapter level; hover shows full citation. */
-function RegBadge({ regulation }: { regulation: string }) {
-  if (!regulation) return null;
-  const display = truncateAtChapter(regulation);
-  return (
-    <span
-      title={regulation}
-      style={{
-        fontSize: 10, fontFamily: "monospace", color: "#c9d1d9",
-        background: "#21262d", border: "1px solid #30363d",
-        padding: "2px 8px", borderRadius: 4,
-        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        maxWidth: 220, display: "inline-block", verticalAlign: "middle",
-        cursor: "help", flexShrink: 1, minWidth: 0,
-      }}
-    >
-      {display}
-    </span>
   );
 }
 

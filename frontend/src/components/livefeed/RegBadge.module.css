@@ -1,0 +1,18 @@
+.badge {
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  display: inline-block;
+  vertical-align: middle;
+  cursor: help;
+  flex-shrink: 1;
+  min-width: 0;
+}
