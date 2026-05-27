@@ -8,6 +8,7 @@ import { phoneticExpand, extractCallsign, normalizeNumeric, isAsrAmbiguous, extr
 import { truncateAtChapter } from "../../lib/regs";
 import { isActiveAt, detectConflicts, AdsbAircraft } from "../../lib/conflicts";
 import { buildReportText } from "../../lib/report";
+import { useWatchList } from "../../hooks/useWatchList";
 
 export type {
   SpeakerSegment, Enrichment, ObservationKind, Observation,
@@ -53,28 +54,6 @@ const HFACS_PLAIN: Record<string, string> = {
   "Organizational Influence": "Policy, culture, or resource context",
 };
 
-
-// ── Module-level watch list (reactive across all card instances) ──────────────
-const _watchListeners = new Set<() => void>();
-function _getWatchSet(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem("atc_watchlist") || "[]")); }
-  catch { return new Set(); }
-}
-function useWatchList(): [Set<string>, (cs: string) => void] {
-  const [list, setList] = React.useState<Set<string>>(_getWatchSet);
-  React.useEffect(() => {
-    const upd = () => setList(new Set(_getWatchSet()));
-    _watchListeners.add(upd);
-    return () => { _watchListeners.delete(upd); };
-  }, []);
-  const toggle = React.useCallback((cs: string) => {
-    const next = _getWatchSet();
-    if (next.has(cs)) next.delete(cs); else next.add(cs);
-    localStorage.setItem("atc_watchlist", JSON.stringify(Array.from(next)));
-    _watchListeners.forEach(fn => fn());
-  }, []);
-  return [list, toggle];
-}
 
 const ACTION_COLOR: Record<string, string> = {
   CLIMB: "#3fb950", DESCEND: "#58a6ff", TAKEOFF: "#d2a8ff", LANDING: "#79c0ff",
