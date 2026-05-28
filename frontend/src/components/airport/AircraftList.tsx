@@ -56,7 +56,7 @@ function MonitoredRow({ ac, hoveredId, onHover }: MonitoredRowProps) {
       onMouseLeave={() => onHover(null)}
       className={styles.monRow}
       style={{
-        border:     `1px solid ${isHov ? `color-mix(in srgb, ${compVar} 33.3333%, transparent)` : "#1c2128"}`,
+        border:     `1px solid ${isHov ? `color-mix(in srgb, ${compVar} 33.3333%, transparent)` : "var(--drag-handle-bg)"}`,
         background: isHov ? `color-mix(in srgb, ${compVar} 5.8824%, transparent)` : "var(--bg)",
       }}
     >

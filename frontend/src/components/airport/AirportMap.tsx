@@ -74,7 +74,7 @@ function makeAircraftIcon(ac: AircraftInfo, hovered: boolean): L.DivIcon {
         position:absolute;top:50%;left:24px;transform:translateY(-50%);
         font:${hovered ? "bold 11px" : "bold 10px"} 'SF Mono',monospace;
         color:${color};white-space:nowrap;
-        text-shadow:0 0 4px #000,0 0 4px #000,0 0 5px #000;
+        text-shadow:0 0 4px var(--icon-shadow),0 0 4px var(--icon-shadow),0 0 5px var(--icon-shadow);
         pointer-events:none;line-height:1.4;
       ">
         ${ac.callsign}

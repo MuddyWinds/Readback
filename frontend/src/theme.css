@@ -54,6 +54,7 @@
   --aircraft-unmon: #3a4048;     /* Unmonitored aircraft icon fill (map) */
   --fit-btn-bg: #0d2016;         /* "Fit aircraft" button background */
   --drag-handle-bg: #1c2128;     /* Drag-to-resize handle background */
+  --icon-shadow: #000;           /* Aircraft label text-shadow (Leaflet divIcon) */
 
   /* Spacing & radii */
   --space-1: 4px;
