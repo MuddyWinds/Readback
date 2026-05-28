@@ -12,6 +12,7 @@ import { useEventAlerts } from "./hooks/useEventAlerts";
 import { resolveNavTarget } from "./lib/alerts";
 import { severityCounts } from "./lib/selectors";
 import { HeaderBar } from "./components/app/HeaderBar";
+import { TabPeriodBar } from "./components/app/TabPeriodBar";
 import styles from "./App.module.css";
 
 const FILTER_BUTTONS: { key: Filter; label: string }[] = [
@@ -22,14 +23,6 @@ const FILTER_BUTTONS: { key: Filter; label: string }[] = [
   { key: "high",         label: "High" },
   { key: "critical",     label: "Critical" },
   { key: "unassessable", label: "Unassessable" },
-];
-
-const DATE_FILTERS: { key: DateFilter; label: string }[] = [
-  { key: "today", label: "Today" },
-  { key: "7d",    label: "Last 7 days" },
-  { key: "30d",   label: "Last 30 days" },
-  { key: "ytd",   label: "YTD" },
-  { key: "all",   label: "All time" },
 ];
 
 export default function App() {
@@ -242,29 +235,13 @@ export default function App() {
       />
 
       {/* ── Tab + period bar ── */}
-      <div className={styles.tabBar}>
-        <div className={`${styles.tabBarInner} ${isMobile ? styles.tabBarInnerMobile : styles.tabBarInnerDesktop}`}>
-          <div className={`${styles.tabRow} ${isMobile ? styles.tabRowMobile : ""}`}>
-            <button onClick={() => setTab("live")} className={tab === "live" ? styles.tabActive : styles.tab}>
-              {isMobile ? "Feed" : "Live Feed"}
-            </button>
-            <button onClick={() => setTab("settings")} className={tab === "settings" ? styles.tabActive : styles.tab}>
-              {isMobile ? "Setup" : "Settings"}
-            </button>
-          </div>
-          <div className={`${styles.periodRow} ${isMobile ? styles.periodRowMobile : ""}`}>
-            {DATE_FILTERS.filter(({ key }) => !(isMobile && key === "ytd")).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setDateFilter(key)}
-                className={dateFilter === key ? styles.periodActive : styles.period}
-              >
-                {isMobile ? ({ today: "Today", "7d": "7d", "30d": "30d", ytd: "YTD", all: "All" } as Record<DateFilter, string>)[key] : label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <TabPeriodBar
+        tab={tab}
+        onTab={setTab}
+        dateFilter={dateFilter}
+        onDateFilter={setDateFilter}
+        isMobile={isMobile}
+      />
 
       {/* ── Content ── */}
       {tab === "settings" ? (
