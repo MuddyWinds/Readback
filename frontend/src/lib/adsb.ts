@@ -1,4 +1,4 @@
-import { AnalysisResult } from "./types";
+import type { AnalysisResult } from "./types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
