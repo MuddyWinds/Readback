@@ -1,4 +1,4 @@
-import { expect, test } from "@jest/globals";
+import { expect, test } from "vitest";
 import { buildReportText } from "./report";
 import { AnalysisResult } from "./types";
 function r(over: Partial<AnalysisResult> = {}): AnalysisResult {

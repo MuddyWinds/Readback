@@ -1,4 +1,4 @@
-import { expect, test } from "@jest/globals";
+import { expect, test } from "vitest";
 import { truncateAtChapter, toDocName } from "./regs";
 test("toDocName returns a non-empty label for a regulation id", () => {
   expect(toDocName("14 CFR 91.123").length).toBeGreaterThan(0);

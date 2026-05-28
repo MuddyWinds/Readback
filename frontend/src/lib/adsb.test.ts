@@ -1,4 +1,4 @@
-import { expect, test } from "@jest/globals";
+import { expect, test } from "vitest";
 import { angularDiff, bearingTo, calcDistNm, hpaToInhg, activeRunway } from "./adsb";
 
 test("angularDiff is the smallest signed/magnitude difference on a circle", () => {

@@ -1,4 +1,4 @@
-import { expect, test } from "@jest/globals";
+import { expect, test } from "vitest";
 import { phoneticExpand, extractCallsign, normalizeNumeric, isAsrAmbiguous, parseBullets, extractActions } from "./transcript";
 
 test("phoneticExpand maps airline name + number words to a collapsed callsign", () => {

@@ -1,4 +1,4 @@
-import { expect, test } from "@jest/globals";
+import { expect, test } from "vitest";
 import { isActiveAt, detectConflicts } from "./conflicts";
 test("isActiveAt is true when ts falls within [from, to]", () => {
   expect(isActiveAt("2026-05-20T00:00:00Z", "2026-05-20T02:00:00Z", "2026-05-20T01:00:00Z")).toBe(true);

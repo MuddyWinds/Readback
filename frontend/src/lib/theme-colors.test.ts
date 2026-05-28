@@ -1,4 +1,4 @@
-import { expect, test } from "@jest/globals";
+import { expect, test } from "vitest";
 import { cssVar } from "./theme-colors";
 
 test("cssVar reads a custom property from :root", () => {

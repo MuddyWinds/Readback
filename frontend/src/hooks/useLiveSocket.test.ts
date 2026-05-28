@@ -1,4 +1,4 @@
-import { expect, test } from "@jest/globals";
+import { expect, test } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 
 import { handleSocketMessage } from "./useLiveSocket";
