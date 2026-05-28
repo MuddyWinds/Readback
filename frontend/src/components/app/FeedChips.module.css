@@ -1,0 +1,66 @@
+/* ── Airport pill row (feed selector chips) ──────────────────────────────── */
+.pillRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-lg);
+  padding: 4px 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+}
+.chipSelected {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.chipPlaying {
+  color: var(--text);
+  background: var(--feed-playing-bg);
+}
+.chipDefault {
+  color: var(--text-dim);
+  background: transparent;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.note {
+  color: var(--sev-standard);
+  font-size: 12px;
+  line-height: 1;
+  animation: pulse 1s infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.stopBtn {
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1;
+  margin-left: 2px;
+  cursor: pointer;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
