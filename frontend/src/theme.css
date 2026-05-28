@@ -49,8 +49,11 @@
   --action-taxi: #c9d1d9;
 
   /* Phase / map tokens */
-  --phase-enr: #6e7681;   /* ADS-B enroute phase colour (semantic alias of text-ghost) */
-  --ring-green: #1e3a1e;  /* Leaflet range rings */
+  --phase-enr: #6e7681;          /* ADS-B enroute phase colour (semantic alias of text-ghost) */
+  --ring-green: #1e3a1e;         /* Leaflet range rings */
+  --aircraft-unmon: #3a4048;     /* Unmonitored aircraft icon fill (map) */
+  --fit-btn-bg: #0d2016;         /* "Fit aircraft" button background */
+  --drag-handle-bg: #1c2128;     /* Drag-to-resize handle background */
 
   /* Spacing & radii */
   --space-1: 4px;

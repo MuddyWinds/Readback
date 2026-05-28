@@ -1,0 +1,122 @@
+/* AirportMap component styles */
+
+.zoomPresets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.presetBtn {
+  background: var(--surface, #161b22);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 4px;
+  color: var(--text-dim, #8b949e);
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 9px;
+  padding: 3px 8px;
+}
+
+.fitBtn {
+  background: var(--fit-btn-bg, #0d2016);
+  border: 1px solid color-mix(in srgb, var(--sev-standard, #3fb950) 33.3333%, transparent);
+  border-radius: 4px;
+  color: var(--sev-standard, #3fb950);
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 9px;
+  margin-left: auto;
+  padding: 3px 8px;
+}
+
+.mapWrap {
+  border-radius: 6px;
+  height: var(--map-h);
+  overflow: hidden;
+  position: relative;
+}
+
+.mapEl {
+  height: 100%;
+  width: 100%;
+}
+
+.zoomCtrl {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  z-index: 1000;
+}
+
+.zoomBtn {
+  backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--surface, #161b22) 80%, transparent);
+  border: 1px solid var(--border, #30363d);
+  color: var(--text, #e6edf3);
+  cursor: pointer;
+  font-size: 16px;
+  height: 26px;
+  line-height: 1;
+  width: 26px;
+}
+
+.zoomBtnTop    { border-radius: 4px 4px 0 0; }
+.zoomBtnBottom { border-radius: 0 0 4px 4px; }
+
+.centreBtn {
+  backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--surface, #161b22) 80%, transparent);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 4px;
+  bottom: 22px;
+  color: var(--sev-standard, #3fb950);
+  cursor: pointer;
+  font-size: 13px;
+  height: 26px;
+  position: absolute;
+  right: 8px;
+  width: 26px;
+  z-index: 1000;
+}
+
+.phaseLegend {
+  backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--bg, #0d1117) 53.3333%, transparent);
+  border-radius: 4px;
+  bottom: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  left: 8px;
+  padding: 3px 7px;
+  position: absolute;
+  z-index: 1000;
+}
+
+.legendItem {
+  align-items: center;
+  display: flex;
+  gap: 3px;
+}
+
+.legendDot {
+  display: inline-block;
+  height: 7px;
+  width: 7px;
+}
+
+.legendLabel {
+  color: var(--text-dim, #8b949e);
+  font-family: monospace;
+  font-size: 9px;
+}
+
+/* Per-phase colours for legend dots */
+.phase-arr { background: var(--sev-low,      #44aaff); }
+.phase-dep { background: var(--sev-standard, #3fb950); }
+.phase-gnd { background: var(--sev-medium,   #e3b341); }
+.phase-enr { background: var(--phase-enr,    #6e7681); }
