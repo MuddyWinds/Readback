@@ -1,11 +1,5 @@
 /* AircraftList – colour modifier classes (keyed by category / phase string) */
 
-/* Flight-category colours */
-.cat-VFR  { color: var(--sev-standard, #3fb950); }
-.cat-MVFR { color: var(--sev-low,      #44aaff); }
-.cat-IFR  { color: var(--sev-high,     #ff8800); }
-.cat-LIFR { color: var(--sev-critical, #ff4444); }
-
 /* Phase colours */
 .phase-arr { color: var(--sev-low,      #44aaff); }
 .phase-dep { color: var(--sev-standard, #3fb950); }

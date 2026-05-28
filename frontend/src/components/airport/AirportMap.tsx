@@ -105,12 +105,11 @@ interface Props {
   onHover:     (id: string | null) => void;
   apLat:       number;
   apLon:       number;
-  airportCode: string;
   mapHeight:   number;
 }
 
 export function AirportMap({
-  aircraft, hoveredId, onHover, apLat, apLon, airportCode, mapHeight,
+  aircraft, hoveredId, onHover, apLat, apLon, mapHeight,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<L.Map | null>(null);

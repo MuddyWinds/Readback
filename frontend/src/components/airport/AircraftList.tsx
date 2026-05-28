@@ -24,6 +24,7 @@ function phaseColorVar(phase: AircraftInfo["phase"]): string {
     case "dep": return "var(--sev-standard)"; // dep
     case "gnd": return "var(--sev-medium)";   // gnd
     case "enr": return "var(--phase-enr)";    // enr
+    default:    return "var(--text-dim)";     // unknown
   }
 }
 

@@ -234,7 +234,6 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
                 onHover={setHoveredId}
                 apLat={geo[0]}
                 apLon={geo[1]}
-                airportCode={airportCode}
                 mapHeight={mapHeight}
               />
 

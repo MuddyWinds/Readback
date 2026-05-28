@@ -32,7 +32,6 @@
 
 .mapWrap {
   border-radius: 6px;
-  height: var(--map-h);
   overflow: hidden;
   position: relative;
 }
