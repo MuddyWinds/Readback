@@ -56,6 +56,15 @@
   --drag-handle-bg: #1c2128;     /* Drag-to-resize handle background */
   --icon-shadow: #000;           /* Aircraft label text-shadow (Leaflet divIcon) */
 
+  /* App header action buttons */
+  --btn-start-bg: #238636;          /* Start All — idle (same as sev-standard-border) */
+  --btn-start-bg-active: #1f6f3b;   /* Start All — starting state */
+  --btn-stop-bg: #da3633;           /* Stop All — idle */
+  --btn-stop-bg-active: #8f2422;    /* Stop All — stopping state */
+
+  /* Feed chip playing state background */
+  --feed-playing-bg: #0d1f12;
+
   /* Spacing & radii */
   --space-1: 4px;
   --space-2: 8px;

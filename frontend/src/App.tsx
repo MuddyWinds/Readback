@@ -12,11 +12,38 @@ import { useLiveSocket } from "./hooks/useLiveSocket";
 import { useEventAlerts } from "./hooks/useEventAlerts";
 import { resolveNavTarget } from "./lib/alerts";
 import { severityCounts } from "./lib/selectors";
+import styles from "./App.module.css";
 
-const SEV_COLOR: Record<string, string> = {
-  standard: "#3fb950", low: "#44aaff", medium: "#e3b341", high: "#ff8800", critical: "#ff4444",
-  unassessable: "#484f58",
-};
+// Severity dot color for feed stage — resolved via CSS var names at use-site
+type StageDotVar =
+  | "var(--text-faint)"
+  | "var(--sev-standard)"
+  | "var(--sev-medium)"
+  | "var(--sev-critical)"
+  | "var(--text-ghost)";
+
+function stageDotColor(stage: string, active: boolean): StageDotVar {
+  if (!active) return "var(--text-faint)";
+  if (stage === "error") return "var(--sev-critical)";
+  if (stage === "audio") return "var(--sev-standard)";
+  if (stage === "transcribing" || stage.startsWith("queued")) return "var(--sev-medium)";
+  if (stage === "silent" || stage === "too_short") return "var(--text-ghost)";
+  return "var(--sev-standard)";
+}
+
+function stageLabel(stage: string, active: boolean): string {
+  if (!active) return "off";
+  if (stage === "queued_unassessable") return "queued (unassessable)";
+  if (stage.startsWith("queued_")) return "queued (" + stage.slice("queued_".length) + ")";
+  return stage;
+}
+
+// Status state resolves to one of these token var names
+type StatusVar =
+  | "var(--sev-critical)"
+  | "var(--sev-medium)"
+  | "var(--accent)"
+  | "var(--sev-standard)";
 
 const FILTER_BUTTONS: { key: Filter; label: string }[] = [
   { key: "all",          label: "All" },
@@ -35,24 +62,6 @@ const DATE_FILTERS: { key: DateFilter; label: string }[] = [
   { key: "ytd",   label: "YTD" },
   { key: "all",   label: "All time" },
 ];
-
-type StageDotColor = "#484f58" | "#3fb950" | "#e3b341" | "#ff4444" | "#8b949e";
-
-function stageDotColor(stage: string, active: boolean): StageDotColor {
-  if (!active) return "#484f58";
-  if (stage === "error") return "#ff4444";
-  if (stage === "audio") return "#3fb950";
-  if (stage === "transcribing" || stage.startsWith("queued")) return "#e3b341";
-  if (stage === "silent" || stage === "too_short") return "#8b949e";
-  return "#3fb950";
-}
-
-function stageLabel(stage: string, active: boolean): string {
-  if (!active) return "off";
-  if (stage === "queued_unassessable") return "queued (unassessable)";
-  if (stage.startsWith("queued_")) return "queued (" + stage.slice("queued_".length) + ")";
-  return stage;
-}
 
 function PipelineStatusStrip({
   status,
@@ -77,90 +86,59 @@ function PipelineStatusStrip({
   const softError = status?.last_gemini_error || status?.last_error || null;
 
   let statusLabel: string;
-  let statusColor: string;
-  let statusTextColor: string;
+  let statusVar: StatusVar;
   let statusTooltip: string | undefined;
 
   if (hardError) {
     statusLabel = "API unreachable";
-    statusColor = "#ff4444";
-    statusTextColor = "#ff4444";
+    statusVar = "var(--sev-critical)";
     statusTooltip = hardError;
   } else if (status?.last_gemini_error) {
     statusLabel = "Gemini Down";
-    statusColor = "#e3b341";
-    statusTextColor = "#e3b341";
+    statusVar = "var(--sev-medium)";
     statusTooltip = status.last_gemini_error;
   } else if (softError) {
     statusLabel = "Pipeline error";
-    statusColor = "#e3b341";
-    statusTextColor = "#e3b341";
+    statusVar = "var(--sev-medium)";
     statusTooltip = softError;
   } else if (status?.queued_transcripts) {
     statusLabel = "Batch Queued";
-    statusColor = "#58a6ff";
-    statusTextColor = "#58a6ff";
+    statusVar = "var(--accent)";
   } else {
     statusLabel = "Listening";
-    statusColor = "#3fb950";
-    statusTextColor = "#3fb950";
+    statusVar = "var(--sev-standard)";
   }
 
   return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      flexWrap: "wrap" as const,
-      maxWidth: "100%",
-      minWidth: 0,
-    }}>
+    <div className={styles.stripWrap}>
       {/* Status pill */}
       <div
         title={statusTooltip}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 7,
-          background: "#0d1117",
-          border: "1px solid #30363d",
-          borderRadius: 6,
-          padding: "4px 10px",
-          flexShrink: 0,
-          cursor: statusTooltip ? "help" : "default",
-        }}
+        className={`${styles.statusPill} ${statusTooltip ? styles.statusPillHelp : styles.statusPillDefault}`}
       >
-        <span style={{
-          width: 8, height: 8, borderRadius: "50%",
-          background: statusColor,
-          flexShrink: 0,
-        }} />
-        <span style={{
-          fontSize: 12,
-          color: statusTextColor,
-          fontWeight: 500,
-          whiteSpace: "nowrap" as const,
-        }}>{statusLabel}</span>
+        <span
+          className={styles.statusDot}
+          style={{ background: statusVar }}
+        />
+        <span
+          className={styles.statusLabel}
+          style={{ color: statusVar }}
+        >{statusLabel}</span>
       </div>
 
       {/* Airport pill row */}
-      <div style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        background: "#0d1117",
-        border: "1px solid #21262d",
-        borderRadius: 10,
-        padding: "4px 6px",
-        flexWrap: "wrap" as const,
-        minWidth: 0,
-      }}>
+      <div className={styles.airportPillRow}>
         {feeds.map(feed => {
           const active = activeFeeds.has(feed.url);
           const stage = status?.feed_status?.[feed.url]?.stage ?? (active ? "starting" : "off");
           const dot = stageDotColor(stage, active);
           const selected = airportFilter === feed.code;
           const playing = activeAudio === feed.url;
+          const chipClass = playing
+            ? styles.feedChipPlaying
+            : selected
+            ? styles.feedChipSelected
+            : styles.feedChipDefault;
           return (
             <button
               key={feed.code}
@@ -177,37 +155,14 @@ function PipelineStatusStrip({
                 onAirportSelect(feed.code);
               }}
               title={`${feed.label} — ${stageLabel(stage, active)}`}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 12,
-                fontWeight: 500,
-                color: selected ? "#e6edf3" : "#8b949e",
-                background: playing ? "#0d1f12" : selected ? "#21262d" : "transparent",
-                border: "none",
-                borderRadius: 6,
-                padding: "4px 10px",
-                cursor: "pointer",
-                whiteSpace: "nowrap" as const,
-                flexShrink: 0,
-                transition: "background 0.12s, color 0.12s",
-              }}
+              className={`${styles.feedChipBtn} ${chipClass}`}
             >
-              <span style={{
-                width: 6, height: 6, borderRadius: "50%",
-                background: dot,
-                flexShrink: 0,
-              }} />
+              <span
+                className={styles.chipDot}
+                style={{ background: dot }}
+              />
               {playing && (
-                <span style={{
-                  color: "#3fb950",
-                  fontSize: 12,
-                  lineHeight: 1,
-                  animation: "pulse 1s infinite",
-                  display: "inline-block",
-                  flexShrink: 0,
-                }}>♪</span>
+                <span className={styles.chipNote}>♪</span>
               )}
               <span>{feed.code}</span>
               {playing && (
@@ -216,13 +171,7 @@ function PipelineStatusStrip({
                   role="button"
                   aria-label={`Stop ${feed.code} audio`}
                   title={`Stop ${feed.code} audio`}
-                  style={{
-                    color: "#8b949e",
-                    fontSize: 12,
-                    lineHeight: 1,
-                    marginLeft: 2,
-                    cursor: "pointer",
-                  }}
+                  className={styles.chipStop}
                 >
                   ✕
                 </span>
@@ -411,34 +360,6 @@ export default function App() {
     [results, airportFilter],
   );
 
-  // ── Styles ──────────────────────────────────────────────────────────────────
-
-  const tabBtnStyle = (active: boolean) => ({
-    background: "none" as const, border: "none" as const,
-    color: active ? "#e6edf3" : "#8b949e",
-    borderBottom: active ? "2px solid #f78166" : "2px solid transparent",
-    padding: "10px 16px", cursor: "pointer" as const,
-    fontSize: 14, fontWeight: active ? 600 : 400,
-  });
-
-  const filterBtnStyle = (active: boolean, accent: string) => ({
-    display: "flex", alignItems: "center", gap: 7,
-    padding: "6px 13px", borderRadius: 7, cursor: "pointer" as const,
-    background: active ? accent + "22" : "transparent",
-    border: `1px solid ${active ? accent + "88" : "transparent"}`,
-    color: active ? "#e6edf3" : "#8b949e",
-    fontSize: 13, fontWeight: active ? 600 : 400,
-    transition: "all 0.1s", whiteSpace: "nowrap" as const,
-  });
-
-  const periodBtnStyle = (active: boolean) => ({
-    background: active ? "#21262d" : "none" as const,
-    color: active ? "#58a6ff" : "#8b949e",
-    border: "none" as const, borderRadius: 4, padding: "3px 9px",
-    cursor: "pointer" as const, fontSize: 11, fontWeight: active ? 600 : 400,
-    transition: "all 0.1s",
-  });
-
   const { bp } = useWindowWidth();
   const isMobile  = bp === "mobile";
   const isTablet  = bp === "tablet";
@@ -451,37 +372,19 @@ export default function App() {
   const sidebarIsDrawer = sidebarOpen && (isMobile || isTablet);
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      maxWidth: "100vw",
-      overflowX: "hidden",
-      background: "#0d1117",
-      color: "#e6edf3",
-      display: "flex",
-      flexDirection: "column",
-    }}>
+    <div className={styles.root}>
 
       {/* ── Header ── */}
-      <header style={{
-        background: "#161b22", borderBottom: "1px solid #30363d",
-        padding: isMobile ? "10px 16px" : "14px 24px",
-        display: "flex", alignItems: "center",
-        flexShrink: 0, gap: isMobile ? 10 : 16, flexWrap: "wrap" as const,
-      }}>
-        <div style={{ flex: isMobile ? "1 1 0" : "0 0 210px", minWidth: 0 }}>
-          <h1 style={{ fontSize: isMobile ? 14 : 18, fontWeight: 700, letterSpacing: 0.5 }}>
+      <header className={`${styles.header} ${isMobile ? styles.headerMobile : styles.headerDesktop}`}>
+        <div className={`${styles.brandCol} ${isMobile ? styles.brandColMobile : styles.brandColDesktop}`}>
+          <h1 className={`${styles.title} ${isMobile ? styles.titleMobile : styles.titleDesktop}`}>
             ✈ Readback
           </h1>
-          {!isMobile && <p style={{ fontSize: 12, color: "#8b949e", marginTop: 2 }}>ATC phraseology, read back to you</p>}
+          {!isMobile && <p className={styles.subtitle}>ATC phraseology, read back to you</p>}
         </div>
 
         {isRunning && (
-          <div style={{
-            order: isMobile ? 3 : 0,
-            flex: isMobile ? "1 1 100%" : "1 1 auto",
-            minWidth: isMobile ? "100%" : 0,
-            margin: 0,
-          }}>
+          <div className={isMobile ? styles.statusWrapMobile : styles.statusWrapDesktop}>
             <PipelineStatusStrip
               status={pipelineStatus}
               apiError={apiError}
@@ -495,26 +398,14 @@ export default function App() {
           </div>
         )}
 
-        <div style={{
-          display: "flex",
-          gap: isMobile ? 6 : 12,
-          alignItems: "center",
-          flexWrap: "wrap" as const,
-          justifyContent: "flex-end",
-          marginLeft: "auto",
-          flex: "0 0 auto",
-        }}>
+        <div className={`${styles.headerActions} ${isMobile ? styles.headerActionsMobile : styles.headerActionsDesktop}`}>
           {/* Start / Stop */}
           {!isRunning ? (
             <button
               onClick={handleStart}
               disabled={starting}
               aria-label="Start all monitored ATC feeds"
-              style={{
-                background: starting ? "#1f6f3b" : "#238636", color: "#fff", border: "none",
-                borderRadius: 6, padding: "7px 16px", cursor: starting ? "wait" : "pointer",
-                fontSize: 13, fontWeight: 600, minHeight: isMobile ? 44 : undefined,
-              }}
+              className={`${starting ? styles.btnStartActive : styles.btnStart}${isMobile ? ` ${styles.btnMinHeightMobile}` : ""}`}
             >
               {starting ? "Starting..." : `▶ Start All (${feeds.length})`}
             </button>
@@ -523,19 +414,15 @@ export default function App() {
               onClick={handleStop}
               disabled={stopping}
               aria-label="Stop all monitored ATC feeds"
-              style={{
-                background: stopping ? "#8f2422" : "#da3633", color: "#fff", border: "none",
-                borderRadius: 6, padding: isMobile ? "7px 12px" : "7px 16px", cursor: stopping ? "wait" : "pointer",
-                fontSize: 13, fontWeight: 600, minHeight: isMobile ? 44 : undefined,
-              }}
+              className={`${stopping ? styles.btnStopActive : styles.btnStop} ${isMobile ? styles.btnStopMobile : styles.btnStopDesktop}${isMobile ? ` ${styles.btnMinHeightMobile}` : ""}`}
             >
               {stopping ? "Stopping..." : isMobile ? "■ Stop" : "■ Stop All"}
             </button>
           )}
 
           {isRunning && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#3fb950" }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3fb950", animation: "pulse 1.5s infinite", display: "inline-block" }} />
+            <div className={styles.liveBadge}>
+              <span className={styles.liveDot} />
               {!isMobile && "LIVE"}
             </div>
           )}
@@ -543,35 +430,23 @@ export default function App() {
       </header>
 
       {/* ── Tab + period bar ── */}
-      <div style={{ borderBottom: "1px solid #30363d", background: "#161b22", flexShrink: 0 }}>
-        <div style={{
-          padding: isMobile ? "0 16px" : "0 24px",
-          display: "flex",
-          flexDirection: isMobile ? "column" as const : "row" as const,
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-          paddingBottom: isMobile ? 8 : 0,
-        }}>
-          <div style={{ display: "flex", alignSelf: isMobile ? "stretch" : undefined }}>
-            <button onClick={() => setTab("live")}      style={tabBtnStyle(tab === "live")}>
+      <div className={styles.tabBar}>
+        <div className={`${styles.tabBarInner} ${isMobile ? styles.tabBarInnerMobile : styles.tabBarInnerDesktop}`}>
+          <div className={`${styles.tabRow} ${isMobile ? styles.tabRowMobile : ""}`}>
+            <button onClick={() => setTab("live")} className={tab === "live" ? styles.tabActive : styles.tab}>
               {isMobile ? "Feed" : "Live Feed"}
             </button>
-            <button onClick={() => setTab("settings")} style={tabBtnStyle(tab === "settings")}>
+            <button onClick={() => setTab("settings")} className={tab === "settings" ? styles.tabActive : styles.tab}>
               {isMobile ? "Setup" : "Settings"}
             </button>
           </div>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 2,
-            background: "#0d1117", border: "1px solid #30363d",
-            borderRadius: 6, padding: "3px",
-              alignSelf: isMobile ? "stretch" : undefined,
-              justifyContent: isMobile ? "space-between" : undefined,
-              width: isMobile ? "100%" : undefined,
-              boxSizing: "border-box" as const,
-          }}>
+          <div className={`${styles.periodRow} ${isMobile ? styles.periodRowMobile : ""}`}>
             {DATE_FILTERS.filter(({ key }) => !(isMobile && key === "ytd")).map(({ key, label }) => (
-              <button key={key} onClick={() => setDateFilter(key)} style={periodBtnStyle(dateFilter === key)}>
+              <button
+                key={key}
+                onClick={() => setDateFilter(key)}
+                className={dateFilter === key ? styles.periodActive : styles.period}
+              >
                 {isMobile ? ({ today: "Today", "7d": "7d", "30d": "30d", ytd: "YTD", all: "All" } as Record<DateFilter, string>)[key] : label}
               </button>
             ))}
@@ -581,68 +456,50 @@ export default function App() {
 
       {/* ── Content ── */}
       {tab === "settings" ? (
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <div className={styles.contentWrap}>
           {needsSetup && (
-            <div style={{ background: "#1f1a0d", borderBottom: "1px solid #e3b34133", color: "#e3b341", padding: "10px 24px", fontSize: 13 }}>
+            <div className={styles.setupBanner}>
               Add at least one feed and a Gemini API key to get started.
             </div>
           )}
           {settings
             ? <SettingsPage key={settings.gemini_api_key + ":" + settings.feeds.length} />
-            : <p style={{ color: "#8b949e", padding: 24 }}>Loading settings...</p>}
+            : <p className={styles.loadingText}>Loading settings...</p>}
         </div>
       ) : (
         /* Live Feed — flex layout; sidebar is side panel on desktop, drawer on mobile/tablet */
-        <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden", flexDirection: "column" }}>
+        <div className={styles.liveOuter}>
 
           {/* Main row: feed + sidebar — centered + capped on large screens */}
-          <div style={{
-            display: "flex", flex: 1, minHeight: 0, overflow: "hidden",
-            maxWidth: isLarge ? 1360 : "none",
-            margin: isLarge ? "0 auto" : undefined,
-            width: "100%",
-          }}>
+          <div className={`${styles.liveMainRow} ${isLarge ? styles.liveMainRowLarge : styles.liveMainRowFull}`}>
 
             {/* Feed column */}
-            <div style={{
-              flex: (sidebarOpen && !sidebarIsDrawer) ? "1 1 0" : "1 1 100%",
-              display: "flex", flexDirection: "column",
-              transition: "flex 0.2s ease",
-              overflowY: "auto",
-            }}>
-              <div style={{
-                maxWidth: (sidebarOpen && !sidebarIsDrawer) ? "none" : 900,
-                margin:   (sidebarOpen && !sidebarIsDrawer) ? 0 : "0 auto",
-                width: "100%",
-                padding: isMobile ? "12px" : "24px",
-                boxSizing: "border-box" as const,
-                transition: "max-width 0.2s ease, margin 0.2s ease",
-              }}>
+            <div className={`${styles.feedCol} ${(sidebarOpen && !sidebarIsDrawer) ? styles.feedColExpanded : styles.feedColFull}`}>
+              <div className={`${styles.feedInner} ${(sidebarOpen && !sidebarIsDrawer) ? styles.feedInnerFull : styles.feedInnerConstrained} ${isMobile ? styles.feedInnerMobile : styles.feedInnerDesktop}`}>
                 {/* Severity filter bar — wraps on small screens */}
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 4, marginBottom: 16,
-                  background: "#161b22", border: "1px solid #21262d",
-                  borderRadius: 10, padding: isMobile ? "6px 8px" : "8px 12px",
-                  flexWrap: isMobile ? "nowrap" as const : "wrap" as const,
-                  overflowX: isMobile ? "auto" as const : undefined,
-                  WebkitOverflowScrolling: isMobile ? "touch" as const : undefined,
-                }}>
+                <div className={`${styles.filterBar} ${isMobile ? styles.filterBarMobile : styles.filterBarDesktop}`}>
                   {FILTER_BUTTONS.map(({ key, label }) => {
                     const active = filter === key;
-                    const accent = key === "all" ? "#58a6ff" : SEV_COLOR[key];
-                    // On mobile: skip "unassessable" label text, show counts only
+                    const filterAccent = key === "all" ? "var(--accent)" : `var(--sev-${key})`;
                     const displayLabel = isMobile && key === "unassessable" ? "N/A" : label;
+                    const btnClass = active
+                      ? `${styles.filterBtnActive} ${isMobile ? styles.filterBtnActiveMobile : styles.filterBtnActiveDesktop}`
+                      : `${styles.filterBtn} ${isMobile ? styles.filterBtnMobile : styles.filterBtnDesktop}`;
+                    const badgeClass = active
+                      ? styles.filterBadgeActive
+                      : (sevCounts[key] > 0 ? styles.filterBadgeHasCount : styles.filterBadgeInactive);
                     return (
-                      <button key={key} onClick={() => setFilter(key)} style={{
-                        ...filterBtnStyle(active, accent),
-                        padding: isMobile ? "4px 8px" : "6px 13px",
-                        fontSize: isMobile ? 11 : 13,
-                      }}>
+                      <button
+                        key={key}
+                        onClick={() => setFilter(key)}
+                        className={btnClass}
+                        style={{ ["--filter-accent" as any]: filterAccent }}
+                      >
                         {displayLabel}
-                        <span style={{
-                          fontSize: isMobile ? 11 : 13, fontWeight: 700,
-                          color: active ? accent : (sevCounts[key] > 0 ? "#c9d1d9" : "#484f58"),
-                        }}>
+                        <span
+                          className={`${styles.filterBadge} ${badgeClass}`}
+                          style={active ? { color: filterAccent } : undefined}
+                        >
                           {sevCounts[key]}
                         </span>
                       </button>
@@ -663,10 +520,7 @@ export default function App() {
 
             {/* Side panel sidebar (desktop only) */}
             {sidebarOpen && !sidebarIsDrawer && (
-              <div style={{
-                flex: "0 0 400px", maxWidth: 400, minWidth: 300,
-                borderLeft: "1px solid #21262d", overflow: "hidden",
-              }}>
+              <div className={styles.sidePanel}>
                 <AirportSidebar airportCode={sidebarAirport!} onClose={closeSidebar} results={results} />
               </div>
             )}
@@ -674,10 +528,7 @@ export default function App() {
 
           {/* Bottom drawer sidebar (mobile / tablet) */}
           {sidebarIsDrawer && (
-            <div style={{
-              flexShrink: 0, height: isTablet ? 360 : 280,
-              borderTop: "1px solid #21262d", overflow: "hidden",
-            }}>
+            <div className={isTablet ? styles.drawerDesktop : styles.drawerMobile}>
               <AirportSidebar airportCode={sidebarAirport!} onClose={closeSidebar} results={results} />
             </div>
           )}
@@ -685,22 +536,12 @@ export default function App() {
       )}
 
       {/* ── Advisory footer ── */}
-      <footer style={{
-        flexShrink: 0,
-        borderTop: "1px solid #21262d",
-        padding: isMobile ? "8px 16px" : "10px 24px",
-        background: "#0d1117",
-      }}>
-        <p style={{ fontSize: 10, color: "#484f58", margin: 0, lineHeight: 1.6 }}>
+      <footer className={`${styles.footer} ${isMobile ? styles.footerMobile : styles.footerDesktop}`}>
+        <p className={styles.footerText}>
           Readback is an educational tool. Transcriptions may be imperfect and feeds are
           often one-sided — notes and events are advisory, not authoritative.
         </p>
       </footer>
-
-      <style>{`
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
-      `}</style>
     </div>
   );
 }
