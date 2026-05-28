@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { useWindowWidth } from "../../hooks/useWindowWidth";
 import { useSettings } from "../../SettingsContext";
 import { AirportAnalytics } from "./AirportAnalytics";
+import { AircraftList } from "./AircraftList";
 import { DataRow } from "./DataRow";
 import { WindArrow } from "./WindArrow";
 import { useAdsb, useMetar, useNotam } from "../../lib/queries";
@@ -339,120 +340,6 @@ function AirportMap({
           ))}
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── Aircraft list ─────────────────────────────────────────────────────────────
-
-function AircraftList({
-  aircraft, hoveredId, onHover,
-}: {
-  aircraft:  AircraftInfo[];
-  hoveredId: string | null;
-  onHover:   (id: string | null) => void;
-}) {
-  if (aircraft.length === 0) return (
-    <p style={{ fontSize: 11, color: "#484f58", fontStyle: "italic", margin: "8px 0 0" }}>
-      No aircraft data — OpenSky may be rate-limiting
-    </p>
-  );
-
-  const monitored   = aircraft.filter(a => a.monitored);
-  const background  = aircraft.filter(a => !a.monitored);
-  const grid        = "1fr 34px 52px 38px";
-
-  // Monitored row: compliance-coloured, shows last event
-  const MonitoredRow = ({ ac }: { ac: AircraftInfo }) => {
-    const compColor = monitoredColor(ac);
-    const phaseColor = PHASE_COLOR[ac.phase];
-    const isHov     = ac.id === hoveredId;
-    const altStr    = ac.altFt != null
-      ? (ac.altFt >= 18000 ? `FL${Math.round(ac.altFt / 100)}` : `${ac.altFt.toLocaleString()}ft`)
-      : (ac.onGround ? "GND" : "—");
-    const compLabel = ac.standard === false ? "NON-STANDARD"
-      : ac.standard === true ? "STANDARD" : "UNASSESSED";
-
-    return (
-      <div
-        onMouseEnter={() => onHover(ac.id)}
-        onMouseLeave={() => onHover(null)}
-        style={{
-          padding: "6px 6px",
-          borderRadius: 4,
-          border: `1px solid ${isHov ? compColor + "55" : "#1c2128"}`,
-          background: isHov ? compColor + "0f" : "#0d1117",
-          cursor: "default",
-          marginBottom: 4,
-        }}
-      >
-        {/* Row 1: callsign + phase + compliance badge */}
-        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: compColor, flexShrink: 0 }} />
-          <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace", color: "#e6edf3", flex: 1 }}>
-            {ac.callsign}
-          </span>
-          <span style={{ fontSize: 8, fontWeight: 700, color: phaseColor, background: phaseColor + "22", border: `1px solid ${phaseColor}44`, borderRadius: 3, padding: "1px 4px" }}>
-            {PHASE_LABEL[ac.phase]}
-          </span>
-          <span style={{ fontSize: 8, fontWeight: 700, color: compColor, background: compColor + "18", border: `1px solid ${compColor}44`, borderRadius: 3, padding: "1px 4px" }}>
-            {compLabel}
-          </span>
-        </div>
-        {/* Row 2: last event + position data */}
-        <div style={{ display: "flex", gap: 8, paddingLeft: 11 }}>
-          {ac.lastEvent && (
-            <span style={{ fontSize: 9, color: ac.standard === false ? "#ff8800" : "#6e7681", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
-              {ac.lastEvent}
-            </span>
-          )}
-          <span style={{ fontSize: 9, color: "#484f58", fontFamily: "monospace", flexShrink: 0 }}>
-            {altStr}{ac.speedKt != null ? ` · ${ac.speedKt}kt` : ""} · {ac.distNm.toFixed(1)}nm
-          </span>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div style={{ marginTop: 10 }}>
-      {/* Monitored aircraft */}
-      {monitored.length > 0 && (
-        <>
-          <div style={{ fontSize: 9, fontWeight: 700, color: "#484f58", letterSpacing: 1.2, textTransform: "uppercase" as const, marginBottom: 6 }}>
-            Monitored ({monitored.length})
-          </div>
-          {monitored.map(ac => <MonitoredRow key={ac.id} ac={ac} />)}
-        </>
-      )}
-
-      {monitored.length === 0 && (
-        <p style={{ fontSize: 10, color: "#484f58", fontStyle: "italic", marginBottom: 8 }}>
-          No monitored callsigns currently in range
-        </p>
-      )}
-
-      {/* Background traffic — just a count, no clutter */}
-      {background.length > 0 && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 6, marginTop: 8,
-          padding: "5px 8px",
-          background: "#161b22", border: "1px solid #21262d", borderRadius: 4,
-        }}>
-          <div style={{ display: "flex", gap: 4 }}>
-            {(["arr","dep","gnd","enr"] as const).map(p => {
-              const n = background.filter(a => a.phase === p).length;
-              if (n === 0) return null;
-              return (
-                <span key={p} style={{ fontSize: 9, color: PHASE_COLOR[p], fontFamily: "monospace" }}>
-                  {n} {PHASE_LABEL[p]}
-                </span>
-              );
-            })}
-          </div>
-          <span style={{ fontSize: 9, color: "#484f58", marginLeft: "auto" }}>background traffic</span>
-        </div>
-      )}
     </div>
   );
 }
