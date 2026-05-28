@@ -1,0 +1,352 @@
+/* AirportSidebar container styles */
+
+.root {
+  background: var(--bg, #0d1117);
+  border-left: 1px solid var(--border-dim, #21262d);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+
+.header {
+  align-items: center;
+  background: var(--surface, #161b22);
+  border-bottom: 1px solid var(--border-dim, #21262d);
+  display: flex;
+  flex-shrink: 0;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.airportCode {
+  color: var(--text, #e6edf3);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* Category chip — colour driven by --cat-clr set inline */
+.catChip {
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--cat-clr) 33.3333%, transparent);
+  color: var(--cat-clr);
+  background: color-mix(in srgb, var(--cat-clr) 13.3333%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+}
+
+.closeBtn {
+  background: none;
+  border: 1px solid var(--border, #30363d);
+  border-radius: 4px;
+  color: var(--text-ghost, #6e7681);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 8px;
+}
+
+/* ── Body ── */
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ── Scope section ── */
+
+.scopeSection {
+  border-bottom: 1px solid var(--border-dim, #21262d);
+}
+
+.scopeToggle {
+  align-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  padding: 11px 16px;
+  width: 100%;
+}
+
+.scopeTitle {
+  color: var(--text-faint, #484f58);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+}
+
+.scopeMeta {
+  color: var(--text-dim, #8b949e);
+  font-family: monospace;
+  font-size: 9px;
+}
+
+.scopeMonCount {
+  color: var(--sev-medium, #e3b341);
+}
+
+.scopeChevron {
+  color: var(--sev-unassessable-border, #3a3f47);
+  font-size: 10px;
+}
+
+.scopeBody {
+  padding: 0 16px 14px;
+}
+
+/* Info bar */
+.infoBar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.infoLeft {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.activeRwyBadge {
+  background: color-mix(in srgb, var(--sev-standard, #3fb950) 9.4118%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-standard, #3fb950) 26.6667%, transparent);
+  border-radius: 3px;
+  color: var(--sev-standard, #3fb950);
+  font-family: monospace;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+}
+
+.infoHint {
+  color: var(--text-faint, #484f58);
+  font-family: monospace;
+  font-size: 9px;
+}
+
+.infoRight {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.adsbAgeLive    { color: var(--sev-standard, #3fb950); font-family: monospace; font-size: 9px; }
+.adsbAgeOk      { color: var(--sev-medium,   #e3b341); font-family: monospace; font-size: 9px; }
+.adsbAgeStale   { color: var(--sev-high,     #ff8800); font-family: monospace; font-size: 9px; }
+
+.refetchBtn {
+  background: none;
+  border: 1px solid var(--border, #30363d);
+  border-radius: 3px;
+  color: var(--text-ghost, #6e7681);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 6px;
+}
+
+/* Drag handle */
+.dragHandle {
+  align-items: center;
+  background: var(--drag-handle-bg, #1c2128);
+  border-radius: 3px;
+  cursor: ns-resize;
+  display: flex;
+  height: 6px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.dragPip {
+  background: var(--border, #30363d);
+  border-radius: 1px;
+  height: 2px;
+  width: 24px;
+}
+
+.noGeo {
+  color: var(--text-faint, #484f58);
+  font-size: 11px;
+  font-style: italic;
+  padding: 0 16px 14px;
+}
+
+/* ── Weather section ── */
+
+.weatherSection {
+  padding: 14px 16px;
+}
+
+.sectionTitle {
+  color: var(--text-faint, #484f58);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.loadingText {
+  color: var(--text-faint, #484f58);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.errorText {
+  color: var(--sev-critical, #ff4444);
+  font-size: 12px;
+}
+
+/* Cat banner — colour driven by --cat-clr inline */
+.catBanner {
+  align-items: center;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--cat-clr) 26.6667%, transparent);
+  background: color-mix(in srgb, var(--cat-clr) 9.4118%, transparent);
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 7px 10px;
+}
+
+.catDot {
+  background: var(--cat-clr);
+  border-radius: 50%;
+  flex-shrink: 0;
+  height: 8px;
+  width: 8px;
+}
+
+.catName {
+  color: var(--cat-clr);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.catDesc {
+  color: var(--text-ghost, #6e7681);
+  font-size: 11px;
+}
+
+.wxPill {
+  background: color-mix(in srgb, var(--sev-medium, #e3b341) 13.3333%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sev-medium, #e3b341) 26.6667%, transparent);
+  border-radius: 4px;
+  color: var(--sev-medium, #e3b341);
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 4px;
+  padding: 1px 6px;
+}
+
+.rawOb {
+  background: var(--surface, #161b22);
+  border: 1px solid var(--border-dim, #21262d);
+  border-radius: 6px;
+  color: var(--text-faint, #484f58);
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 10px;
+  line-height: 1.7;
+  margin-top: 10px;
+  padding: 8px 10px;
+  word-break: break-all;
+}
+
+/* ── NOTAM section ── */
+
+.notamSection {
+  border-top: 1px solid var(--border-dim, #21262d);
+  padding: 14px 16px;
+}
+
+.notamTitle {
+  color: var(--text-faint, #484f58);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+/* NOTAM count chip — colour driven by --notam-clr */
+.notamCountChip {
+  background: color-mix(in srgb, var(--notam-clr) 9.4118%, transparent);
+  border: 1px solid color-mix(in srgb, var(--notam-clr) 26.6667%, transparent);
+  border-radius: 3px;
+  color: var(--notam-clr);
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 6px;
+  padding: 1px 5px;
+}
+
+.notamEmpty {
+  color: var(--text-faint, #484f58);
+  font-size: 11px;
+  font-style: italic;
+  margin: 0;
+}
+
+.notamList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Individual NOTAM card — --notam-clr set inline */
+.notamCard {
+  background: color-mix(in srgb, var(--notam-clr) 5.098%, transparent);
+  border: 1px solid color-mix(in srgb, var(--notam-clr) 20%, transparent);
+  border-left: 3px solid var(--notam-clr);
+  border-radius: 0 6px 6px 0;
+  padding: 7px 10px;
+}
+
+.notamCardHead {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.notamKeyword {
+  background: color-mix(in srgb, var(--notam-clr) 13.3333%, transparent);
+  border-radius: 3px;
+  color: var(--notam-clr);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+}
+
+.notamId {
+  color: var(--text-faint, #484f58);
+  font-family: monospace;
+  font-size: 9px;
+}
+
+.notamBody {
+  color: var(--text-sub, #c9d1d9);
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 10px;
+  line-height: 1.6;
+  margin: 0;
+  max-height: 60px;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+
+.notamMore {
+  color: var(--text-faint, #484f58);
+  font-size: 10px;
+  margin: 0;
+}

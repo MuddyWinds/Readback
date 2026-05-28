@@ -13,6 +13,7 @@ import {
 } from "../../lib/adsb";
 import type { RawAircraft } from "../../lib/adsb";
 import type { AnalysisResult } from "../../lib/types";
+import styles from "./AirportSidebar.module.css";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,11 +39,34 @@ interface Props {
   results?:    AnalysisResult[];
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const CAT_COLOR: Record<string, string> = {
-  VFR: "#3fb950", MVFR: "#44aaff", IFR: "#ff8800", LIFR: "#ff4444",
-};
+/**
+ * Return a CSS var() string for a flight category colour.
+ * Exact hex parity: VFR=#3fb950, MVFR=#44aaff, IFR=#ff8800, LIFR=#ff4444,
+ * unknown=#8b949e (--text-dim), no-data=#484f58 (--text-faint).
+ */
+function catColorVar(fltCat: string | null | undefined): string {
+  if (!fltCat) return "var(--text-faint)";  // #484f58 (no-data)
+  switch (fltCat) {
+    case "VFR":  return "var(--sev-standard)";  // #3fb950
+    case "MVFR": return "var(--sev-low)";        // #44aaff
+    case "IFR":  return "var(--sev-high)";       // #ff8800
+    case "LIFR": return "var(--sev-critical)";   // #ff4444
+    default:     return "var(--text-dim)";        // #8b949e
+  }
+}
+
+/**
+ * Return a CSS var() string for a NOTAM card/chip colour.
+ * Exact hex parity: critical=#ff4444, TWY=#ff8800, NAVAID=#e3b341, else=#8b949e.
+ */
+function notamColorVar(n: { critical?: boolean; keyword?: string }): string {
+  if (n.critical)              return "var(--sev-critical)";  // #ff4444
+  if (n.keyword === "TWY")     return "var(--sev-high)";      // #ff8800
+  if (n.keyword === "NAVAID")  return "var(--sev-medium)";    // #e3b341
+  return "var(--text-dim)";                                    // #8b949e
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -109,95 +133,98 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
   );
   const activeRwy = activeRunway(metar?.wdir ?? null, feed?.runways ?? []);
 
-  const catColor  = metar?.fltCat ? (CAT_COLOR[metar.fltCat] ?? "#8b949e") : "#484f58";
-  const catLabel  = metar?.fltCat ? (CAT_LABEL[metar.fltCat] ?? metar.fltCat) : null;
-  const ceiling   = metar ? deriveCeiling(metar.clouds) : null;
-  const ceilStr   = ceiling !== null ? `${ceiling.toLocaleString()} ft` : (metar ? "CAVOK" : "—");
-  const windStr   = (() => {
+  const catVar   = catColorVar(metar?.fltCat);
+  const catLabel = metar?.fltCat ? (CAT_LABEL[metar.fltCat] ?? metar.fltCat) : null;
+  const ceiling  = metar ? deriveCeiling(metar.clouds) : null;
+  const ceilStr  = ceiling !== null ? `${ceiling.toLocaleString()} ft` : (metar ? "CAVOK" : "—");
+  const windStr  = (() => {
     if (!metar) return "—";
     const dir = metar.wdir !== null ? `${String(metar.wdir).padStart(3, "0")}°` : "VRB";
     const spd = metar.wspd !== null ? `${metar.wspd} kt` : "";
     const gst = metar.wgst !== null ? ` G${metar.wgst} kt` : "";
     return `${dir} / ${spd}${gst}`;
   })();
-  const visStr    = metar?.visib != null ? `${metar.visib} SM` : "—";
-  const altimStr  = metar?.altim != null ? `${hpaToInhg(metar.altim)} inHg` : "—";
-  const tempStr   = metar ? `${metar.temp ?? "—"} °C / ${metar.dewp ?? "—"} °C` : "—";
+  const visStr   = metar?.visib != null ? `${metar.visib} SM` : "—";
+  const altimStr = metar?.altim != null ? `${hpaToInhg(metar.altim)} inHg` : "—";
+  const tempStr  = metar ? `${metar.temp ?? "—"} °C / ${metar.dewp ?? "—"} °C` : "—";
 
-  const adsbAge = adsb.dataUpdatedAt ? Math.round((Date.now() - adsb.dataUpdatedAt) / 1000) : null;
-  const ageLabel  = adsbAge == null ? "" : adsbAge < 10 ? "Live" : adsbAge < 120 ? `${adsbAge}s ago` : `${Math.round(adsbAge / 60)}m ago`;
+  const adsbAge  = adsb.dataUpdatedAt ? Math.round((Date.now() - adsb.dataUpdatedAt) / 1000) : null;
+  const ageLabel = adsbAge == null ? "" : adsbAge < 10 ? "Live" : adsbAge < 120 ? `${adsbAge}s ago` : `${Math.round(adsbAge / 60)}m ago`;
   const airborne    = aircraft.filter(a => a.phase !== "gnd").length;
   const onGround    = aircraft.filter(a => a.phase === "gnd").length;
   const monitoredCt = aircraft.filter(a => a.monitored).length;
 
+  const hasCriticalNotam = notams.some((n: any) => n.critical);
+  const notamChipVar     = hasCriticalNotam ? "var(--sev-critical)" : "var(--sev-medium)";
+
+  const adsbAgeClass = adsbAge == null ? ""
+    : adsbAge < 15  ? styles.adsbAgeLive
+    : adsbAge < 90  ? styles.adsbAgeOk
+    :                 styles.adsbAgeStale;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0d1117", borderLeft: "1px solid #21262d", overflow: "hidden" }}>
+    <div className={styles.root}>
 
       {/* ── Header ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", flexShrink: 0, background: "#161b22", borderBottom: "1px solid #21262d" }}>
+      <div className={styles.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: "#e6edf3", letterSpacing: 0.3 }}>{airportCode}</span>
+          <span className={styles.airportCode}>{airportCode}</span>
           {metar?.fltCat && (
-            <span title={catLabel ?? undefined} style={{ fontSize: 10, fontWeight: 700, color: catColor, background: catColor + "22", border: `1px solid ${catColor}55`, borderRadius: 4, padding: "1px 7px" }}>
+            <span
+              title={catLabel ?? undefined}
+              className={styles.catChip}
+              style={{ ["--cat-clr" as any]: catVar }}
+            >
               {metar.fltCat}
             </span>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={onClose} style={{ background: "none", border: "1px solid #30363d", color: "#6e7681", cursor: "pointer", fontSize: 12, padding: "2px 8px", borderRadius: 4, lineHeight: 1 }}>✕</button>
+          <button onClick={onClose} className={styles.closeBtn}>✕</button>
         </div>
       </div>
 
       {/* ── Scrollable body ── */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div className={styles.body}>
 
         {/* ── Airport Scope / Live Map ── */}
-        <div style={{ borderBottom: "1px solid #21262d" }}>
+        <div className={styles.scopeSection}>
           <button
             onClick={() => setScopeOpen(v => !v)}
-            style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 16px", background: "none", border: "none", cursor: "pointer" }}
+            className={styles.scopeToggle}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#484f58", letterSpacing: 1.3, textTransform: "uppercase" as const }}>
-                Live Traffic Map
-              </span>
+              <span className={styles.scopeTitle}>Live Traffic Map</span>
               {aircraft.length > 0 && (
-                <span style={{ fontSize: 9, color: "#8b949e", fontFamily: "monospace" }}>
-                  {monitoredCt > 0 && <span style={{ color: "#e3b341" }}>{monitoredCt} monitored · </span>}
+                <span className={styles.scopeMeta}>
+                  {monitoredCt > 0 && (
+                    <span className={styles.scopeMonCount}>{monitoredCt} monitored · </span>
+                  )}
                   {airborne} airborne{onGround > 0 ? ` · ${onGround} gnd` : ""}
                 </span>
               )}
             </div>
-            <span style={{ fontSize: 10, color: "#3a3f47" }}>{scopeOpen ? "▲" : "▼"}</span>
+            <span className={styles.scopeChevron}>{scopeOpen ? "▲" : "▼"}</span>
           </button>
 
           {scopeOpen && geo && (
-            <div style={{ padding: "0 16px 14px" }}>
+            <div className={styles.scopeBody}>
 
               {/* Info bar */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8, flexWrap: "wrap" as const }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" as const }}>
+              <div className={styles.infoBar}>
+                <div className={styles.infoLeft}>
                   {activeRwy && (
-                    <span style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: "#3fb950", background: "#3fb95018", border: "1px solid #3fb95044", borderRadius: 3, padding: "2px 7px" }}>
+                    <span className={styles.activeRwyBadge}>
                       ACTIVE RWY {activeRwy}
                     </span>
                   )}
-                  <span style={{ fontSize: 9, color: "#484f58", fontFamily: "monospace" }}>
-                    OSM · scroll/pinch to zoom
-                  </span>
+                  <span className={styles.infoHint}>OSM · scroll/pinch to zoom</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div className={styles.infoRight}>
                   {adsbAge != null && (
-                    <span style={{ fontSize: 9, fontFamily: "monospace", color: adsbAge < 15 ? "#3fb950" : adsbAge < 90 ? "#e3b341" : "#ff8800" }}>
-                      ADS-B {ageLabel}
-                    </span>
+                    <span className={adsbAgeClass}>ADS-B {ageLabel}</span>
                   )}
-                  <button
-                    onClick={() => adsb.refetch()}
-                    style={{ background: "none", border: "1px solid #30363d", color: "#6e7681", cursor: "pointer", fontSize: 11, padding: "1px 6px", borderRadius: 3 }}
-                  >
-                    ↻
-                  </button>
+                  <button onClick={() => adsb.refetch()} className={styles.refetchBtn}>↻</button>
                 </div>
               </div>
 
@@ -214,13 +241,9 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
               {/* Drag-to-resize handle */}
               <div
                 onMouseDown={e => { dragRef.current = { startY: e.clientY, startH: mapHeight }; e.preventDefault(); }}
-                style={{
-                  height: 6, marginTop: 4, borderRadius: 3,
-                  background: "#1c2128", cursor: "ns-resize",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}
+                className={styles.dragHandle}
               >
-                <div style={{ width: 24, height: 2, borderRadius: 1, background: "#30363d" }} />
+                <div className={styles.dragPip} />
               </div>
 
               <AircraftList
@@ -232,63 +255,79 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
           )}
 
           {scopeOpen && !geo && (
-            <div style={{ padding: "0 16px 14px" }}>
-              <p style={{ fontSize: 11, color: "#484f58", fontStyle: "italic" }}>No coordinates for {airportCode}</p>
-            </div>
+            <p className={styles.noGeo}>No coordinates for {airportCode}</p>
           )}
         </div>
 
         {/* ── Weather · METAR ── */}
-        <div style={{ padding: "14px 16px" }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#484f58", letterSpacing: 1.3, textTransform: "uppercase" as const, marginBottom: 10 }}>Weather · METAR</div>
-          {loading && <p style={{ fontSize: 12, color: "#484f58", fontStyle: "italic" }}>Fetching METAR…</p>}
-          {error && !loading && <p style={{ fontSize: 12, color: "#ff4444" }}>Failed to load METAR for {airportCode}</p>}
+        <div className={styles.weatherSection}>
+          <div className={styles.sectionTitle}>Weather · METAR</div>
+          {loading && <p className={styles.loadingText}>Fetching METAR…</p>}
+          {error && !loading && <p className={styles.errorText}>Failed to load METAR for {airportCode}</p>}
           {metar && !loading && (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: catColor + "18", border: `1px solid ${catColor}44`, borderRadius: 6, padding: "7px 10px", marginBottom: 10 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: catColor, flexShrink: 0 }} />
-                <span style={{ fontSize: 11, fontWeight: 600, color: catColor }}>{metar.fltCat}</span>
-                <span style={{ fontSize: 11, color: "#6e7681" }}>{catLabel}</span>
-                {metar.wxString && <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 600, color: "#e3b341", background: "#e3b34122", border: "1px solid #e3b34144", borderRadius: 4, padding: "1px 6px" }}>{metar.wxString}</span>}
-                {metar.wdir !== null && <div style={{ marginLeft: "auto" }}><WindArrow deg={metar.wdir} size={28} /></div>}
+              <div
+                className={styles.catBanner}
+                style={{ ["--cat-clr" as any]: catVar }}
+              >
+                <div className={styles.catDot} />
+                <span className={styles.catName}>{metar.fltCat}</span>
+                <span className={styles.catDesc}>{catLabel}</span>
+                {metar.wxString && (
+                  <span className={styles.wxPill}>{metar.wxString}</span>
+                )}
+                {metar.wdir !== null && (
+                  <div style={{ marginLeft: "auto" }}>
+                    <WindArrow deg={metar.wdir} size={28} />
+                  </div>
+                )}
               </div>
               <DataRow label="Wind"       value={windStr} />
               <DataRow label="Visibility" value={visStr}  warn={metar.visib != null && metar.visib < 3} />
               <DataRow label="Ceiling"    value={ceilStr} warn={ceiling !== null && ceiling < 1000} />
               <DataRow label="Temp / Dew" value={tempStr} />
               <DataRow label="Altimeter"  value={altimStr} />
-              <div style={{ marginTop: 10, background: "#161b22", border: "1px solid #21262d", borderRadius: 6, padding: "8px 10px", fontSize: 10, fontFamily: "'SF Mono','Fira Code',monospace", color: "#484f58", lineHeight: 1.7, wordBreak: "break-all" as const }}>
-                {metar.rawOb}
-              </div>
+              <div className={styles.rawOb}>{metar.rawOb}</div>
             </>
           )}
         </div>
 
         {/* ── NOTAMs ── */}
-        <div style={{ borderTop: "1px solid #21262d", padding: "14px 16px" }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#484f58", letterSpacing: 1.3, textTransform: "uppercase" as const, marginBottom: 8 }}>
+        <div className={styles.notamSection}>
+          <div className={styles.notamTitle}>
             Active NOTAMs
             {notams.length > 0 && (
-              <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: notams.some((n: any) => n.critical) ? "#ff4444" : "#e3b341", background: notams.some((n: any) => n.critical) ? "#ff444418" : "#e3b34118", border: `1px solid ${notams.some((n: any) => n.critical) ? "#ff444444" : "#e3b34144"}`, borderRadius: 3, padding: "1px 5px" }}>{notams.length}</span>
+              <span
+                className={styles.notamCountChip}
+                style={{ ["--notam-clr" as any]: notamChipVar }}
+              >
+                {notams.length}
+              </span>
             )}
           </div>
           {notams.length === 0
-            ? <p style={{ fontSize: 11, color: "#484f58", fontStyle: "italic", margin: 0 }}>No active NOTAMs</p>
+            ? <p className={styles.notamEmpty}>No active NOTAMs</p>
             : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className={styles.notamList}>
                 {notams.slice(0, 8).map((n: any, i: number) => {
-                  const color = n.critical ? "#ff4444" : n.keyword === "TWY" ? "#ff8800" : n.keyword === "NAVAID" ? "#e3b341" : "#8b949e";
+                  const nVar = notamColorVar(n);
                   return (
-                    <div key={i} style={{ background: color + "0d", border: `1px solid ${color}33`, borderLeft: `3px solid ${color}`, borderRadius: "0 6px 6px 0", padding: "7px 10px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, color, background: color + "22", borderRadius: 3, padding: "1px 5px" }}>{n.keyword}</span>
-                        <span style={{ fontSize: 9, fontFamily: "monospace", color: "#484f58" }}>{n.id}</span>
+                    <div
+                      key={i}
+                      className={styles.notamCard}
+                      style={{ ["--notam-clr" as any]: nVar }}
+                    >
+                      <div className={styles.notamCardHead}>
+                        <span className={styles.notamKeyword}>{n.keyword}</span>
+                        <span className={styles.notamId}>{n.id}</span>
                       </div>
-                      <p style={{ fontSize: 10, color: "#c9d1d9", margin: 0, lineHeight: 1.6, fontFamily: "'SF Mono','Fira Code',monospace", whiteSpace: "pre-wrap" as const, maxHeight: 60, overflow: "hidden" }}>{n.body}</p>
+                      <p className={styles.notamBody}>{n.body}</p>
                     </div>
                   );
                 })}
-                {notams.length > 8 && <p style={{ fontSize: 10, color: "#484f58", margin: 0 }}>+{notams.length - 8} more NOTAMs</p>}
+                {notams.length > 8 && (
+                  <p className={styles.notamMore}>+{notams.length - 8} more NOTAMs</p>
+                )}
               </div>
             )
           }
