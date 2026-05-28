@@ -7,8 +7,8 @@ test("defaults the API base to the page origin when no env override is set", () 
     .toBe("https://readback.example.com");
 });
 
-test("an explicit REACT_APP_API_BASE overrides the page origin (trailing slash trimmed)", () => {
-  expect(resolveApiBase({ REACT_APP_API_BASE: "http://localhost:8000/" }, { origin: "https://x" }))
+test("an explicit VITE_API_BASE overrides the page origin (trailing slash trimmed)", () => {
+  expect(resolveApiBase({ VITE_API_BASE: "http://localhost:8000/" }, { origin: "https://x" }))
     .toBe("http://localhost:8000");
 });
 
@@ -22,7 +22,7 @@ test("derives a same-origin wss:// URL from an https page", () => {
     .toBe("wss://readback.example.com/ws/live");
 });
 
-test("an explicit REACT_APP_WS_URL overrides the derived socket URL", () => {
-  expect(resolveWsUrl({ REACT_APP_WS_URL: "ws://localhost:8000/ws/live" }, { protocol: "https:", host: "x" }))
+test("an explicit VITE_WS_URL overrides the derived socket URL", () => {
+  expect(resolveWsUrl({ VITE_WS_URL: "ws://localhost:8000/ws/live" }, { protocol: "https:", host: "x" }))
     .toBe("ws://localhost:8000/ws/live");
 });
