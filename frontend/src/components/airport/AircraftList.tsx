@@ -10,9 +10,9 @@ import styles from "./AircraftList.module.css";
  * monitored aircraft.  Tokens map to the same hex as the original literals.
  */
 function monitoredColorVar(ac: AircraftInfo): string {
-  if (ac.standard === false) return "var(--sev-critical)";  // #ff4444
-  if (ac.standard === true)  return "var(--sev-standard)";  // #3fb950
-  return "var(--sev-medium)";                                // #e3b341 (unassessed)
+  if (ac.standard === false) return "var(--sev-critical)";
+  if (ac.standard === true)  return "var(--sev-standard)";
+  return "var(--sev-medium)";                                // (unassessed)
 }
 
 /**
@@ -20,10 +20,10 @@ function monitoredColorVar(ac: AircraftInfo): string {
  */
 function phaseColorVar(phase: AircraftInfo["phase"]): string {
   switch (phase) {
-    case "arr": return "var(--sev-low)";      // #44aaff
-    case "dep": return "var(--sev-standard)"; // #3fb950
-    case "gnd": return "var(--sev-medium)";   // #e3b341
-    case "enr": return "var(--phase-enr)";    // #6e7681
+    case "arr": return "var(--sev-low)";      // arr
+    case "dep": return "var(--sev-standard)"; // dep
+    case "gnd": return "var(--sev-medium)";   // gnd
+    case "enr": return "var(--phase-enr)";    // enr
   }
 }
 
@@ -47,7 +47,7 @@ function MonitoredRow({ ac, hoveredId, onHover }: MonitoredRowProps) {
   const compLabel = ac.standard === false ? "NON-STANDARD"
     : ac.standard === true ? "STANDARD" : "UNASSESSED";
 
-  // lastEvent colour: non-standard → --sev-high (#ff8800), otherwise --text-ghost (#6e7681)
+  // lastEvent colour: non-standard → --sev-high, otherwise --text-ghost
   const lastEventColorVar = ac.standard === false ? "var(--sev-high)" : "var(--text-ghost)";
 
   return (

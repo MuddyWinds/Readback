@@ -20,9 +20,9 @@ const ZOOM_PRESETS = [
 /**
  * Return the CSS var() string for a monitored aircraft's phraseology status.
  * Tokens resolve to the exact same hex as the original literals:
- *   false → var(--sev-critical)  #ff4444  (non-standard)
- *   true  → var(--sev-standard)  #3fb950  (standard)
- *   null  → var(--sev-medium)    #e3b341  (unassessed)
+ *   false → var(--sev-critical)  (non-standard)
+ *   true  → var(--sev-standard)  (standard)
+ *   null  → var(--sev-medium)    (unassessed)
  */
 function monitoredColor(ac: AircraftInfo): string {
   if (ac.standard === false) return "var(--sev-critical)";
@@ -134,7 +134,7 @@ export function AirportMap({
       { maxZoom: 19, subdomains: "abcd" },
     ).addTo(map);
 
-    // Attribution: use var(--text-faint) which resolves to #484f58
+    // Attribution: use var(--text-faint)
     L.control.attribution({ prefix: false, position: "bottomright" })
       .addAttribution(
         '© <a href="https://carto.com" style="color:var(--text-faint)">CARTO</a> ' +
@@ -146,7 +146,7 @@ export function AirportMap({
     ringsRef.current = [10, 20, 30].map(nm =>
       L.circle([apLat, apLon], {
         radius:    nm * 1852,
-        color:     cssVar("--ring-green"),   // resolves to #1e3a1e
+        color:     cssVar("--ring-green"),
         weight:    0.8,
         fill:      false,
         dashArray: "5,8",
@@ -156,8 +156,8 @@ export function AirportMap({
     // Airport centre dot — cssVar because Leaflet option object is JS-only
     L.circleMarker([apLat, apLon], {
       radius:      6,
-      color:       cssVar("--sev-standard"), // resolves to #3fb950
-      fillColor:   cssVar("--sev-standard"), // resolves to #3fb950
+      color:       cssVar("--sev-standard"),
+      fillColor:   cssVar("--sev-standard"),
       fillOpacity: 0.9,
       weight:      1.5,
     }).addTo(map);

@@ -43,29 +43,29 @@ interface Props {
 
 /**
  * Return a CSS var() string for a flight category colour.
- * Exact hex parity: VFR=#3fb950, MVFR=#44aaff, IFR=#ff8800, LIFR=#ff4444,
- * unknown=#8b949e (--text-dim), no-data=#484f58 (--text-faint).
+ * Exact hex parity: VFR (--sev-standard), MVFR (--sev-low), IFR (--sev-high), LIFR (--sev-critical),
+ * unknown (--text-dim), no-data (--text-faint).
  */
 function catColorVar(fltCat: string | null | undefined): string {
-  if (!fltCat) return "var(--text-faint)";  // #484f58 (no-data)
+  if (!fltCat) return "var(--text-faint)";  // no-data
   switch (fltCat) {
-    case "VFR":  return "var(--sev-standard)";  // #3fb950
-    case "MVFR": return "var(--sev-low)";        // #44aaff
-    case "IFR":  return "var(--sev-high)";       // #ff8800
-    case "LIFR": return "var(--sev-critical)";   // #ff4444
-    default:     return "var(--text-dim)";        // #8b949e
+    case "VFR":  return "var(--sev-standard)";  // VFR
+    case "MVFR": return "var(--sev-low)";        // MVFR
+    case "IFR":  return "var(--sev-high)";       // IFR
+    case "LIFR": return "var(--sev-critical)";   // LIFR
+    default:     return "var(--text-dim)";        // unknown
   }
 }
 
 /**
  * Return a CSS var() string for a NOTAM card/chip colour.
- * Exact hex parity: critical=#ff4444, TWY=#ff8800, NAVAID=#e3b341, else=#8b949e.
+ * Exact hex parity: critical (--sev-critical), TWY (--sev-high), NAVAID (--sev-medium), else (--text-dim).
  */
 function notamColorVar(n: { critical?: boolean; keyword?: string }): string {
-  if (n.critical)              return "var(--sev-critical)";  // #ff4444
-  if (n.keyword === "TWY")     return "var(--sev-high)";      // #ff8800
-  if (n.keyword === "NAVAID")  return "var(--sev-medium)";    // #e3b341
-  return "var(--text-dim)";                                    // #8b949e
+  if (n.critical)              return "var(--sev-critical)";  // critical
+  if (n.keyword === "TWY")     return "var(--sev-high)";      // TWY
+  if (n.keyword === "NAVAID")  return "var(--sev-medium)";    // NAVAID
+  return "var(--text-dim)";                                    // else
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
