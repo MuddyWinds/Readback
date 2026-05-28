@@ -203,7 +203,7 @@ The stack publishes host ports **`3000`** (frontend), **`8000`** (backend) and
 **`5432`** (Postgres).
 
 > **Port conflicts.** If another process already holds one of those ports — e.g. a
-> stray `npm start` from another project on `:3000` — Docker may bind only one IP
+> stray frontend dev server from another project on `:3000` — Docker may bind only one IP
 > family and `http://localhost:3000` becomes ambiguous (you can end up looking at the
 > wrong app). Free the port, then let the container rebind:
 >
@@ -232,20 +232,20 @@ uvicorn backend.main:app --reload --port 8000
 
 # Terminal 3 — Frontend
 cd frontend
-npm install && npm start
+npm install && npm run dev
 ```
 
 ### Frontend backend origin
 
 By default the frontend talks to the **same origin it is served from**, so a
 production build behind a reverse proxy needs no configuration. For local dev
-the CRA server runs on `:3000` and the backend on `:8000`, so
+the Vite dev server runs on `:3000` and the backend on `:8000`, so
 `frontend/.env.development` points at `http://localhost:8000` - which works
 because `:3000` is already in the backend CORS allowlist.
 
 A **production split-origin** deploy (frontend and backend on different hosts)
-is *not* fully supported by this plan: setting `REACT_APP_API_BASE` /
-`REACT_APP_WS_URL` at build time points the browser at the other host, but the
+is *not* fully supported by this plan: setting `VITE_API_BASE` /
+`VITE_WS_URL` at build time points the browser at the other host, but the
 backend (`backend/main.py`) currently allows CORS only from
 `http://localhost:3000`, so cross-origin browser fetches would be blocked.
 Supporting that requires making the backend allowlist configurable - a separate,

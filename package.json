@@ -2,7 +2,7 @@
   "private": true,
   "scripts": {
     "build": "npm --prefix frontend run build",
-    "frontend:start": "npm --prefix frontend start",
+    "frontend:start": "npm --prefix frontend run dev",
     "test": ".venv/bin/python -m pytest"
   }
 }
