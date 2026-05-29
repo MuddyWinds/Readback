@@ -109,6 +109,7 @@ async def get_metar(airport_code: str):
 
 def _notam_keyword(body: str) -> str:
     b = body.upper()
+    if "EMERG" in b: return "EMERGENCY"
     if "TFR" in b or "TEMPORARY FLIGHT RESTRICTION" in b: return "TFR"
     if "RWY" in b and ("CLSD" in b or "OUT OF SERVICE" in b):  return "RWY"
     if "TWY" in b and "CLSD" in b: return "TWY"
@@ -118,6 +119,37 @@ def _notam_keyword(body: str) -> str:
     return "GEN"
 
 
+# aviationapi.com keys responses sometimes by the ICAO code, sometimes by the
+# FAA 3-letter form. Build the list of candidate request/response keys for a
+# given input — e.g. KSFO yields [("KSFO","KSFO"), ("KSFO","SFO"), ("SFO","SFO")].
+def _notam_request_variants(code: str) -> list[tuple[str, str]]:
+    code = code.upper()
+    stripped = code.lstrip("K") if len(code) == 4 and code.startswith("K") else code
+    variants: list[tuple[str, str]] = [(code, code)]
+    if stripped != code:
+        variants.append((code, stripped))
+        variants.append((stripped, stripped))
+    return variants
+
+
+def _extract_notams_list(raw, response_key: str) -> list:
+    """Pull the notam list out of aviationapi.com's response, which varies."""
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, dict):
+        # Try the response_key we expect, then any case variant, then the
+        # first list-valued entry — aviationapi has moved the key around.
+        if isinstance(raw.get(response_key), list):
+            return raw[response_key]
+        for k, v in raw.items():
+            if isinstance(v, list) and k.upper().endswith(response_key.upper()):
+                return v
+        for v in raw.values():
+            if isinstance(v, list):
+                return v
+    return []
+
+
 @router.get("/api/notam/{airport_code}")
 async def get_notam(airport_code: str):
     code = airport_code.upper()
@@ -125,28 +157,71 @@ async def get_notam(airport_code: str):
     if cached and (time.time() - cached["fetched_at"]) < _SHORT_TTL:
         return cached["data"]
 
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(
-                "https://api.aviationapi.com/v1/notams",
-                params={"apt": code},
-                headers={"Accept": "application/json"},
-            )
-            raw = resp.json()
-    except Exception as exc:
-        return {"error": str(exc), "notams": []}
+    notams_raw: list = []
+    last_error: str | None = None
+    chosen_variant: tuple[str, str] | None = None
 
-    if isinstance(raw, dict):
-        notams_raw = raw.get(code, raw.get(code.lstrip("K"), []))
-    elif isinstance(raw, list):
-        notams_raw = raw
-    else:
-        notams_raw = []
+    # A real browser UA — aviationapi.com periodically Cloudflares default UAs.
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "Readback/1.0 (+https://github.com/) httpx",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10, headers=headers) as client:
+            for request_code, response_key in _notam_request_variants(code):
+                try:
+                    resp = await client.get(
+                        "https://api.aviationapi.com/v1/notams",
+                        params={"apt": request_code},
+                    )
+                    if resp.status_code >= 400:
+                        last_error = f"HTTP {resp.status_code} for apt={request_code}"
+                        print(f"[NOTAM] {code}: {last_error}", flush=True)
+                        continue
+                    raw = resp.json()
+                except Exception as exc:
+                    last_error = f"{type(exc).__name__}: {exc}"
+                    print(f"[NOTAM] {code}: request apt={request_code} failed: {last_error}", flush=True)
+                    continue
+
+                candidate = _extract_notams_list(raw, response_key)
+                if candidate:
+                    notams_raw = candidate
+                    chosen_variant = (request_code, response_key)
+                    break
+    except Exception as exc:
+        # Outer guard for client construction etc.
+        return {"error": f"{type(exc).__name__}: {exc}", "notams": []}
+
+    if not notams_raw and last_error:
+        # No variant produced rows AND we hit a real error — surface it.
+        # Don't cache, so the next request retries.
+        return {"error": last_error, "notams": []}
+
+    if chosen_variant:
+        print(f"[NOTAM] {code}: {len(notams_raw)} row(s) via apt={chosen_variant[0]}", flush=True)
+    elif not notams_raw:
+        # Successful upstream but empty for every variant — that's a real
+        # "no NOTAMs" (or this airport isn't in aviationapi's coverage).
+        # Cache so we don't hammer for an empty answer, but the UI can
+        # disambiguate from a fetch failure via response shape.
+        print(f"[NOTAM] {code}: upstream returned empty for every variant", flush=True)
 
     notams = []
     for n in (notams_raw or []):
-        body = n.get("body") or n.get("text") or n.get("notam_body") or ""
-        kw   = _notam_keyword(body)
+        # aviationapi has churned through several body field names over the
+        # years — try every one we've seen.
+        body = (
+            n.get("body")
+            or n.get("text")
+            or n.get("notam_body")
+            or n.get("summary")
+            or n.get("text_full")
+            or n.get("notam_text")
+            or ""
+        )
+        kw = _notam_keyword(body)
         notams.append({
             "id":       n.get("notam_number") or n.get("notam_id") or "—",
             "body":     body,

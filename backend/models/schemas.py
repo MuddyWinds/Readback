@@ -1,7 +1,14 @@
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
+
+
+def _iso_utc(dt: datetime) -> str:
+    """Serialize naive-UTC datetimes with a trailing ``Z`` so downstream
+    JavaScript clients don't have to second-guess timezone semantics."""
+    iso = dt.isoformat()
+    return iso if iso.endswith("Z") else iso + "Z"
 
 
 class HFACSLevel1(str, Enum):
@@ -89,3 +96,7 @@ class AnalysisResult(BaseModel):
     summary: str
     confidence_score: float  # 0.0 - 1.0
     enrichment: Optional[dict] = None     # speaker_segments, readback comparison, callsign clarity
+
+    @field_serializer("timestamp")
+    def _serialize_timestamp(self, value: datetime) -> str:
+        return _iso_utc(value)

@@ -3,6 +3,7 @@ import { useSettings } from "../../SettingsContext";
 import type { AnalysisResult } from "../../lib/types";
 import { useAdsb, useAdsbSnapshot } from "../../lib/queries";
 import { detectConflicts, AdsbAircraft } from "../../lib/conflicts";
+import { callsignsMatch } from "../../lib/callsign";
 import styles from "./PositionSnapshot.module.css";
 
 // Workload color token — 4 tiers mapped to existing theme tokens (no hex)
@@ -20,6 +21,11 @@ function workloadLabel(airborneCount: number): string {
   return "Low";
 }
 
+// Anything older than this is no longer fairly represented by *current* live
+// ADS-B — at 6 hours the air picture has churned multiple times. We still
+// show the sector but flag that it's "now" and not "at transmission time".
+const LIVE_FALLBACK_HORIZON_MS = 30 * 60 * 1000;
+
 // ─── ADS-B position snapshot — fetches live data per-airport ──────────────────
 export function PositionSnapshot({
   r, callsign, confidence, borderColor,
@@ -27,19 +33,28 @@ export function PositionSnapshot({
   const { geo } = useSettings();
   const snapshot = useAdsbSnapshot(r.id);
   const snapshotData = snapshot.data;
-  const shouldFetchLive =
+  const snapshotMissing =
     !r.id || snapshot.isError || Boolean(snapshotData?.error) || (snapshot.isSuccess && !snapshotData?.aircraft);
+
+  // Only fall back to live ADS-B when the row is recent enough that "now"
+  // still resembles the moment we analysed. For older rows the previous
+  // implementation showed *current* traffic with a "⚡ current" badge, which
+  // misled reviewers into thinking it was contemporaneous.
+  const tsMs = new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z").getTime();
+  const ageMs = Date.now() - tsMs;
+  const recentEnoughForLive = Number.isFinite(ageMs) && ageMs <= LIVE_FALLBACK_HORIZON_MS;
+  const shouldFetchLive = snapshotMissing && recentEnoughForLive;
+
   const live = useAdsb(shouldFetchLive ? r.airport_code : "");
-  const aircraft = (shouldFetchLive ? live.data?.aircraft : snapshotData?.aircraft) as AdsbAircraft[] | null | undefined;
+  const aircraft = (snapshotMissing ? (shouldFetchLive ? live.data?.aircraft : null) : snapshotData?.aircraft) as
+    AdsbAircraft[] | null | undefined;
   const loading = (r.id && snapshot.isLoading) || (shouldFetchLive && live.isLoading);
   const err = shouldFetchLive && live.isError ? "Could not fetch ADS-B data" : null;
-  const dataSource: "snapshot" | "live" | null = aircraft
-    ? (shouldFetchLive ? "live" : "snapshot")
-    : null;
+  const dataSource: "snapshot" | "live" | "unavailable" | null = aircraft
+    ? (snapshotMissing ? "live" : "snapshot")
+    : (snapshotMissing && !recentEnoughForLive ? "unavailable" : null);
 
-  const matched = aircraft?.find(a =>
-    callsign && a.callsign && a.callsign.replace(/\s/g, "") === callsign.replace(/\s/g, "")
-  ) ?? null;
+  const matched = aircraft?.find(a => callsignsMatch(a.callsign, callsign)) ?? null;
 
   // Derive human-readable flight phase from ADS-B state
   const flightPhase = (a: AdsbAircraft): { label: string; detail: string } => {
@@ -54,11 +69,12 @@ export function PositionSnapshot({
     return { label: "En-route", detail: `FL${Math.round(altFt / 100)} · ${spdKt ?? "—"} kt` };
   };
 
+  const airportGeo = geo[r.airport_code] ?? null;
+
   const distNmFromAirport = (a: AdsbAircraft): number | null => {
-    const g = geo[r.airport_code];
-    if (!g || a.latitude == null || a.longitude == null) return null;
-    const dlat = (a.latitude - g[0]) * 60;
-    const dlon = (a.longitude - g[1]) * 60 * Math.cos(g[0] * Math.PI / 180);
+    if (!airportGeo || a.latitude == null || a.longitude == null) return null;
+    const dlat = (a.latitude - airportGeo[0]) * 60;
+    const dlon = (a.longitude - airportGeo[1]) * 60 * Math.cos(airportGeo[0] * Math.PI / 180);
     return Math.round(Math.sqrt(dlat*dlat + dlon*dlon) * 10) / 10;
   };
 
@@ -81,10 +97,14 @@ export function PositionSnapshot({
         {callsign && confidence === "low" && (
           <span className={styles.phoneticMatch}>⚠ phonetic match</span>
         )}
-        {dataSource && (
-          <span className={dataSource === "snapshot" ? styles.dataSourceSnapshot : styles.dataSourceLive}>
-            {dataSource === "snapshot" ? "⏱ at transmission time" : "⚡ current"}
-          </span>
+        {dataSource === "snapshot" && (
+          <span className={styles.dataSourceSnapshot}>⏱ at transmission time</span>
+        )}
+        {dataSource === "live" && (
+          <span className={styles.dataSourceLive}>⚡ current sector (snapshot unavailable)</span>
+        )}
+        {dataSource === "unavailable" && (
+          <span className={styles.staleSnapshotHint}>snapshot unavailable — too old to show live</span>
         )}
         <span className={styles.timestamp}>
           {new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z").toISOString().slice(11, 19)}Z
@@ -96,7 +116,12 @@ export function PositionSnapshot({
 
       {!loading && !err && aircraft && (() => {
         const airborne  = aircraft.filter(a => !a.on_ground);
-        const conflicts = detectConflicts(aircraft);
+        const conflicts = airportGeo
+          ? detectConflicts(aircraft, {
+              airport: { lat: airportGeo[0], lon: airportGeo[1] },
+              subjectCallsign: callsign,
+            })
+          : [];
         const wlToken   = workloadToken(airborne.length);
         const wlLabel   = workloadLabel(airborne.length);
 
@@ -152,24 +177,38 @@ export function PositionSnapshot({
               </div>
             )}
 
-            {/* ── Separation alerts ── */}
-            {conflicts.map((c, i) => {
-              const isSepLoss = c.level === "SEPARATION LOSS";
-              return (
-                <div
-                  key={i}
-                  className={`${styles.conflictRow} ${isSepLoss ? styles.conflictSepLoss : styles.conflictProxAlert}`}
-                >
-                  <span className={isSepLoss ? styles.conflictLevelSepLoss : styles.conflictLevelProx}>
-                    {c.level}
-                  </span>
-                  <span className={styles.conflictCallsigns}>{c.callA} ↔ {c.callB}</span>
-                  <span className={styles.conflictDist}>
-                    {c.distNm.toFixed(1)} nm · Δ{Math.round(c.altDiffFt)} ft
-                  </span>
+            {/* ── Separation alerts ── only pairs involving the subject when known;
+                  otherwise nothing (the old "show every pair in the bbox" UX
+                  attached unrelated traffic to a card about one callsign). */}
+            {conflicts.length > 0 && (
+              <>
+                <div className={styles.conflictsHeader}>
+                  {callsign
+                    ? `Proximity involving ${callsign}`
+                    : "Proximity in terminal area"}
                 </div>
-              );
-            })}
+                {conflicts.map((c, i) => {
+                  const isSepLoss = c.level === "SEPARATION LOSS";
+                  return (
+                    <div
+                      key={i}
+                      className={`${styles.conflictRow} ${isSepLoss ? styles.conflictSepLoss : styles.conflictProxAlert}`}
+                    >
+                      <span className={isSepLoss ? styles.conflictLevelSepLoss : styles.conflictLevelProx}>
+                        {c.level}
+                      </span>
+                      <span className={styles.subjectVsLabel}>
+                        {c.involvesSubject ? "Subject" : ""}
+                      </span>
+                      <span className={styles.conflictCallsigns}>{c.callA} vs {c.callB}</span>
+                      <span className={styles.conflictDist}>
+                        {c.distNm.toFixed(1)} nm · Δ{Math.round(c.altDiffFt)} ft
+                      </span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
           </div>
         );
       })()}

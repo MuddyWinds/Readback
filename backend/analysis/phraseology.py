@@ -362,14 +362,31 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
                 except Exception:
                     continue
 
+        # The LLM occasionally emits arrays / numbers / objects for
+        # callsign_detected despite the prompt asking for a string. Coerce
+        # at the persistence boundary so every consumer sees ``str | None``.
+        raw_callsign = entry.get("callsign_detected")
+        if isinstance(raw_callsign, str):
+            callsign_detected = raw_callsign.strip() or None
+        elif isinstance(raw_callsign, (list, tuple)) and raw_callsign and isinstance(raw_callsign[0], str):
+            callsign_detected = raw_callsign[0].strip() or None
+        else:
+            callsign_detected = None
+
+        raw_clarity = entry.get("callsign_clarity", 0)
+        try:
+            callsign_clarity = int(raw_clarity)
+        except (TypeError, ValueError):
+            callsign_clarity = 0
+
         enrichment = {
             "speaker_segments":      entry.get("speaker_segments") or [],
             "atc_instruction":       entry.get("atc_instruction"),
             "pilot_readback":        entry.get("pilot_readback"),
             "readback_correct":      entry.get("readback_correct"),
             "readback_discrepancy":  entry.get("readback_discrepancy"),
-            "callsign_detected":     entry.get("callsign_detected"),
-            "callsign_clarity":      entry.get("callsign_clarity", 0),
+            "callsign_detected":     callsign_detected,
+            "callsign_clarity":      callsign_clarity,
         }
 
         results.append(AnalysisResult(

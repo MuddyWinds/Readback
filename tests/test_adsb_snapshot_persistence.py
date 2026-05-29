@@ -82,7 +82,9 @@ async def test_snapshot_survives_into_a_fresh_session(monkeypatch, tmp_path):
         await engine.dispose()
 
     assert snap["airport"] == "KJFK"
-    assert snap["captured_at"] == "2026-05-20T01:00:00"
+    # `captured_at` is serialized as ISO-UTC with a trailing Z so JS clients
+    # don't have to second-guess timezone semantics.
+    assert snap["captured_at"] == "2026-05-20T01:00:00Z"
     assert snap["aircraft"] == aircraft
 
 

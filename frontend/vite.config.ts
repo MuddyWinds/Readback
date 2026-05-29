@@ -15,6 +15,23 @@ export default defineConfig({
   build: {
     outDir: "build",
     sourcemap: false,
+    // recharts alone is ~524 kB un-minified (~150 kB gzipped). We accept that
+    // size here because it's a known cost of the analytics charts and the lib
+    // is split into its own cache-friendly vendor chunk below. A previous
+    // attempt to lazy-load AirportAnalytics via React.lazy crashed the
+    // sidebar on chunk-resolution failures (see git history); revisit with a
+    // proper ErrorBoundary if/when bundle size matters more.
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        // Split the two heaviest libs into their own vendor chunks so
+        // browser/CDN cache survives app-only redeploys.
+        manualChunks: {
+          leaflet: ["leaflet"],
+          recharts: ["recharts"],
+        },
+      },
+    },
   },
   test: {
     environment: "jsdom",

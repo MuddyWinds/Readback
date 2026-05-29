@@ -1,4 +1,5 @@
 import type { AnalysisResult } from "./types";
+import { normalizeCallsign } from "./callsign";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -88,11 +89,12 @@ export function buildMonitorIndex(
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   for (const r of airportResults) {
-    // Try enrichment callsign first, then regex fallback
-    const cs = (
-      r.enrichment?.callsign_detected ??
-      r.transcript?.toUpperCase().match(/\b([A-Z]{2,3}\d{1,4}[A-Z]?|N\d{4,5}[A-Z]{0,2})\b/)?.[1]
-    )?.toUpperCase().trim();
+    // Try enrichment callsign first, then regex fallback. `normalizeCallsign`
+    // also handles the case where the LLM emitted an array/number/object —
+    // those return null and we fall through to the regex.
+    const enrichmentCs = normalizeCallsign(r.enrichment?.callsign_detected as unknown as string | null | undefined);
+    const regexHit = r.transcript?.toUpperCase().match(/\b([A-Z]{2,3}\d{1,4}[A-Z]?|N\d{4,5}[A-Z]{0,2})\b/)?.[1];
+    const cs = enrichmentCs ?? normalizeCallsign(regexHit);
     if (!cs) continue;
     if (idx.has(cs)) continue; // keep newest
     const topObservation = (r.observations ?? [])[0];
@@ -118,7 +120,11 @@ export function processAdsb(
       const lon     = a.longitude!;
       const altFt   = a.altitude_m  != null ? Math.round(a.altitude_m  * 3.28084) : null;
       const speedKt = a.velocity_ms != null ? Math.round(a.velocity_ms * 1.94384) : null;
-      const cs      = (a.callsign ?? a.icao24 ?? "?").trim().toUpperCase();
+      // Normalize the ADS-B callsign so it matches our monitorIdx keys —
+      // OpenSky sometimes returns the zero-padded form ("AAL0123") while the
+      // monitorIdx is keyed by the normalized form ("AAL123").
+      const rawCs   = (a.callsign ?? a.icao24 ?? "?").trim().toUpperCase();
+      const cs      = normalizeCallsign(rawCs) ?? rawCs;
       const match   = monitorIdx.get(cs);
       return {
         id:        a.icao24,

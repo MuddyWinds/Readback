@@ -26,7 +26,7 @@ from backend.core.state import (
     utc_now_naive,
 )
 from backend.db.database import AsyncSessionLocal
-from backend.db.models import AnalysisResultDB, TranscriptChunkDB
+from backend.db.models import AnalysisResultDB
 from backend.analysis.phraseology import analyze_batch
 from backend.ingestion.audio_stream import stream_audio_chunks
 from backend.ingestion.silence_gate import should_transcribe
@@ -35,22 +35,6 @@ from backend.models.schemas import AnalysisResult
 
 BATCH_INTERVAL_SECONDS = 300  # flush to Gemini every 5 minutes
 IDLE_POLL_SECONDS = 30        # while waiting for first transcripts, check more often
-
-_NOTABLE_KEYWORDS = [
-    "mayday", "pan pan", "emergency", "declare",
-    "go around", "go-around", "missed approach", "abort", "rejected takeoff",
-    "runway incursion", "stop stop stop", "hold position", "cancel takeoff",
-    "cleared to land", "cleared for takeoff",
-    "altitude", "leaving", "unable", "negative", "say again", "correction",
-    "traffic alert", "tcas", "resolution advisory",
-    "minimum fuel", "fuel emergency", "engine",
-]
-
-
-def _needs_analysis(transcript: str) -> bool:
-    t = transcript.lower()
-    return any(kw in t for kw in _NOTABLE_KEYWORDS)
-
 
 def _batch_interval() -> int:
     return current_runtime().batch_interval_seconds or BATCH_INTERVAL_SECONDS
@@ -120,21 +104,16 @@ async def _persist_batch(
     pairs: list[tuple[dict, AnalysisResult]],
     batch_adsb: dict[str, list],
 ) -> None:
-    """Write all results to the configured database and broadcast each one via WebSocket."""
+    """Write all results to the configured database, then broadcast each one via WebSocket.
+
+    Broadcasting only happens after the transaction commits successfully —
+    otherwise clients could receive an ``id`` that gets rolled back, and any
+    later PATCH against it would 404.
+    """
+    broadcast_payloads: list[dict] = []
     async with AsyncSessionLocal() as session:
         for item, result in pairs:
-            chunk_row = TranscriptChunkDB(
-                timestamp=result.timestamp,
-                airport_code=result.airport_code,
-                feed_url="",
-                raw_text=item["transcript"],
-                duration_seconds=settings.CHUNK_DURATION_SECONDS,
-            )
-            session.add(chunk_row)
-            await session.flush()
-
             result_row = AnalysisResultDB(
-                chunk_id=chunk_row.id,
                 timestamp=result.timestamp,
                 airport_code=result.airport_code,
                 transcript=item["transcript"],
@@ -152,16 +131,19 @@ async def _persist_batch(
             if result.airport_code in batch_adsb:
                 result_row.adsb_snapshot = {
                     "airport": result.airport_code,
-                    "captured_at": result.timestamp.isoformat(),
+                    "captured_at": result.timestamp.isoformat() + "Z",
                     "aircraft": batch_adsb[result.airport_code],
                 }
 
-            await broadcast({
+            broadcast_payloads.append({
                 "type": "analysis",
                 "data": {**result.model_dump(mode="json"), "id": result_row.id, "status": "new"},
             })
 
         await session.commit()
+
+    for payload in broadcast_payloads:
+        await broadcast(payload)
 
 
 async def run_batcher() -> None:

@@ -4,16 +4,10 @@ from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
-
-class TranscriptChunkDB(Base):
-    __tablename__ = "transcript_chunks"
-
-    id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
-    airport_code = Column(String(10), index=True)
-    feed_url = Column(String(500))
-    raw_text = Column(Text)
-    duration_seconds = Column(Integer)
+# Historical note: ``transcript_chunks`` used to mirror raw_text for every
+# AnalysisResult — pure write amplification with no reader. The model was
+# removed; the table is left in older databases as orphaned cruft (harmless)
+# and fresh installs simply don't create it.
 
 
 class AnalysisResultDB(Base):

@@ -20,16 +20,42 @@ router = APIRouter()
 _VALID_STATUSES = {"new", "under_review", "confirmed", "false_positive"}
 
 
+def _iso_utc(dt) -> str:
+    """Mirror of schemas._iso_utc — stored timestamps are naive UTC; emit Z."""
+    if dt is None:
+        return None  # type: ignore[return-value]
+    iso = dt.isoformat()
+    return iso if iso.endswith("Z") else iso + "Z"
+
+
+def _safe_observations(raw) -> list[dict]:
+    """Drop observations that don't fit the current schema.
+
+    Historically the read path did ``[Observation(**v) for v in raw]`` and
+    raised on the first stray row from a since-changed Gemini emission —
+    poisoning ``/api/stats`` for the entire batch. Skip the bad ones instead.
+    """
+    out: list[dict] = []
+    for v in (raw or []):
+        if not isinstance(v, dict):
+            continue
+        try:
+            out.append(Observation(**v).model_dump())
+        except Exception:
+            continue
+    return out
+
+
 def _row_to_dict(r: AnalysisResultDB) -> dict:
     return {
         "id": r.id,
-        "timestamp": r.timestamp.isoformat(),
+        "timestamp": _iso_utc(r.timestamp),
         "airport_code": r.airport_code,
         "transcript": r.transcript,
         "assessable": r.assessable if r.assessable is not None else True,
         "assessable_confidence": r.assessable_confidence or 1.0,
         "is_standard": r.is_standard,
-        "observations": r.observations,
+        "observations": _safe_observations(r.observations),
         "summary": r.summary,
         "confidence_score": r.confidence_score,
         "enrichment": r.enrichment,
@@ -39,6 +65,14 @@ def _row_to_dict(r: AnalysisResultDB) -> dict:
 
 
 def _row_to_analysis_result(r: AnalysisResultDB) -> AnalysisResult:
+    safe_observations = []
+    for v in (r.observations or []):
+        if not isinstance(v, dict):
+            continue
+        try:
+            safe_observations.append(Observation(**v))
+        except Exception:
+            continue
     return AnalysisResult(
         timestamp=r.timestamp,
         airport_code=r.airport_code,
@@ -46,7 +80,7 @@ def _row_to_analysis_result(r: AnalysisResultDB) -> AnalysisResult:
         assessable=r.assessable if r.assessable is not None else True,
         assessable_confidence=r.assessable_confidence if r.assessable_confidence is not None else 1.0,
         is_standard=r.is_standard,
-        observations=[Observation(**v) for v in (r.observations or [])],
+        observations=safe_observations,
         summary=r.summary,
         confidence_score=r.confidence_score,
     )
