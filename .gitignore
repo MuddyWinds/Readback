@@ -21,6 +21,10 @@ frontend/node_modules/
 *.db.*.bak
 *.sqlite3.*.bak
 
+# Database dumps/backups (from scripts/db_export.sh) — data, never commit
+backups/
+*.sql
+
 # OS
 .DS_Store
 

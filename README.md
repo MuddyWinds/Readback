@@ -120,7 +120,7 @@ LiveATC Stream (MP3)
 You need just two things to begin:
 
 - A free [**Gemini API key**](https://aistudio.google.com/app/apikey) (the free tier is plenty).
-- Either **Docker**, *or* **Node + Python** — pick whichever path you prefer below.
+- A runtime: **Docker** (simplest), or **Node + Python** from source — pick a path below.
 
 First, clone the repo and add your key:
 
@@ -150,21 +150,23 @@ docker compose up
 
 Open **http://localhost:3000** and jump to [First run](#first-run-configure-a-feed).
 
-### Option B — Node + Python (no Docker)
+### Option B — Run from source (database in Docker)
 
-Best if you'd rather not use Docker, or you're developing. You run three pieces — a
-database, the backend, and the frontend — by hand. For the database the lightest option
-is **SQLite**: a single local file, nothing to install or manage.
+Best if you'd rather run the backend and frontend from source while developing. The
+**backend and frontend run natively**; only the **database** stays in Docker — a single
+lightweight Postgres container so your data persists in one place and matches Option A
+exactly. (Don't mix this with SQLite — see the note below — or your records will split
+across two separate databases. Want *zero* Docker? See [Option C](#option-c--fully-docker-free-native-postgres).)
 
 Install **Node 18+**, **Python 3.11+**, and **ffmpeg** (`brew install ffmpeg` on Mac,
 `apt install ffmpeg` on Linux). Then, from the repo root:
 
 ```bash
-# Terminal 1 — backend (SQLite, no database server needed)
+# Terminal 1 — backend (reads DATABASE_URL from .env → Postgres on localhost:5432)
+docker compose up -d db
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt aiosqlite
-DATABASE_URL="sqlite+aiosqlite:///./readback.db" \
-  .venv/bin/uvicorn backend.main:app --port 8000 --reload
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m uvicorn backend.main:app --port 8000 --reload
 ```
 
 ```bash
@@ -176,9 +178,76 @@ npm run dev
 
 Open **http://localhost:3000**.
 
-> **Prefer Postgres locally?** Start just the database with `docker compose up db` (or use
-> any Postgres you already have) and drop the `DATABASE_URL=sqlite…` line — the backend
-> then falls back to its default, `postgresql://atc:atc@localhost:5432/atcmonitor`.
+> **Don't pass a `DATABASE_URL=` override here.** Without it the backend uses the value in
+> `.env` (`postgresql://atc:atc@localhost:5432/atcmonitor`, auto-upgraded to the async
+> driver), so it always reads and writes the same Postgres data. Prepending a
+> `DATABASE_URL="sqlite+aiosqlite:///./readback.db"` would point it at a *separate, empty*
+> SQLite file and your existing threads would appear to vanish.
+
+> **Really want a server-less SQLite file instead?** Install the extra driver and pass the
+> override explicitly — but commit to it, because SQLite and Postgres never share data:
+> `.venv/bin/pip install aiosqlite` then run with
+> `DATABASE_URL="sqlite+aiosqlite:///./readback.db" .venv/bin/python -m uvicorn backend.main:app --port 8000 --reload`.
+
+### Option C — Fully Docker-free (native Postgres)
+
+For zero Docker at all, run Postgres natively. The trade-off: a native install is a
+**separate, empty database** from the Docker volume, so if you already have data in Docker
+(Option A/B) you must migrate it once — otherwise you start fresh.
+
+Install **Node 18+**, **Python 3.11+**, **ffmpeg**, and **Postgres 16**
+(`brew install postgresql@16 ffmpeg` on Mac). Then create the database and role to match
+the project's default `DATABASE_URL`:
+
+```bash
+# One-time: create the atc role + atcmonitor database
+brew services start postgresql@16
+createuser -s atc 2>/dev/null; psql -d postgres -c "ALTER USER atc WITH PASSWORD 'atc';"
+createdb -O atc atcmonitor
+```
+
+```bash
+# Terminal 1 — backend (no Docker; uses .env → postgresql://atc:atc@localhost:5432/atcmonitor)
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m uvicorn backend.main:app --port 8000 --reload
+```
+
+Run the frontend exactly as in Option B (Terminal 2). The schema is created automatically
+on first backend start.
+
+> **Already have data in the Docker volume?** Migrate it once with the helper scripts
+> ([details below](#moving-data-between-databases)):
+> ```bash
+> docker compose up -d db              # start the Docker DB
+> scripts/db_export.sh                 # → backups/readback_<timestamp>.sql
+> docker compose down                  # free port 5432
+> brew services start postgresql@16
+> scripts/db_import.sh backups/readback_*.sql   # load into native Postgres
+> ```
+> Only **one** Postgres can bind port 5432 at a time, so stop the Docker DB before starting
+> the native one (and vice versa).
+
+### Moving data between databases
+
+Your records live in whichever Postgres `DATABASE_URL` points at — there is no automatic
+sync between a Docker and a native install. To move them, use the two helper scripts (both
+read `DATABASE_URL`, strip any `+driver` suffix, and fall back to the `readback-db-1`
+container when no local `pg_dump`/`psql` is installed):
+
+```bash
+# Export the current database to a timestamped dump in backups/
+scripts/db_export.sh [output_file]
+
+# Restore a dump into the database DATABASE_URL points at.
+# Refuses to run if the target already has rows (pass --force to merge anyway).
+scripts/db_import.sh <dump_file> [--force]
+```
+
+`db_export.sh` doubles as a backup tool; `db_import.sh` is the safe way to seed a fresh
+database (e.g. when switching to [Option C](#option-c--fully-docker-free-native-postgres)).
+Always restore into an **empty** database — `pg_dump` preserves the ID sequence, so new
+rows continue past your existing IDs without collisions.
 
 ### First run: configure a feed
 
