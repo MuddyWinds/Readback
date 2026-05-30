@@ -13,7 +13,7 @@
 
 .value {
   color: var(--text, #e6edf3);
-  font-family: "SF Mono", "Fira Code", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
 }

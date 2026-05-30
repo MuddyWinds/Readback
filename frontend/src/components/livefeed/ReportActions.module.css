@@ -16,7 +16,7 @@
 }
 
 .copyBtn {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-dim);
   background: none;
   border: 1px solid var(--border);
@@ -30,7 +30,7 @@
 }
 
 .pasteNote {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--sev-unassessable-border);
   font-style: italic;
 }

@@ -66,6 +66,15 @@
   justify-content: space-between;
   width: 100%;
 }
+/* Comfortable touch targets for the dense period pills on mobile (WCAG 2.5.8) */
+.periodRowMobile .period,
+.periodRowMobile .periodActive {
+  min-height: 36px;
+  padding: 8px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 
 .period {
   background: none;

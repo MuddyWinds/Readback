@@ -13,8 +13,8 @@
   border-radius: 4px;
   color: var(--text-dim, #8b949e);
   cursor: pointer;
-  font-family: monospace;
-  font-size: 9px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   padding: 3px 8px;
 }
 
@@ -24,8 +24,8 @@
   border-radius: 4px;
   color: var(--sev-standard, #3fb950);
   cursor: pointer;
-  font-family: monospace;
-  font-size: 9px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   margin-left: auto;
   padding: 3px 8px;
 }
@@ -110,8 +110,8 @@
 
 .legendLabel {
   color: var(--text-dim, #8b949e);
-  font-family: monospace;
-  font-size: 9px;
+  font-family: var(--font-mono);
+  font-size: 11px;
 }
 
 /* Per-phase colours for legend dots */

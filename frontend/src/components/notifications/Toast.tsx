@@ -14,8 +14,20 @@ function Toast({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: number)
   // The main action is a real <button> (native Enter/Space, no preventDefault
   // hacks). The close control is a *sibling*, not nested inside it, so there are
   // no nested interactive elements.
+  //
+  // Announce each toast to assistive tech as it mounts. High/critical events use
+  // role="alert" (assertive — interrupts), lower severities use role="status"
+  // (polite). Putting the live semantics on each toast (rather than the stack)
+  // is what makes screen readers read newly-inserted alerts.
+  const assertive = toast.severity === "high" || toast.severity === "critical";
   return (
-    <div className={styles.toast} style={{ ["--accent" as any]: `var(--sev-${toast.severity})` }}>
+    <div
+      className={styles.toast}
+      role={assertive ? "alert" : "status"}
+      aria-live={assertive ? "assertive" : "polite"}
+      aria-atomic="true"
+      style={{ ["--accent" as any]: `var(--sev-${toast.severity})` }}
+    >
       <button
         type="button"
         className={styles.main}

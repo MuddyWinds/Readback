@@ -20,7 +20,7 @@
   color: var(--text-ghost);
   padding: 2px 9px;
   border-radius: 12px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
   flex-shrink: 0;
@@ -41,7 +41,7 @@
 }
 
 .confBadge {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-faint);
   background: var(--surface);
   border: 1px solid var(--surface-2);
@@ -57,7 +57,7 @@
 }
 
 .chevron {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--sev-unassessable-border);
 }
 
@@ -70,7 +70,7 @@
 }
 
 .reasonLabel {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-faint);
   letter-spacing: 1.2px;
@@ -91,7 +91,7 @@
 }
 
 .transcriptLabel {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-faint);
   letter-spacing: 1.2px;
@@ -105,7 +105,7 @@
   border-radius: 6px;
   padding: 10px 14px;
   font-size: 12px;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   color: var(--text-ghost);
   line-height: 1.75;
   white-space: pre-wrap;

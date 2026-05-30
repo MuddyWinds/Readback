@@ -117,58 +117,131 @@ LiveATC Stream (MP3)
 
 ## Quick Start
 
-### Prerequisites
+You need just two things to begin:
 
-- Docker + Docker Compose (Docker Desktop must be **running** before `docker compose up`)
-- [Gemini API key](https://aistudio.google.com/app/apikey) (free tier works)
-- `ffmpeg` — **only for the local-dev path below**; the Docker image already includes it. Install with `brew install ffmpeg` (Mac) or `apt install ffmpeg` (Linux)
+- A free [**Gemini API key**](https://aistudio.google.com/app/apikey) (the free tier is plenty).
+- Either **Docker**, *or* **Node + Python** — pick whichever path you prefer below.
 
-### 1. Clone and configure
+First, clone the repo and add your key:
 
 ```bash
 git clone https://github.com/MuddyWinds/Readback.git
 cd Readback
-cp .env.example .env
+cp .env.example .env          # then open .env and paste your Gemini key
 ```
 
-Edit `.env` and set:
-
 ```env
+# .env — the only required setting
 GEMINI_API_KEY=your_key_here
 ```
 
-### 2. Run with Docker
+Now choose **one** of the two paths.
+
+### Option A — Docker (recommended)
+
+The simplest way to run everything. Docker starts the database, backend, and frontend
+together — one command, nothing else to install.
+
+> Make sure **Docker Desktop is running** first.
 
 ```bash
 docker compose up
 ```
 
-Open `http://localhost:3000` — the dashboard loads automatically.
+Open **http://localhost:3000** and jump to [First run](#first-run-configure-a-feed).
 
-### 3. Configure feeds and start monitoring
+### Option B — Node + Python (no Docker)
+
+Best if you'd rather not use Docker, or you're developing. You run three pieces — a
+database, the backend, and the frontend — by hand. For the database the lightest option
+is **SQLite**: a single local file, nothing to install or manage.
+
+Install **Node 18+**, **Python 3.11+**, and **ffmpeg** (`brew install ffmpeg` on Mac,
+`apt install ffmpeg` on Linux). Then, from the repo root:
+
+```bash
+# Terminal 1 — backend (SQLite, no database server needed)
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt aiosqlite
+DATABASE_URL="sqlite+aiosqlite:///./readback.db" \
+  .venv/bin/uvicorn backend.main:app --port 8000 --reload
+```
+
+```bash
+# Terminal 2 — frontend
+cd frontend
+npm install
+npm run dev
+```
+
+Open **http://localhost:3000**.
+
+> **Prefer Postgres locally?** Start just the database with `docker compose up db` (or use
+> any Postgres you already have) and drop the `DATABASE_URL=sqlite…` line — the backend
+> then falls back to its default, `postgresql://atc:atc@localhost:5432/atcmonitor`.
+
+### First run: configure a feed
 
 On first launch the app opens the **Settings** tab automatically (it detects that no
-feeds are configured yet). Add one or more LiveATC feed URLs — each with an airport
-code — and save. Then switch to the **Live** tab and click **▶ Start All** to begin
-monitoring every configured feed at once.
+feeds are configured yet). Add one or more LiveATC feeds — each with an airport code —
+and save. Then switch to the **Live** tab and click **▶ Start All** to begin monitoring.
 
 You can paste either a LiveATC **stream URL** (`audio.liveatc.net/<mount>`) or the
 **listen-page link** from your browser (e.g.
-`https://www.liveatc.net/hlisten.php?mount=vhhh5&icao=vhhh`) - click **Verify** and it is
+`https://www.liveatc.net/hlisten.php?mount=vhhh5&icao=vhhh`) — click **Verify** and it is
 converted to a working stream URL with the airport code filled in. Coordinates, runways,
 the map marker, ADS-B correlation, hazards, and weather then resolve automatically for
-**any operational fixed-wing ICAO airport worldwide** - the airports listed below are just
+**any operational fixed-wing ICAO airport worldwide** — the airports listed below are just
 convenient starting points.
 
-Or drive it via API:
+Prefer the command line? You can drive monitoring through the API instead:
 
 ```bash
-# Start KSFO tower feed
+# Start a feed
 curl -X POST "http://localhost:8000/api/monitor/start?feed_url=http://feeds.liveatc.net/ksfo&airport_code=KSFO"
 
-# Stop monitoring
+# Stop it
 curl -X POST "http://localhost:8000/api/monitor/stop?airport_code=KSFO"
 ```
+
+### View it on your phone (same Wi-Fi)
+
+Yes — you can keep your **laptop as the server** and open the dashboard on your **phone**,
+as long as both are on the **same Wi-Fi network**. The dashboard is just a web page that
+your laptop serves; the phone is only a viewer.
+
+Two small settings let the phone's browser reach your laptop (instead of looking for the
+backend on the phone itself):
+
+1. **Find your laptop's local IP address** — say it's `192.168.1.42`:
+
+   ```bash
+   ipconfig getifaddr en0          # macOS (Wi-Fi)
+   hostname -I | awk '{print $1}'  # Linux
+   ```
+
+2. **Point the frontend at that IP, and allow it through CORS.** In `.env`:
+
+   ```env
+   ALLOWED_ORIGINS=http://localhost:3000,http://192.168.1.42:3000
+   ```
+
+   In `frontend/.env.development`:
+
+   ```env
+   VITE_API_BASE=http://192.168.1.42:8000
+   VITE_WS_URL=ws://192.168.1.42:8000/ws/live
+   ```
+
+3. **Restart** so the changes take effect — for Docker run `docker compose up -d --build`
+   (the frontend image bakes its env in at build time); for Option B, just restart the two
+   dev servers.
+
+4. On your phone, open **http://192.168.1.42:3000**.
+
+> Swap `192.168.1.42` for your real IP everywhere above. On macOS, approve the firewall
+> prompt to *allow incoming connections* the first time. This setup keeps working on the
+> laptop at `http://localhost:3000` too, so you don't have to choose.
 
 ---
 
@@ -220,36 +293,23 @@ The stack publishes host ports **`3000`** (frontend), **`8000`** (backend) and
 
 ---
 
-## Running Locally (Development)
+## Configuration
 
-```bash
-# Terminal 1 — Database
-docker compose up db
+All backend settings are read from `.env` (template in `.env.example`). The ones you're
+most likely to touch:
 
-# Terminal 2 — Backend
-pip install -r requirements.txt
-uvicorn backend.main:app --reload --port 8000
+| Variable | Default | What it does |
+|---|---|---|
+| `GEMINI_API_KEY` | — *(required)* | Your Gemini API key |
+| `DATABASE_URL` | `postgresql://atc:atc@localhost:5432/atcmonitor` | Database connection. Use `sqlite+aiosqlite:///./readback.db` for a zero-install local file; Docker sets the Postgres URL for you |
+| `ALLOWED_ORIGINS` | `http://localhost:3000` | Comma-separated browser origins allowed to call the API. Add your laptop's LAN origin to view on a phone, or your deployed domain |
+| `WHISPER_MODEL` | `base` | faster-whisper model: `tiny` / `base` / `small` / `medium` / `large` |
 
-# Terminal 3 — Frontend
-cd frontend
-npm install && npm run dev
-```
-
-### Frontend backend origin
-
-By default the frontend talks to the **same origin it is served from**, so a
-production build behind a reverse proxy needs no configuration. For local dev
-the Vite dev server runs on `:3000` and the backend on `:8000`, so
-`frontend/.env.development` points at `http://localhost:8000` - which works
-because `:3000` is already in the backend CORS allowlist.
-
-A **production split-origin** deploy (frontend and backend on different hosts)
-is *not* fully supported by this plan: setting `VITE_API_BASE` /
-`VITE_WS_URL` at build time points the browser at the other host, but the
-backend (`backend/main.py`) currently allows CORS only from
-`http://localhost:3000`, so cross-origin browser fetches would be blocked.
-Supporting that requires making the backend allowlist configurable - a separate,
-backend-side change. Until then, deploy same-origin with a reverse proxy.
+The **frontend** resolves the backend from the page's own origin by default, so a
+same-origin production build behind a reverse proxy needs no configuration. For the split
+`:3000` / `:8000` dev setup it reads `frontend/.env.development` (`VITE_API_BASE`,
+`VITE_WS_URL`). Point those at another host (e.g. your LAN IP) to reach the backend from a
+different device — and add that origin to `ALLOWED_ORIGINS` so CORS lets it through.
 
 ## Running Tests
 

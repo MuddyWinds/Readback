@@ -67,24 +67,27 @@ function makeAircraftIcon(ac: AircraftInfo, hovered: boolean): L.DivIcon {
       ${vLine}${ring}${shape}
     </svg>`;
 
-  // Label: monitored always visible; background only on hover
+  // Label: monitored always visible; background only on hover.
+  // At rest we show a single callsign line to keep the map legible when several
+  // monitored targets cluster near the field — altitude/speed (and the event,
+  // which also appears in the aircraft list below) are revealed on hover.
   const showLabel = isMonitored || hovered;
   const labelContent = showLabel
     ? `<div style="
         position:absolute;top:50%;left:24px;transform:translateY(-50%);
-        font:${hovered ? "bold 11px" : "bold 10px"} 'SF Mono',monospace;
+        font:bold 11px var(--font-mono);
         color:${color};white-space:nowrap;
         text-shadow:0 0 4px var(--icon-shadow),0 0 4px var(--icon-shadow),0 0 5px var(--icon-shadow);
         pointer-events:none;line-height:1.4;
       ">
         ${ac.callsign}
         ${hovered && ac.altFt != null
-          ? `<br/><span style="font-size:9px;opacity:0.75;font-weight:normal">${
+          ? `<br/><span style="font-size:10px;opacity:0.8;font-weight:normal">${
               ac.altFt >= 18000 ? `FL${Math.round(ac.altFt / 100)}` : `${ac.altFt.toLocaleString()}ft`
             }${ac.speedKt != null ? ` · ${ac.speedKt}kt` : ""}</span>`
           : ""}
-        ${isMonitored && !hovered && ac.lastEvent
-          ? `<br/><span style="font-size:8px;opacity:0.6;font-weight:normal">${ac.lastEvent}</span>`
+        ${hovered && ac.lastEvent
+          ? `<br/><span style="font-size:10px;opacity:0.7;font-weight:normal">${ac.lastEvent}</span>`
           : ""}
       </div>`
     : "";

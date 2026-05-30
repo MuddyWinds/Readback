@@ -122,8 +122,9 @@
   padding: 6px 13px;
 }
 .filterBtnMobile {
-  padding: 4px 8px;
+  padding: 8px 10px;
   font-size: 11px;
+  min-height: 36px; /* comfortable touch target on mobile (WCAG 2.5.8) */
 }
 .filterBtnActive {
   display: flex;
@@ -143,8 +144,9 @@
   padding: 6px 13px;
 }
 .filterBtnActiveMobile {
-  padding: 4px 8px;
+  padding: 8px 10px;
   font-size: 11px;
+  min-height: 36px; /* comfortable touch target on mobile (WCAG 2.5.8) */
 }
 
 .filterBadge {
@@ -197,7 +199,7 @@
   padding: 8px 16px;
 }
 .footerText {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-faint);
   margin: 0;
   line-height: 1.6;

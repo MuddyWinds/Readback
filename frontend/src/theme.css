@@ -7,7 +7,7 @@
   --border-dim: #21262d;
   --text: #e6edf3;
   --text-dim: #8b949e;
-  --text-faint: #484f58;
+  --text-faint: #767e89;   /* dimmest readable text — ~4.6:1 on --bg (was #484f58, ~2.4:1, failed AA) */
   --text-sub: #c9d1d9;     /* mid-gray body/secondary text */
   --text-ghost: #6e7681;   /* dim secondary label text */
   --accent: #58a6ff;
@@ -73,6 +73,30 @@
   --radius-sm: 4px;
   --radius: 6px;
   --radius-lg: 10px;
+
+  /* Typography */
+  --font-mono: "SF Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Focus ring — single source of truth for keyboard focus visibility */
+  --focus-ring: var(--accent);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+}
+
+/* ── Keyboard focus visibility ───────────────────────────────────────────────
+   Every interactive element gets a consistent, high-contrast ring on keyboard
+   focus. Scoped to :focus-visible so mouse/touch interaction stays clean.
+   The default browser ring is near-invisible against the dark surfaces. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+/* Belt-and-braces: a few UA stylesheets still paint the legacy outline on
+   :focus for mouse clicks — suppress it only when :focus-visible is supported,
+   so we never strip focus from keyboard users. */
+:focus:not(:focus-visible) {
+  outline: none;
 }
 
 @keyframes resultFlash {
@@ -80,3 +104,19 @@
   100% { box-shadow: 0 0 0 2px transparent; }
 }
 .result-flash { animation: resultFlash 1.5s ease; border-radius: var(--radius); }
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────
+   Honor the OS "reduce motion" preference: neutralize the new-result flash and
+   collapse any animation/transition/scroll motion to effectively instant.
+   Focus outlines (above) are unaffected. */
+@media (prefers-reduced-motion: reduce) {
+  .result-flash { animation: none; }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -17,7 +17,7 @@
 }
 
 .headerTitle {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--ps-border);
   letter-spacing: 1.2px;
@@ -25,8 +25,8 @@
 }
 
 .callsignBadge {
-  font-size: 10px;
-  font-family: monospace;
+  font-size: 11px;
+  font-family: var(--font-mono);
   font-weight: 700;
   color: var(--text);
   background: var(--surface-2);
@@ -35,13 +35,13 @@
 }
 
 .callsignUnclear {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-faint);
   font-style: italic;
 }
 
 .phoneticMatch {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--sev-medium);
   background: color-mix(in srgb, var(--sev-medium) 9.4118%, transparent);
   border: 1px solid color-mix(in srgb, var(--sev-medium) 26.6667%, transparent);
@@ -50,7 +50,7 @@
 }
 
 .dataSourceSnapshot {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--sev-standard);
   background: var(--surface-2);
   border-radius: 3px;
@@ -58,7 +58,7 @@
 }
 
 .dataSourceLive {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-dim);
   background: var(--surface-2);
   border-radius: 3px;
@@ -67,9 +67,9 @@
 
 .timestamp {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-faint);
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .loadingText {
@@ -112,7 +112,7 @@
 }
 
 .aircraftPhaseDetail {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-dim);
 }
 
@@ -123,14 +123,14 @@
 }
 
 .statLabel {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-faint);
   letter-spacing: 0.5px;
 }
 
 .statValue {
   font-size: 11px;
-  font-family: monospace;
+  font-family: var(--font-mono);
   color: var(--text-sub);
   font-weight: 600;
 }
@@ -158,23 +158,23 @@
 }
 
 .workloadPrefix {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-ghost);
 }
 
 .workloadValue {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--wl-color);
 }
 
 .workloadCounts {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-faint);
 }
 
 .workloadNote {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-faint);
   font-style: italic;
 }
@@ -199,34 +199,34 @@
 }
 
 .conflictLevelSepLoss {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--sev-critical);
   flex-shrink: 0;
 }
 
 .conflictLevelProx {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--sev-high);
   flex-shrink: 0;
 }
 
 .conflictCallsigns {
-  font-size: 10px;
-  font-family: monospace;
+  font-size: 11px;
+  font-family: var(--font-mono);
   color: var(--text-sub);
 }
 
 .conflictDist {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-ghost);
   margin-left: auto;
   white-space: nowrap;
 }
 
 .conflictsHeader {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-ghost);
   letter-spacing: 1px;
@@ -235,7 +235,7 @@
 }
 
 .subjectVsLabel {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-ghost);
   text-transform: uppercase;
@@ -243,7 +243,7 @@
 }
 
 .staleSnapshotHint {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-faint);
   font-style: italic;
 }
