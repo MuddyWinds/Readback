@@ -13,34 +13,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.database import get_db
 from backend.db.models import AnalysisResultDB
 from backend.analysis.categorizer import build_stats
-from backend.models.schemas import AnalysisResult, Observation
+from backend.models.schemas import AnalysisResult, Observation, _iso_utc
 
 router = APIRouter()
 
 _VALID_STATUSES = {"new", "under_review", "confirmed", "false_positive"}
 
 
-def _iso_utc(dt) -> str:
-    """Mirror of schemas._iso_utc — stored timestamps are naive UTC; emit Z."""
-    if dt is None:
-        return None  # type: ignore[return-value]
-    iso = dt.isoformat()
-    return iso if iso.endswith("Z") else iso + "Z"
-
-
-def _safe_observations(raw) -> list[dict]:
-    """Drop observations that don't fit the current schema.
+def _safe_observations(raw) -> list[Observation]:
+    """Parse stored observations, skipping any that don't fit the current schema.
 
     Historically the read path did ``[Observation(**v) for v in raw]`` and
     raised on the first stray row from a since-changed Gemini emission —
     poisoning ``/api/stats`` for the entire batch. Skip the bad ones instead.
     """
-    out: list[dict] = []
+    out: list[Observation] = []
     for v in (raw or []):
         if not isinstance(v, dict):
             continue
         try:
-            out.append(Observation(**v).model_dump())
+            out.append(Observation(**v))
         except Exception:
             continue
     return out
@@ -49,13 +41,13 @@ def _safe_observations(raw) -> list[dict]:
 def _row_to_dict(r: AnalysisResultDB) -> dict:
     return {
         "id": r.id,
-        "timestamp": _iso_utc(r.timestamp),
+        "timestamp": _iso_utc(r.timestamp) if r.timestamp is not None else None,
         "airport_code": r.airport_code,
         "transcript": r.transcript,
         "assessable": r.assessable if r.assessable is not None else True,
         "assessable_confidence": r.assessable_confidence or 1.0,
         "is_standard": r.is_standard,
-        "observations": _safe_observations(r.observations),
+        "observations": [o.model_dump() for o in _safe_observations(r.observations)],
         "summary": r.summary,
         "confidence_score": r.confidence_score,
         "enrichment": r.enrichment,
@@ -65,14 +57,6 @@ def _row_to_dict(r: AnalysisResultDB) -> dict:
 
 
 def _row_to_analysis_result(r: AnalysisResultDB) -> AnalysisResult:
-    safe_observations = []
-    for v in (r.observations or []):
-        if not isinstance(v, dict):
-            continue
-        try:
-            safe_observations.append(Observation(**v))
-        except Exception:
-            continue
     return AnalysisResult(
         timestamp=r.timestamp,
         airport_code=r.airport_code,
@@ -80,7 +64,7 @@ def _row_to_analysis_result(r: AnalysisResultDB) -> AnalysisResult:
         assessable=r.assessable if r.assessable is not None else True,
         assessable_confidence=r.assessable_confidence if r.assessable_confidence is not None else 1.0,
         is_standard=r.is_standard,
-        observations=safe_observations,
+        observations=_safe_observations(r.observations),
         summary=r.summary,
         confidence_score=r.confidence_score,
     )

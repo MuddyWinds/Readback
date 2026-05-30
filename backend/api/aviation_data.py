@@ -107,15 +107,30 @@ async def get_metar(airport_code: str):
 
 # ── NOTAMs ─────────────────────────────────────────────────────────────────────
 
+# "EMERG"/"EMERGENCY" shows up in many routine NOTAMs — emergency frequency,
+# ELT/locator, emergency lighting, equipment, generators — none of which are an
+# operational emergency. Treat the word as the EMERGENCY category only when it
+# is NOT one of these administrative collocations.
+_BENIGN_EMERGENCY = (
+    "EMERGENCY FREQ", "EMERG FREQ",
+    "EMERGENCY LOCATOR", "EMERG LOCATOR", "ELT",
+    "EMERGENCY LIGHT", "EMERG LIGHT",
+    "EMERGENCY EQUIP", "EMERG EQUIP",
+    "EMERGENCY GEN", "EMERG GEN",
+)
+
+
 def _notam_keyword(body: str) -> str:
     b = body.upper()
-    if "EMERG" in b: return "EMERGENCY"
+    # Specific operational categories win first — a runway closure that merely
+    # mentions "emergency" should still classify as RWY.
     if "TFR" in b or "TEMPORARY FLIGHT RESTRICTION" in b: return "TFR"
     if "RWY" in b and ("CLSD" in b or "OUT OF SERVICE" in b):  return "RWY"
     if "TWY" in b and "CLSD" in b: return "TWY"
     if "NAVAID" in b or "ILS" in b or "VOR" in b or "NDB" in b: return "NAVAID"
     if "LASER" in b: return "LASER"
     if "CRANE" in b or "OBSTACLE" in b: return "OBS"
+    if "EMERG" in b and not any(p in b for p in _BENIGN_EMERGENCY): return "EMERGENCY"
     return "GEN"
 
 
