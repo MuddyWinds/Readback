@@ -6,6 +6,7 @@ helpers extracted from transcribe().
 
 from dataclasses import dataclass
 
+import backend.ingestion.transcriber as tr
 from backend.ingestion.transcriber import (
     score_segments,
     is_likely_hallucination,
@@ -76,9 +77,6 @@ def test_hallucination_floor_avoids_div_by_zero():
     assert WORDS_PER_SPEECH_SECOND_MAX == 6.0
 
 
-import backend.ingestion.transcriber as tr
-
-
 class _FakeModel:
     def __init__(self, segments):
         self._segments = segments
@@ -115,3 +113,13 @@ def test_transcribe_unassessable_when_hallucination(monkeypatch):
     out = tr.transcribe(object())
     assert out["assessable"] is False
     assert "hallucination" in out["reason"].lower()
+
+
+def test_transcribe_assessable_despite_low_confidence(monkeypatch):
+    # logprob -0.82 was refused by the old AVG_LOGPROB_THRESHOLD=-0.85 gate;
+    # now low confidence is surfaced, not gated, so Gemini can judge it.
+    segs = [Seg("Cessna niner eight papa cleared touch and go", -0.82, 0.10, 0.0, 4.0)]
+    monkeypatch.setattr(tr, "get_model", lambda: _FakeModel(segs))
+    out = tr.transcribe(object())
+    assert out["assessable"] is True
+    assert out["stt_confidence"] < 0.3   # low, but still routed to Gemini
