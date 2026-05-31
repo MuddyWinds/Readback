@@ -46,6 +46,8 @@ export default function App() {
   const [stopping, setStopping]         = useState(false);
   // Sidebar: which airport's panel is open in Live Feed (null = hidden)
   const [sidebarAirport, setSidebarAirport] = useState<string | null>(null);
+  // Aircraft hovered in a feed card → highlighted/flown-to on the airport map
+  const [selectedAircraft, setSelectedAircraft] = useState<{ icao24: string | null; callsign: string | null } | null>(null);
 
   // Toast click → navigate: id of a result card to scroll to + flash once the
   // filter/airport/sidebar state has applied and the card mounts.
@@ -160,6 +162,7 @@ export default function App() {
       setActiveFeeds(new Set());
       setAirportFilter("all");
       setSidebarAirport(null);
+      setSelectedAircraft(null);
       stopAudio();
     } catch (err: any) {
       setActionError(`Unable to stop feeds: ${err.message}`);
@@ -175,6 +178,7 @@ export default function App() {
     if (!feed) return;
     const isActive = sidebarAirport === code;
     setTab("live");
+    setSelectedAircraft(null);
     if (isActive) {
       setSidebarAirport(null);
       setAirportFilter("all");
@@ -191,6 +195,7 @@ export default function App() {
   const closeSidebar = () => {
     setSidebarAirport(null);
     setAirportFilter("all");
+    setSelectedAircraft(null);
   };
 
   const isRunning  = activeFeeds.size > 0;
@@ -303,6 +308,7 @@ export default function App() {
                     isRunning={isRunning}
                     pipelineStatus={pipelineStatus}
                     apiError={apiError}
+                    onSelectAircraft={setSelectedAircraft}
                   />
               </div>
             </div>
@@ -310,7 +316,12 @@ export default function App() {
             {/* Side panel sidebar (desktop only) */}
             {sidebarOpen && !sidebarIsDrawer && (
               <div className={styles.sidePanel}>
-                <AirportSidebar airportCode={sidebarAirport!} onClose={closeSidebar} results={results} />
+                <AirportSidebar
+                  airportCode={sidebarAirport!}
+                  onClose={closeSidebar}
+                  results={results}
+                  selectedAircraft={selectedAircraft}
+                />
               </div>
             )}
           </div>
@@ -318,7 +329,12 @@ export default function App() {
           {/* Bottom drawer sidebar (mobile / tablet) */}
           {sidebarIsDrawer && (
             <div className={isTablet ? styles.drawerDesktop : styles.drawerMobile}>
-              <AirportSidebar airportCode={sidebarAirport!} onClose={closeSidebar} results={results} />
+              <AirportSidebar
+                airportCode={sidebarAirport!}
+                onClose={closeSidebar}
+                results={results}
+                selectedAircraft={selectedAircraft}
+              />
             </div>
           )}
         </div>

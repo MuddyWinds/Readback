@@ -11,6 +11,7 @@ import {
   buildMonitorIndex, processAdsb,
   activeRunway, deriveCeiling, hpaToInhg, CAT_LABEL,
 } from "../../lib/adsb";
+import { normalizeCallsign } from "../../lib/callsign";
 import type { RawAircraft } from "../../lib/adsb";
 import type { AnalysisResult } from "../../lib/types";
 import styles from "./AirportSidebar.module.css";
@@ -37,6 +38,7 @@ interface Props {
   airportCode: string;
   onClose:     () => void;
   results?:    AnalysisResult[];
+  selectedAircraft?: { icao24: string | null; callsign: string | null } | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -70,7 +72,7 @@ function notamColorVar(n: { critical?: boolean; keyword?: string }): string {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
+export function AirportSidebar({ airportCode, onClose, results = [], selectedAircraft }: Props) {
   const { bp }  = useWindowWidth();
   const { settings } = useSettings();
   const isSmall = bp === "mobile" || bp === "tablet";
@@ -131,6 +133,13 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
     () => (geo ? processAdsb(rawAdsb, geo[0], geo[1], monitorIdx) : []),
     [rawAdsb, geo, monitorIdx],
   );
+  const selectedId = useMemo(() => {
+    if (!selectedAircraft) return null;
+    const key = normalizeCallsign(selectedAircraft.callsign);
+    const hit = key ? aircraft.find(a => normalizeCallsign(a.callsign) === key) : undefined;
+    if (hit) return hit.id;
+    return selectedAircraft.icao24 ?? null;
+  }, [selectedAircraft, aircraft]);
   const activeRwy = activeRunway(metar?.wdir ?? null, feed?.runways ?? []);
 
   const catVar   = catColorVar(metar?.fltCat);
@@ -231,6 +240,7 @@ export function AirportSidebar({ airportCode, onClose, results = [] }: Props) {
               <AirportMap
                 aircraft={aircraft}
                 hoveredId={hoveredId}
+                selectedId={selectedId}
                 onHover={setHoveredId}
                 apLat={geo[0]}
                 apLon={geo[1]}

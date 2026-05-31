@@ -22,15 +22,23 @@ interface PipelineStatusSummary {
 }
 
 // ─── ResultCard — routes to the right component ──────────────────────────────
-const ResultCard = React.memo(function ResultCard({ r, priorOccurrences, lastSeenAgo }: {
+const ResultCard = React.memo(function ResultCard({ r, priorOccurrences, lastSeenAgo, onSelectAircraft }: {
   r: AnalysisResult;
   priorOccurrences?: number;
   lastSeenAgo?: string | null;
+  onSelectAircraft?: (sel: { icao24: string | null; callsign: string | null } | null) => void;
 }) {
   const severity = getCardSeverity(r);
   if (severity === "unassessable") return <UnassessableCard r={r} />;
   if (severity === "standard") return <CompliantCard r={r} />;
-  return <ObservationCard r={r} priorOccurrences={priorOccurrences} lastSeenAgo={lastSeenAgo} />;
+  return (
+    <ObservationCard
+      r={r}
+      priorOccurrences={priorOccurrences}
+      lastSeenAgo={lastSeenAgo}
+      onSelectAircraft={onSelectAircraft}
+    />
+  );
 });
 
 // ─── LiveFeed ─────────────────────────────────────────────────────────────────
@@ -41,6 +49,7 @@ interface Props {
   isRunning?: boolean;
   pipelineStatus?: PipelineStatusSummary | null;
   apiError?: string | null;
+  onSelectAircraft?: (sel: { icao24: string | null; callsign: string | null } | null) => void;
 }
 
 function emptyMessage(
@@ -58,7 +67,7 @@ function emptyMessage(
   return "Connecting to live ATC feeds...";
 }
 
-export function LiveFeed({ results, filter, airportFilter, isRunning, pipelineStatus, apiError }: Props) {
+export function LiveFeed({ results, filter, airportFilter, isRunning, pipelineStatus, apiError, onSelectAircraft }: Props) {
   // Build callsign occurrence index (results ordered newest-first)
   // For each result, compute how many OLDER results share the same callsign
   const callsignIndex = React.useMemo(() => {
@@ -118,6 +127,7 @@ export function LiveFeed({ results, filter, airportFilter, isRunning, pipelineSt
               r={r}
               priorOccurrences={priorOccurrences}
               lastSeenAgo={lastSeenAgo}
+              onSelectAircraft={onSelectAircraft}
             />
           );
         })}

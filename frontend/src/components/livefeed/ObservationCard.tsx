@@ -19,9 +19,10 @@ interface Props {
   r: AnalysisResult;
   priorOccurrences?: number;
   lastSeenAgo?: string | null;
+  onSelectAircraft?: (sel: { icao24: string | null; callsign: string | null } | null) => void;
 }
 
-export function ObservationCard({ r, priorOccurrences, lastSeenAgo }: Props) {
+export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAircraft }: Props) {
   const severity   = getCardSeverity(r);
   const posDefault = severity === "critical" || severity === "high";
   const [showTranscript, setShowTranscript] = useState(true);
@@ -40,6 +41,7 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo }: Props) {
   const bullets       = r.summary ? parseBullets(r.summary) : [];
 
   const groups = groupByCallsign(r.enrichment, r.observations ?? [], r.transcript);
+  const icaoByCallsign = React.useRef<Map<string, string | null>>(new Map());
 
   return (
     <div
@@ -183,7 +185,15 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo }: Props) {
             .filter(v => v.kind === "situational_event")
             .sort((a, b) => (SEV_ORDER[b.significance] ?? 0) - (SEV_ORDER[a.significance] ?? 0));
           return (
-            <div key={g.key} className={styles.transcriptBlock}>
+            <div
+              key={g.key}
+              className={styles.transcriptBlock}
+              onMouseEnter={() => onSelectAircraft?.({
+                icao24: g.callsign ? (icaoByCallsign.current.get(g.callsign) ?? null) : null,
+                callsign: g.callsign,
+              })}
+              onMouseLeave={() => onSelectAircraft?.(null)}
+            >
               {g.callsign && (
                 <div className={styles.groupHeading}>{g.callsign}</div>
               )}
@@ -213,6 +223,7 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo }: Props) {
                   callsign={g.callsign}
                   confidence={groupConf}
                   borderColor="var(--sev-border)"
+                  onResolved={(cs, icao) => { if (cs) icaoByCallsign.current.set(cs, icao); }}
                 />
               )}
 

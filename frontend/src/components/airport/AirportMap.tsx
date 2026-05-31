@@ -105,6 +105,7 @@ function makeAircraftIcon(ac: AircraftInfo, hovered: boolean): L.DivIcon {
 interface Props {
   aircraft:    AircraftInfo[];
   hoveredId:   string | null;
+  selectedId?: string | null;
   onHover:     (id: string | null) => void;
   apLat:       number;
   apLon:       number;
@@ -112,7 +113,7 @@ interface Props {
 }
 
 export function AirportMap({
-  aircraft, hoveredId, onHover, apLat, apLon, mapHeight,
+  aircraft, hoveredId, selectedId, onHover, apLat, apLon, mapHeight,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<L.Map | null>(null);
@@ -193,7 +194,8 @@ export function AirportMap({
 
     // Add / update markers
     aircraft.forEach(ac => {
-      const isHov = ac.id === hoveredId;
+      const isSel = ac.id === selectedId;
+      const isHov = ac.id === hoveredId || isSel;
       const icon  = makeAircraftIcon(ac, isHov);
 
       if (markersRef.current.has(ac.id)) {
@@ -210,7 +212,15 @@ export function AirportMap({
         markersRef.current.set(ac.id, m);
       }
     });
-  }, [aircraft, hoveredId]);
+  }, [aircraft, hoveredId, selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const map = mapRef.current;
+    if (!map) return;
+    const ac = aircraft.find(a => a.id === selectedId);
+    if (ac) map.flyTo([ac.lat, ac.lon], Math.max(map.getZoom(), 12), { duration: 0.6 });
+  }, [selectedId, aircraft]);
 
   const flyTo = (lat: number, lon: number, zoom: number) => {
     mapRef.current?.flyTo([lat, lon], zoom, { duration: 0.7 });
