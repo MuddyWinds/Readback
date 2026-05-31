@@ -64,13 +64,14 @@ def test_batch_assessability_summary_separates_outage_from_verdict(monkeypatch):
         ({"airport_code": "KJFK", "stt_confidence": 0.3}, _res(True)),   # low-conf, assessable
         ({"airport_code": "KATL", "stt_confidence": 0.9}, _res(False)),  # genuine Gemini "unassessable"
         ({"airport_code": "KSFO", "stt_confidence": 0.5, "analysis_failed": True}, _res(False)),  # outage fallback
+        ({"airport_code": "KLAX", "stt_confidence": 0.2, "analysis_failed": True}, _res(False)),  # low-conf AND outage
     ]
 
     summary = batcher._batch_assessability_summary(pairs)
     assert summary == {
-        "total": 3,
+        "total": 4,
         "assessable": 1,
-        "gemini_unassessable": 1,     # only the real verdict, NOT the outage card
-        "analysis_unavailable": 1,    # the outage fallback, kept separate
-        "low_conf_routed": 1,
+        "gemini_unassessable": 1,     # only the real verdict, NOT either outage card
+        "analysis_unavailable": 2,    # both outage fallbacks
+        "low_conf_routed": 2,         # the 0.3 assessable + the 0.2 outage (both were routed)
     }

@@ -80,7 +80,8 @@ def _batch_assessability_summary(pairs: list[tuple[dict, AnalysisResult]]) -> di
     assessable = sum(1 for _, r in pairs if r.assessable)
     analysis_unavailable = sum(1 for it, _ in pairs if it.get("analysis_failed"))
     gemini_unassessable = sum(
-        1 for it, r in pairs if not r.assessable and not it.get("analysis_failed")
+        1 for it, r in pairs
+        if not r.assessable and not it.get("analysis_failed") and it.get("stt_assessable", True)
     )
     low_conf = sum(1 for it, _ in pairs if it.get("stt_confidence", 1.0) < 0.4)
     return {
