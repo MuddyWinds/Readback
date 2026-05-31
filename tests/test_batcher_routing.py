@@ -27,6 +27,7 @@ def _patch(monkeypatch, batcher, transcribe_result):
     monkeypatch.setattr(batcher, "should_transcribe", lambda audio, thr: (True, {"max_rms": 0.5, "p95_rms": 0.4}))
     monkeypatch.setattr(batcher, "current_runtime", lambda: _Runtime())
     monkeypatch.setattr(batcher, "transcribe", lambda audio: transcribe_result)
+    monkeypatch.setattr(batcher, "get_stt_executor", lambda: None)
 
 
 async def _drain(queue):
