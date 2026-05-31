@@ -3,6 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import { getCardSeverity, SEV_ORDER } from "../../lib/severity";
 import type { AnalysisResult } from "../../lib/types";
 import { extractCallsign, extractActions, parseBullets } from "../../lib/transcript";
+import { groupByCallsign, UNATTRIBUTED } from "../../lib/grouping";
 import { useWatchList } from "../../hooks/useWatchList";
 import { SEV_LABEL, SEV_ICON, ACTION_REQUIRED, ACTION_TOKEN } from "./constants";
 import { SectionLabel } from "./SectionLabel";
@@ -38,16 +39,7 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo }: Props) {
   const labelTextColor = ["low", "medium"].includes(severity) ? "var(--bg)" : "white";
   const bullets       = r.summary ? parseBullets(r.summary) : [];
 
-  const phraseologyNotes = r.observations?.length > 0
-    ? [...r.observations]
-        .filter(v => v.kind === "phraseology_note")
-        .sort((a, b) => (SEV_ORDER[b.significance] ?? 0) - (SEV_ORDER[a.significance] ?? 0))
-    : [];
-  const situationalEvents = r.observations?.length > 0
-    ? [...r.observations]
-        .filter(v => v.kind === "situational_event")
-        .sort((a, b) => (SEV_ORDER[b.significance] ?? 0) - (SEV_ORDER[a.significance] ?? 0))
-    : [];
+  const groups = groupByCallsign(r.enrichment, r.observations ?? [], r.transcript);
 
   return (
     <div
@@ -164,73 +156,86 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo }: Props) {
           </button>
         </div>
 
-        {/* Transcript block — structured if enrichment available */}
-        {showTranscript && (
-          <div className={styles.transcriptBlock}>
-            <StructuredTranscript
-              enrichment={r.enrichment}
-              rawTranscript={r.transcript}
-              borderColor="var(--sev-border)"
-              assessableConfidence={r.assessable_confidence}
-            />
-          </div>
-        )}
-
-        {/* Position snapshot block */}
-        {showPosition && (
-          <PositionSnapshot r={r} callsign={callsign} confidence={confidence} borderColor="var(--sev-border)" />
-        )}
       </div>
 
-      {/* ── 3. ANALYSIS — observations split by kind ── */}
-      {r.observations?.length > 0 && (
-        <div className={styles.analysis}>
-          {/* Advisory tooltip icon */}
-          <div className={styles.analysisHeader}>
-            <SectionLabel>Analysis</SectionLabel>
-            <span
-              title="Advisory — transcription may be imperfect and feeds are often one-sided."
-              className={styles.advisoryIcon}
-            >
-              ⓘ
-            </span>
-          </div>
-
-          {/* Phraseology Notes subsection */}
-          {phraseologyNotes.length > 0 && (
-            <div className={situationalEvents.length > 0 ? styles.phraseologyGroup : styles.phraseologyGroupLast}>
-              <div className={styles.phraseologyLabel}>Phraseology Notes</div>
-              <div className={styles.observationList}>
-                {phraseologyNotes.map((v, i) => (
-                  <ObservationItem
-                    key={i}
-                    observation={v}
-                    index={i}
-                    isLast={i === phraseologyNotes.length - 1}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Situational Events subsection */}
-          {situationalEvents.length > 0 && (
-            <div>
-              <div className={styles.situationalLabel}>Situational Events</div>
-              <div className={styles.observationList}>
-                {situationalEvents.map((v, i) => (
-                  <ObservationItem
-                    key={i}
-                    observation={v}
-                    index={i}
-                    isLast={i === situationalEvents.length - 1}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+      {/* ── PER-CALLSIGN GROUPS — transcript + position + observations ── */}
+      <div className={styles.analysis}>
+        {/* Header rendered once, above all groups. The transcript/position
+            always live under this heading, so it must render unconditionally
+            rather than be gated on observation count. */}
+        <div className={styles.analysisHeader}>
+          <SectionLabel>Analysis</SectionLabel>
+          <span
+            title="Advisory — transcription may be imperfect and feeds are often one-sided."
+            className={styles.advisoryIcon}
+          >
+            ⓘ
+          </span>
         </div>
-      )}
+
+        {groups.map((g, gi) => {
+          const groupConf: "high" | "low" =
+            g.key === UNATTRIBUTED ? "low" : confidence;
+          const notes = g.observations
+            .filter(v => v.kind === "phraseology_note")
+            .sort((a, b) => (SEV_ORDER[b.significance] ?? 0) - (SEV_ORDER[a.significance] ?? 0));
+          const events = g.observations
+            .filter(v => v.kind === "situational_event")
+            .sort((a, b) => (SEV_ORDER[b.significance] ?? 0) - (SEV_ORDER[a.significance] ?? 0));
+          return (
+            <div key={g.key} className={styles.transcriptBlock}>
+              {g.callsign && (
+                <div className={styles.groupHeading}>{g.callsign}</div>
+              )}
+              {g.key === UNATTRIBUTED && (
+                <div className={styles.groupHeading}>General / unattributed</div>
+              )}
+
+              {showTranscript && (
+                <StructuredTranscript
+                  segments={g.segments}
+                  enrichment={r.enrichment}
+                  /* Enrichment carries a single readback (readback_discrepancy /
+                     readback_correct are not per-callsign). We intentionally show
+                     it once, on the first group — which is ordered by first
+                     speaker-segment appearance (often ATC) and may differ from
+                     the aircraft that actually read back. */
+                  showReadback={gi === 0}
+                  rawTranscript={r.transcript}
+                  borderColor="var(--sev-border)"
+                  assessableConfidence={r.assessable_confidence}
+                />
+              )}
+
+              {showPosition && g.callsign && (
+                <PositionSnapshot
+                  r={r}
+                  callsign={g.callsign}
+                  confidence={groupConf}
+                  borderColor="var(--sev-border)"
+                />
+              )}
+
+              {notes.length > 0 && (
+                <div className={styles.observationList}>
+                  <div className={styles.phraseologyLabel}>Phraseology Notes</div>
+                  {notes.map((v, i) => (
+                    <ObservationItem key={i} observation={v} index={i} isLast={i === notes.length - 1} />
+                  ))}
+                </div>
+              )}
+              {events.length > 0 && (
+                <div className={styles.observationList}>
+                  <div className={styles.situationalLabel}>Situational Events</div>
+                  {events.map((v, i) => (
+                    <ObservationItem key={i} observation={v} index={i} isLast={i === events.length - 1} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {/* ── 4. REVIEW GUIDANCE ── */}
       <div className={styles.reviewGuidance}>

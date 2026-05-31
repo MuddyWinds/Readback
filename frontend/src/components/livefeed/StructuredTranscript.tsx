@@ -5,9 +5,16 @@ import styles from "./StructuredTranscript.module.css";
 
 /** Structured transcript: speaker-labelled turns, readback comparison. */
 export function StructuredTranscript({
-  enrichment, rawTranscript, borderColor, assessableConfidence,
-}: { enrichment: Enrichment | null | undefined; rawTranscript: string; borderColor: string; assessableConfidence?: number }) {
-  const segs = enrichment?.speaker_segments;
+  segments, enrichment, showReadback = true, rawTranscript, borderColor, assessableConfidence,
+}: {
+  segments?: import("../../lib/types").SpeakerSegment[];
+  enrichment: Enrichment | null | undefined;
+  showReadback?: boolean;
+  rawTranscript: string;
+  borderColor: string;
+  assessableConfidence?: number;
+}) {
+  const segs = segments ?? enrichment?.speaker_segments;
   const hasStructure = segs && segs.length > 0 && segs.some(s => s.role !== "UNKNOWN");
 
   if (!hasStructure) {
@@ -32,6 +39,7 @@ export function StructuredTranscript({
           <span className={`${styles.roleChip} ${roleChipClass[seg.role] ?? styles.roleUnknown}`}>
             {roleLabel[seg.role as keyof typeof roleLabel] ?? "???"}
           </span>
+          {seg.callsign && <span className={styles.segCallsign}>{seg.callsign}</span>}
           <span className={styles.segText}>
             {seg.text}
           </span>
@@ -39,7 +47,7 @@ export function StructuredTranscript({
       ))}
 
       {/* Readback comparison block */}
-      {enrichment?.readback_correct === false && enrichment.readback_discrepancy && (() => {
+      {showReadback && enrichment?.readback_correct === false && enrichment.readback_discrepancy && (() => {
         const lowConfidence = (assessableConfidence ?? 1) < 0.6;
         const asrAmbig = isAsrAmbiguous(enrichment.atc_instruction, enrichment.pilot_readback);
         if (lowConfidence) {

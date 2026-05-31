@@ -53,6 +53,13 @@
   border: 1px solid color-mix(in srgb, var(--text-ghost) 26.6667%, transparent);
 }
 
+.segCallsign {
+  font: 600 10px var(--font-mono);
+  color: var(--text-dim);
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
 .segText {
   font-size: 12px;
   font-family: var(--font-mono);
