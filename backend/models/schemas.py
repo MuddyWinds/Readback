@@ -73,6 +73,7 @@ class Observation(BaseModel):
     safety_pathway: Optional[str] = None   # teaching explanation: why this phraseology matters
     relevant_regulation: Optional[str] = None
     transcript_excerpt: Optional[str] = None
+    callsign: Optional[str] = None         # aircraft this observation concerns, or None
 
 
 class TranscriptChunk(BaseModel):

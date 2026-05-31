@@ -223,12 +223,14 @@ Each object schema:
       "description": "<what happened and why it matters>",
       "safety_pathway": "<wrong action → mechanism → potential outcome>",
       "relevant_regulation": "<e.g. ICAO Doc 4444 §4.5.3.1>",
-      "transcript_excerpt": "<exact phrase from transcript>"
+      "transcript_excerpt": "<exact phrase from transcript>",
+      "callsign": "<the aircraft this observation concerns, ICAO-format e.g. UAL12, or null>"
     }
   ],
 
   "speaker_segments": [
-    {"role": "ATC|PILOT|UNKNOWN", "text": "<exact text of this turn>"}
+    {"role": "ATC|PILOT|UNKNOWN", "text": "<exact text of this turn>",
+     "callsign": "<the aircraft this turn is to/from, ICAO-format, or null>"}
   ],
   "atc_instruction": "<the clearance/instruction the controller issued, or null>",
   "pilot_readback": "<what the pilot read back verbatim, or null — absence does NOT imply an observation>",
@@ -239,6 +241,11 @@ Each object schema:
 }
 
 speaker_segments: split transcript into labelled turns; if one-sided, label all with that speaker.
+attribution: each turn and each observation belongs to ONE aircraft. A controller
+turn addressing an aircraft and that aircraft's reply share the same callsign.
+Use the SAME callsign string form as callsign_detected. For a general broadcast
+or when the aircraft is unclear, set callsign null. callsign_detected remains the
+primary (most prominent) callsign of the transcript.
 readback_correct: true=matches; false=discrepancy; null=cannot determine (one-sided or no readback).
 callsign_clarity: 90-100 standard ICAO format; 50-89 phonetically expanded; 20-49 partial; 0-19 none.
 
@@ -246,6 +253,16 @@ If assessable is false: set is_standard true, observations [], still populate en
 If the transmission met standard phraseology: set observations [].
 Always populate all enrichment fields.
 """
+
+
+def _coerce_callsign(value) -> "str | None":
+    """The model sometimes emits a list/number/object for a callsign field.
+    Collapse to ``str | None`` so every consumer sees one shape."""
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, (list, tuple)) and value and isinstance(value[0], str):
+        return value[0].strip() or None
+    return None
 
 
 async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
@@ -358,6 +375,7 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
                         safety_pathway=v.get("safety_pathway"),
                         relevant_regulation=v.get("relevant_regulation"),
                         transcript_excerpt=v.get("transcript_excerpt"),
+                        callsign=_coerce_callsign(v.get("callsign")),
                     ))
                 except Exception:
                     continue
@@ -365,13 +383,7 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
         # The LLM occasionally emits arrays / numbers / objects for
         # callsign_detected despite the prompt asking for a string. Coerce
         # at the persistence boundary so every consumer sees ``str | None``.
-        raw_callsign = entry.get("callsign_detected")
-        if isinstance(raw_callsign, str):
-            callsign_detected = raw_callsign.strip() or None
-        elif isinstance(raw_callsign, (list, tuple)) and raw_callsign and isinstance(raw_callsign[0], str):
-            callsign_detected = raw_callsign[0].strip() or None
-        else:
-            callsign_detected = None
+        callsign_detected = _coerce_callsign(entry.get("callsign_detected"))
 
         raw_clarity = entry.get("callsign_clarity", 0)
         try:
@@ -379,8 +391,18 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
         except (TypeError, ValueError):
             callsign_clarity = 0
 
+        speaker_segments = []
+        for s in (entry.get("speaker_segments") or []):
+            if not isinstance(s, dict):
+                continue
+            speaker_segments.append({
+                "role": s.get("role", "UNKNOWN"),
+                "text": s.get("text", ""),
+                "callsign": _coerce_callsign(s.get("callsign")),
+            })
+
         enrichment = {
-            "speaker_segments":      entry.get("speaker_segments") or [],
+            "speaker_segments":      speaker_segments,
             "atc_instruction":       entry.get("atc_instruction"),
             "pilot_readback":        entry.get("pilot_readback"),
             "readback_correct":      entry.get("readback_correct"),
