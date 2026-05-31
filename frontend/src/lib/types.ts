@@ -19,7 +19,7 @@ export interface PipelineStatus {
   feed_status: Record<string, FeedStatus>;
 }
 
-export interface SpeakerSegment { role: "ATC" | "PILOT" | "UNKNOWN"; text: string; }
+export interface SpeakerSegment { role: "ATC" | "PILOT" | "UNKNOWN"; text: string; callsign?: string | null; }
 
 export interface Enrichment {
   speaker_segments:     SpeakerSegment[];
@@ -42,6 +42,7 @@ export interface Observation {
   safety_pathway?: string | null;
   relevant_regulation?: string | null;
   transcript_excerpt?: string | null;
+  callsign?: string | null;
 }
 
 export interface AnalysisResult {
