@@ -17,9 +17,61 @@ from backend.core.settings_store import current_runtime
 _model: WhisperModel | None = None
 _stt_executor: ThreadPoolExecutor | None = None
 
-# Plan B thresholds — if either is exceeded, mark transcript unassessable
-NO_SPEECH_PROB_THRESHOLD = 0.60   # >60% chance segment is not speech
-AVG_LOGPROB_THRESHOLD    = -0.85  # model very uncertain about its output
+# Per-segment cutoff: a segment is "speech" if its no-speech probability is below
+# this. Used to scope confidence to speech, not the silence around a short burst.
+NO_SPEECH_PROB_THRESHOLD = 0.60
+
+AVG_LOGPROB_THRESHOLD    = -0.85  # model very uncertain about its output (used by transcribe())
+
+# Word-density hallucination heuristic. Whisper can invent fluent, high-logprob
+# text from noise; such output crams many words into little speech duration.
+# Real ATC rarely exceeds ~3 wps; 6.0 drops only egregious cases. NOT an
+# independent control (timestamps are Whisper's own) — see spec §1a / Rollout.
+WORDS_PER_SPEECH_SECOND_MAX = 6.0
+
+
+def score_segments(segments) -> dict:
+    """Speech-weighted scoring of Whisper segments.
+
+    `segments` is any iterable of objects exposing text, avg_logprob,
+    no_speech_prob, start, end. Confidence, text, and word_count are scoped to
+    *speech-bearing* segments (no_speech_prob < NO_SPEECH_PROB_THRESHOLD) so a
+    short clear transmission is not diluted by surrounding static — and so the
+    text sent downstream is the same text the hallucination heuristic measures.
+    """
+    segments = list(segments)
+    speech = [s for s in segments if s.no_speech_prob < NO_SPEECH_PROB_THRESHOLD]
+
+    text = " ".join(s.text for s in speech).strip()
+    word_count = len(text.split())
+
+    if speech:
+        avg_logprob_speech = sum(s.avg_logprob for s in speech) / len(speech)
+        speech_seconds = sum((s.end - s.start) for s in speech)
+    else:
+        avg_logprob_speech = (
+            sum(s.avg_logprob for s in segments) / len(segments) if segments else -2.0
+        )
+        speech_seconds = 0.0
+
+    stt_confidence = max(0.0, min(1.0, 1.0 + avg_logprob_speech))
+
+    return {
+        "text": text,
+        "stt_confidence": stt_confidence,
+        "has_speech": bool(speech),
+        "avg_logprob_speech": avg_logprob_speech,
+        "speech_seconds": speech_seconds,
+        "word_count": word_count,
+    }
+
+
+def is_likely_hallucination(word_count: int, speech_seconds: float) -> bool:
+    """True when word density is implausibly high for the speech duration.
+
+    The 0.5s floor avoids division by zero when no speech duration was measured.
+    """
+    return (word_count / max(speech_seconds, 0.5)) > WORDS_PER_SPEECH_SECOND_MAX
 
 
 def get_model() -> WhisperModel:
