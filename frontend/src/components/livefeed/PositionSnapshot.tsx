@@ -28,8 +28,8 @@ const LIVE_FALLBACK_HORIZON_MS = 30 * 60 * 1000;
 
 // ─── ADS-B position snapshot — fetches live data per-airport ──────────────────
 export function PositionSnapshot({
-  r, callsign, confidence, borderColor,
-}: { r: AnalysisResult; callsign: string | null; confidence: "high" | "low"; borderColor: string }) {
+  r, callsign, confidence, borderColor, onResolved,
+}: { r: AnalysisResult; callsign: string | null; confidence: "high" | "low"; borderColor: string; onResolved?: (callsign: string | null, icao24: string | null) => void }) {
   const { geo } = useSettings();
   const snapshot = useAdsbSnapshot(r.id);
   const snapshotData = snapshot.data;
@@ -55,6 +55,10 @@ export function PositionSnapshot({
     : (snapshotMissing && !recentEnoughForLive ? "unavailable" : null);
 
   const matched = aircraft?.find(a => callsignsMatch(a.callsign, callsign)) ?? null;
+
+  React.useEffect(() => {
+    onResolved?.(callsign, matched?.icao24 ?? null);
+  }, [callsign, matched?.icao24]);
 
   // Derive human-readable flight phase from ADS-B state
   const flightPhase = (a: AdsbAircraft): { label: string; detail: string } => {
