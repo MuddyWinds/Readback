@@ -74,3 +74,44 @@ def test_hallucination_floor_avoids_div_by_zero():
     # but 5 words / 0.5 = 10 wps > cap.
     assert is_likely_hallucination(word_count=5, speech_seconds=0.0) is True
     assert WORDS_PER_SPEECH_SECOND_MAX == 6.0
+
+
+import backend.ingestion.transcriber as tr
+
+
+class _FakeModel:
+    def __init__(self, segments):
+        self._segments = segments
+
+    def transcribe(self, audio, **_kwargs):
+        return iter(self._segments), None
+
+
+def test_transcribe_assessable_for_clear_short_burst(monkeypatch):
+    segs = [
+        Seg("  ", -1.8, 0.95, 0.0, 10.0),
+        Seg("Delta 456 contact ground point niner", -0.3, 0.05, 10.0, 13.0),
+    ]
+    monkeypatch.setattr(tr, "get_model", lambda: _FakeModel(segs))
+    out = tr.transcribe(object())  # audio arg unused by the fake model
+    assert out["assessable"] is True
+    assert out["text"] == "Delta 456 contact ground point niner"
+    assert out["stt_confidence"] > 0.6
+
+
+def test_transcribe_unassessable_when_no_speech(monkeypatch):
+    segs = [Seg("hiss", -1.9, 0.99, 0.0, 30.0)]
+    monkeypatch.setattr(tr, "get_model", lambda: _FakeModel(segs))
+    out = tr.transcribe(object())
+    assert out["assessable"] is False
+    assert out["reason"] == "No recoverable speech"
+
+
+def test_transcribe_unassessable_when_hallucination(monkeypatch):
+    # 12 words in 1 second of speech -> 12 wps, over the cap.
+    segs = [Seg("one two three four five six seven eight nine ten eleven twelve",
+                -0.2, 0.05, 0.0, 1.0)]
+    monkeypatch.setattr(tr, "get_model", lambda: _FakeModel(segs))
+    out = tr.transcribe(object())
+    assert out["assessable"] is False
+    assert "hallucination" in out["reason"].lower()
