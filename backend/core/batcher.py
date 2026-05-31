@@ -67,6 +67,31 @@ def _gemini_failure_pairs(items: list[dict], exc: Exception) -> list[tuple[dict,
     ]
 
 
+def _batch_assessability_summary(pairs: list[tuple[dict, AnalysisResult]]) -> dict:
+    """Coverage/quality counts for one persisted batch (rollout instrumentation).
+
+    `gemini_unassessable` counts only results where Gemini actually judged the text
+    and returned unassessable. Outage/omission fallbacks are flagged with
+    `analysis_failed` on the item and counted separately as `analysis_unavailable`,
+    so a provider outage cannot masquerade as a text-quality problem (review #2).
+    `low_conf_routed` is how many items we sent to Gemini despite low STT confidence.
+    """
+    total = len(pairs)
+    assessable = sum(1 for _, r in pairs if r.assessable)
+    analysis_unavailable = sum(1 for it, _ in pairs if it.get("analysis_failed"))
+    gemini_unassessable = sum(
+        1 for it, r in pairs if not r.assessable and not it.get("analysis_failed")
+    )
+    low_conf = sum(1 for it, _ in pairs if it.get("stt_confidence", 1.0) < 0.4)
+    return {
+        "total": total,
+        "assessable": assessable,
+        "gemini_unassessable": gemini_unassessable,
+        "analysis_unavailable": analysis_unavailable,
+        "low_conf_routed": low_conf,
+    }
+
+
 async def _fetch_adsb_snapshot(airports: set[str]) -> dict[str, list]:
     """Fetch ADS-B states for every airport in the batch concurrently."""
     results: dict[str, list] = {}
@@ -200,9 +225,27 @@ async def run_batcher() -> None:
             except Exception as exc:
                 print(f"[Batcher] Gemini batch failed: {exc}", flush=True)
                 pipeline_status["last_gemini_error"] = str(exc)
+                for it in stt_good:
+                    it["analysis_failed"] = True
                 pairs.extend(_gemini_failure_pairs(stt_good, exc))
 
         batch_adsb = await _fetch_adsb_snapshot({it["airport_code"] for it in items})
+
+        summary = _batch_assessability_summary(pairs)
+        pipeline_status["last_batch_assessability"] = summary
+        print(f"[Batcher] assessability {summary}", flush=True)
+        # One structured line per low-confidence routed item: airport, stt_conf, word
+        # density, and the Gemini verdict together — the signal the validation gate
+        # consumes (spec Rollout / review #1). Skip outage fallbacks (no real verdict).
+        for it, r in pairs:
+            if it.get("stt_confidence", 1.0) < 0.4 and not it.get("analysis_failed"):
+                print(
+                    f"[Batcher] low-conf verdict: airport={it['airport_code']} "
+                    f"stt_conf={it.get('stt_confidence', 0.0):.2f} "
+                    f"wps={it.get('words_per_speech_second', 0.0):.1f} "
+                    f"assessable={r.assessable}",
+                    flush=True,
+                )
 
         print(f"[Batcher] Persisting {len(pairs)} result(s)...", flush=True)
         await _persist_batch(pairs, batch_adsb)

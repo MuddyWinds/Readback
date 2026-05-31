@@ -47,3 +47,30 @@ def test_gemini_fallback_preserves_stt_confidence(monkeypatch):
     assert pairs[0][1].assessable_confidence == 0.62
     # Missing key falls back to 0.0.
     assert pairs[1][1].assessable_confidence == 0.0
+
+
+def test_batch_assessability_summary_separates_outage_from_verdict(monkeypatch):
+    batcher = _load_batcher(monkeypatch)
+    from backend.models.schemas import AnalysisResult
+
+    def _res(assessable):
+        return AnalysisResult(
+            timestamp=datetime(2026, 5, 20, 1, 0), airport_code="KJFK", transcript="x",
+            assessable=assessable, assessable_confidence=0.5, is_standard=True,
+            observations=[], summary="", confidence_score=0.5,
+        )
+
+    pairs = [
+        ({"airport_code": "KJFK", "stt_confidence": 0.3}, _res(True)),   # low-conf, assessable
+        ({"airport_code": "KATL", "stt_confidence": 0.9}, _res(False)),  # genuine Gemini "unassessable"
+        ({"airport_code": "KSFO", "stt_confidence": 0.5, "analysis_failed": True}, _res(False)),  # outage fallback
+    ]
+
+    summary = batcher._batch_assessability_summary(pairs)
+    assert summary == {
+        "total": 3,
+        "assessable": 1,
+        "gemini_unassessable": 1,     # only the real verdict, NOT the outage card
+        "analysis_unavailable": 1,    # the outage fallback, kept separate
+        "low_conf_routed": 1,
+    }
