@@ -32,3 +32,18 @@ def test_gemini_fallback_preserves_each_transcript_as_visible_result(monkeypatch
         assert result.observations == []
         assert result.confidence_score == 0.0
         assert "Analysis temporarily unavailable" in result.summary
+
+
+def test_gemini_fallback_preserves_stt_confidence(monkeypatch):
+    batcher = _load_batcher(monkeypatch)
+    items = [
+        {"airport_code": "KJFK", "transcript": "cleared to land", "timestamp": datetime(2026, 5, 20, 1, 0), "stt_confidence": 0.62},
+        {"airport_code": "KATL", "transcript": "hold short", "timestamp": datetime(2026, 5, 20, 1, 1)},  # missing key
+    ]
+
+    pairs = batcher._gemini_failure_pairs(items, RuntimeError("503 UNAVAILABLE"))
+
+    # Real STT confidence is preserved; a Gemini failure is not a transcription failure.
+    assert pairs[0][1].assessable_confidence == 0.62
+    # Missing key falls back to 0.0.
+    assert pairs[1][1].assessable_confidence == 0.0
