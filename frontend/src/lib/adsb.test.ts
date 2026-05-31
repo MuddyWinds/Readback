@@ -76,3 +76,54 @@ test("buildMonitorIndex uses the enrichment callsign when it is a string", () =>
   const idx = buildMonitorIndex([r], "VHHH");
   expect(idx.has("CPA999")).toBe(true); // upper-cased
 });
+
+test("buildMonitorIndex registers every callsign mentioned in a result", () => {
+  const results: AnalysisResult[] = [{
+    id: 1, timestamp: "2026-05-20T01:00:00Z", airport_code: "KJFK",
+    transcript: "United 12 ... Delta 456 ...", is_standard: false,
+    summary: "", confidence_score: 0.8,
+    observations: [
+      { kind: "situational_event", note_type: "Go-around Non-compliance",
+        hfacs_level: "Unsafe Act", significance: "high", description: "", callsign: "DAL456" },
+    ],
+    enrichment: {
+      speaker_segments: [
+        { role: "ATC", text: "United 12 left 270", callsign: "UAL12" },
+        { role: "ATC", text: "Delta 456 go around", callsign: "DAL456" },
+      ],
+      atc_instruction: null, pilot_readback: null, readback_correct: null,
+      readback_discrepancy: null, callsign_detected: "UAL12", callsign_clarity: 90,
+    },
+  }];
+
+  const idx = buildMonitorIndex(results, "KJFK");
+
+  expect(idx.has("UAL12")).toBe(true);
+  expect(idx.has("DAL456")).toBe(true);
+  expect(idx.get("DAL456")!.lastEvent).toBe("Go-around Non-compliance");
+});
+
+test("buildMonitorIndex always indexes the primary callsign_detected, even when it is absent from segments/observations", () => {
+  const results: AnalysisResult[] = [{
+    id: 2, timestamp: "2026-05-20T01:00:00Z", airport_code: "KJFK",
+    transcript: "...", is_standard: true,
+    summary: "", confidence_score: 0.8,
+    observations: [
+      { kind: "phraseology_note", note_type: "Read-back Error", hfacs_level: "Unsafe Act",
+        significance: "low", description: "", callsign: "DAL456" },
+    ],
+    enrichment: {
+      speaker_segments: [
+        { role: "ATC", text: "Delta 456 contact ground", callsign: "DAL456" },
+      ],
+      atc_instruction: null, pilot_readback: null, readback_correct: null,
+      readback_discrepancy: null, callsign_detected: "UAL12", callsign_clarity: 90,
+    },
+  }];
+
+  const idx = buildMonitorIndex(results, "KJFK");
+
+  // UAL12 is the primary aircraft but only DAL456 carries segments/observations.
+  expect(idx.has("UAL12")).toBe(true);
+  expect(idx.has("DAL456")).toBe(true);
+});

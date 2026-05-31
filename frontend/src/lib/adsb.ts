@@ -89,19 +89,39 @@ export function buildMonitorIndex(
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   for (const r of airportResults) {
-    // Try enrichment callsign first, then regex fallback. `normalizeCallsign`
-    // also handles the case where the LLM emitted an array/number/object —
-    // those return null and we fall through to the regex.
+    // Collect every callsign mentioned: per-segment, per-observation, then the
+    // primary (callsign_detected), then a regex fallback for legacy rows.
+    const perCallsignEvent = new Map<string, string | null>();
+    for (const o of (r.observations ?? [])) {
+      const k = normalizeCallsign(o.callsign as string | null | undefined);
+      if (k && !perCallsignEvent.has(k)) perCallsignEvent.set(k, o.note_type ?? null);
+    }
+    const mentioned = new Set<string>();
+    for (const s of (r.enrichment?.speaker_segments ?? [])) {
+      const k = normalizeCallsign(s.callsign as string | null | undefined);
+      if (k) mentioned.add(k);
+    }
+    Array.from(perCallsignEvent.keys()).forEach(k => mentioned.add(k));
+    // Always include the primary aircraft, even when callsign_detected never
+    // appears in a per-segment/per-observation callsign (mixed/legacy shapes) —
+    // otherwise the most prominent aircraft can be dropped from the index.
     const enrichmentCs = normalizeCallsign(r.enrichment?.callsign_detected as unknown as string | null | undefined);
-    const regexHit = r.transcript?.toUpperCase().match(/\b([A-Z]{2,3}\d{1,4}[A-Z]?|N\d{4,5}[A-Z]{0,2})\b/)?.[1];
-    const cs = enrichmentCs ?? normalizeCallsign(regexHit);
-    if (!cs) continue;
-    if (idx.has(cs)) continue; // keep newest
-    const topObservation = (r.observations ?? [])[0];
-    idx.set(cs, {
-      standard:  r.assessable === false ? null : (r.is_standard ?? null),
-      lastEvent:  topObservation?.note_type ?? (r.is_standard ? "Standard" : null),
-      resultId:   r.id ?? null,
+    if (enrichmentCs) mentioned.add(enrichmentCs);
+    if (mentioned.size === 0) {
+      // Regex fallback only for legacy rows with no structured callsign anywhere.
+      const regexHit = r.transcript?.toUpperCase().match(/\b([A-Z]{2,3}\d{1,4}[A-Z]?|N\d{4,5}[A-Z]{0,2})\b/)?.[1];
+      const cs = normalizeCallsign(regexHit);
+      if (cs) mentioned.add(cs);
+    }
+
+    Array.from(mentioned).forEach(cs => {
+      if (idx.has(cs)) return; // keep newest (results are sorted newest-first)
+      const ownEvent = perCallsignEvent.get(cs) ?? null;
+      idx.set(cs, {
+        standard:  r.assessable === false ? null : (r.is_standard ?? null),
+        lastEvent: ownEvent ?? (r.is_standard ? "Standard" : null),
+        resultId:  r.id ?? null,
+      });
     });
   }
   return idx;
