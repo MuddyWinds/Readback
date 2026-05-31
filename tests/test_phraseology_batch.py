@@ -84,6 +84,7 @@ async def test_missing_result_preserves_stt_confidence(monkeypatch):
     item = {"airport_code": "KJFK", "transcript": "x", "timestamp": datetime(2026, 5, 20, 1, 0), "stt_confidence": 0.42}
     result = phraseology._missing_analysis_result(item, "missing")
     assert result.assessable_confidence == 0.42
+    assert item.get("analysis_failed") is True  # contract Task 5 reads
 
 
 @pytest.mark.anyio
