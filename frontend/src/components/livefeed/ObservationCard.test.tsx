@@ -79,3 +79,24 @@ describe("ObservationCard STT chip", () => {
     expect(screen.queryByTestId("stt-confidence")).toBeNull();
   });
 });
+
+describe("ObservationCard preserved behavior", () => {
+  it("keeps What-happened bullets, review guidance, and the callsign", () => {
+    renderCard(<ObservationCard r={makeResult({ summary: "- Readback omitted runway" })} />);
+    expect(screen.getByText("Readback omitted runway")).toBeTruthy();
+    expect(screen.getByText(/Review Guidance/i)).toBeTruthy();
+    // UAL123 appears in both the header callsign span and the analysis-group heading
+    expect(screen.getAllByText("UAL123").length).toBeGreaterThan(0);
+  });
+
+  it("renders the watchlist toggle for the primary callsign", () => {
+    renderCard(<ObservationCard r={makeResult()} />);
+    // The star button carries a title that flips on watch state.
+    expect(screen.getByTitle(/watch this callsign/i)).toBeTruthy();
+  });
+
+  it("shows the prior-occurrence alert when priorOccurrences > 0", () => {
+    renderCard(<ObservationCard r={makeResult()} priorOccurrences={2} lastSeenAgo="5 minutes ago" />);
+    expect(screen.getByText(/occurrence this session/i)).toBeTruthy();
+  });
+});

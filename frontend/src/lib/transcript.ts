@@ -86,7 +86,7 @@ export function extractActions(transcript: string): string[] {
 
 export function parseBullets(summary: string): string[] {
   return summary
-    .split(/(?<=[.!?])\s+/)
-    .map(s => s.replace(/[.!?]+$/, "").trim())
+    .split(/\n|(?<=[.!?])\s+/)
+    .map(s => s.replace(/^[-*•]\s+/, "").replace(/[.!?]+$/, "").trim())
     .filter(s => s.length > 8);
 }
