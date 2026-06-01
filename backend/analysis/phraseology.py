@@ -16,7 +16,7 @@ from datetime import datetime
 from google import genai
 from google.genai import types
 
-from backend.core.settings_store import current_gemini_key
+from backend.core.settings_store import current_gemini_key, current_gemini_model
 from backend.models.schemas import AnalysisResult, Observation, KIND_BY_NOTE_TYPE
 
 _client = None
@@ -291,6 +291,7 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
         "UNAVAILABLE", "INTERNAL", "DEADLINE_EXCEEDED", "RESOURCE_EXHAUSTED",
     )
 
+    model = current_gemini_model()
     data = None
     last_exc: Exception | None = None
     for attempt in range(4):
@@ -303,7 +304,7 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
                     await asyncio.sleep(gap)
                 _last_call_time = time.monotonic()
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model=model,
                     contents=user_message,
                     config=types.GenerateContentConfig(
                         system_instruction=BATCH_SYSTEM_PROMPT,
@@ -456,9 +457,10 @@ Write a short study sheet (200-300 words) covering:
 This is an educational study aid, not an investigation. Use plain English,
 be encouraging, and do not assign blame to any individual."""
 
+    model = current_gemini_model()
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=model,
             contents=prompt,
         )
         return response.text.strip()
