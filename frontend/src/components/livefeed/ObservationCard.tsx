@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { getCardSeverity, SEV_ORDER } from "../../lib/severity";
+import { getCardSeverity } from "../../lib/severity";
 import type { AnalysisResult } from "../../lib/types";
 import { extractCallsign, extractActions, parseBullets } from "../../lib/transcript";
-import { groupByCallsign, UNATTRIBUTED } from "../../lib/grouping";
+import { orderedFindings, attributedCallsigns } from "../../lib/findings";
 import { useWatchList } from "../../hooks/useWatchList";
 import { SEV_LABEL, SEV_ICON, ACTION_REQUIRED, ACTION_TOKEN } from "./constants";
 import { SectionLabel } from "./SectionLabel";
@@ -40,8 +40,28 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
   const labelTextColor = ["low", "medium"].includes(severity) ? "var(--bg)" : "white";
   const bullets       = r.summary ? parseBullets(r.summary) : [];
 
-  const groups = groupByCallsign(r.enrichment, r.observations ?? [], r.transcript);
+  const findings    = orderedFindings(r.observations ?? []);
+  const notes       = findings.filter(f => f.type === "phraseology_note");
+  const events      = findings.filter(f => f.type === "situational_event");
+  const showTypeLabels = notes.length > 0 && events.length > 0;
+  const excerptMarks = findings
+    .filter(f => f.observation.transcript_excerpt)
+    .map(f => ({ n: f.n, excerpt: f.observation.transcript_excerpt as string }));
+
+  // Attribution is derived from the findings' own callsigns (NOT speaker
+  // segments): a transcript that merely mentions two aircraft but attributes one
+  // finding stays single-aircraft.
+  const cardCallsigns = attributedCallsigns(r.observations ?? []);
+  const isMulti = cardCallsigns.length >= 2;
+
+  const [activeMark, setActiveMark] = useState<number | null>(null);
   const icaoByCallsign = React.useRef<Map<string, string | null>>(new Map());
+
+  const activate = (n: number, cs: string | null) => {
+    setActiveMark(n);
+    onSelectAircraft?.({ icao24: cs ? (icaoByCallsign.current.get(cs) ?? null) : null, callsign: cs });
+  };
+  const deactivate = () => { setActiveMark(null); onSelectAircraft?.(null); };
 
   return (
     <div
@@ -169,12 +189,42 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
               rawTranscript={r.transcript}
               borderColor="var(--sev-border)"
               assessableConfidence={r.assessable_confidence}
+              excerptMarks={excerptMarks}
+              activeMark={activeMark}
+              onMarkHover={setActiveMark}
             />
           </div>
         )}
+
+        {showPosition && (
+          isMulti ? (
+            cardCallsigns.map(cs => (
+              <div key={cs} data-testid="position-snapshot" className={styles.transcriptBlock}>
+                <div className={styles.groupHeading}>{cs}</div>
+                <PositionSnapshot
+                  r={r}
+                  callsign={cs}
+                  confidence={confidence}
+                  borderColor="var(--sev-border)"
+                  onResolved={(c, icao) => { if (c) icaoByCallsign.current.set(c, icao); }}
+                />
+              </div>
+            ))
+          ) : callsign ? (
+            <div data-testid="position-snapshot" className={styles.transcriptBlock}>
+              <PositionSnapshot
+                r={r}
+                callsign={callsign}
+                confidence={confidence}
+                borderColor="var(--sev-border)"
+                onResolved={(cs, icao) => { if (cs) icaoByCallsign.current.set(cs, icao); }}
+              />
+            </div>
+          ) : null
+        )}
       </div>
 
-      {/* ── 3. ANALYSIS — per-callsign position + observations (NO transcript) ── */}
+      {/* ── 3. ANALYSIS — flat, numbered findings (NO transcript) ── */}
       <div className={styles.analysis}>
         <div className={styles.analysisHeader}>
           <SectionLabel>Analysis</SectionLabel>
@@ -186,59 +236,41 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
           </span>
         </div>
 
-        {groups.map((g) => {
-          const groupConf: "high" | "low" = g.key === UNATTRIBUTED ? "low" : confidence;
-          const notes = g.observations
-            .filter(v => v.kind === "phraseology_note")
-            .sort((a, b) => (SEV_ORDER[b.significance] ?? 0) - (SEV_ORDER[a.significance] ?? 0));
-          const events = g.observations
-            .filter(v => v.kind === "situational_event")
-            .sort((a, b) => (SEV_ORDER[b.significance] ?? 0) - (SEV_ORDER[a.significance] ?? 0));
-          return (
-            <div
-              key={g.key}
-              data-testid="analysis-group"
-              className={styles.transcriptBlock}
-              onMouseEnter={() => onSelectAircraft?.({
-                icao24: g.callsign ? (icaoByCallsign.current.get(g.callsign) ?? null) : null,
-                callsign: g.callsign,
-              })}
-              onMouseLeave={() => onSelectAircraft?.(null)}
-            >
-              {g.callsign && <div className={styles.groupHeading}>{g.callsign}</div>}
-              {g.key === UNATTRIBUTED && <div className={styles.groupHeading}>General / unattributed</div>}
+        {notes.length > 0 && (
+          <div className={styles.observationList}>
+            {showTypeLabels && <div className={styles.phraseologyLabel}>Phraseology Notes</div>}
+            {notes.map(f => (
+              <ObservationItem
+                key={f.n}
+                observation={f.observation}
+                n={f.n}
+                isLast={f.n === findings.length}
+                callsign={isMulti ? (f.observation.callsign ?? null) : null}
+                active={activeMark === f.n}
+                onActivate={() => activate(f.n, f.observation.callsign ?? (isMulti ? null : callsign))}
+                onDeactivate={deactivate}
+              />
+            ))}
+          </div>
+        )}
 
-              {showPosition && g.callsign && (
-                <div data-testid="position-snapshot">
-                  <PositionSnapshot
-                    r={r}
-                    callsign={g.callsign}
-                    confidence={groupConf}
-                    borderColor="var(--sev-border)"
-                    onResolved={(cs, icao) => { if (cs) icaoByCallsign.current.set(cs, icao); }}
-                  />
-                </div>
-              )}
-
-              {notes.length > 0 && (
-                <div className={styles.observationList}>
-                  <div className={styles.phraseologyLabel}>Phraseology Notes</div>
-                  {notes.map((v, i) => (
-                    <ObservationItem key={i} observation={v} index={i} isLast={i === notes.length - 1} />
-                  ))}
-                </div>
-              )}
-              {events.length > 0 && (
-                <div className={styles.observationList}>
-                  <div className={styles.situationalLabel}>Situational Events</div>
-                  {events.map((v, i) => (
-                    <ObservationItem key={i} observation={v} index={i} isLast={i === events.length - 1} />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {events.length > 0 && (
+          <div className={styles.observationList}>
+            {showTypeLabels && <div className={styles.situationalLabel}>Situational Events</div>}
+            {events.map(f => (
+              <ObservationItem
+                key={f.n}
+                observation={f.observation}
+                n={f.n}
+                isLast={f.n === findings.length}
+                callsign={isMulti ? (f.observation.callsign ?? null) : null}
+                active={activeMark === f.n}
+                onActivate={() => activate(f.n, f.observation.callsign ?? (isMulti ? null : callsign))}
+                onDeactivate={deactivate}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── 4. REVIEW GUIDANCE ── */}

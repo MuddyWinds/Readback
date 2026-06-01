@@ -1,13 +1,29 @@
 .row {
-  padding-bottom: 14px;
+  padding: 6px 0 14px;
   margin-bottom: 14px;
   border-bottom: 1px solid var(--surface-2);
+  border-radius: 6px;
+  transition: background 0.12s;
 }
 
 .rowLast {
-  padding-bottom: 14px;
+  padding: 6px 0 0;
   margin-bottom: 0;
   border-bottom: none;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+
+/* Finding glow — mirrors the Evidence highlight glow on hover/focus.
+   Neutral brightness bump, not a severity hue. */
+.rowActive {
+  background: color-mix(in srgb, var(--text-dim) 8%, transparent);
+}
+
+.row:focus-visible,
+.rowLast:focus-visible {
+  outline: 2px solid var(--text-sub);
+  outline-offset: 2px;
 }
 
 .heading {
@@ -15,11 +31,26 @@
   align-items: center;
   gap: 8px;
   flex-wrap: nowrap;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   overflow: hidden;
 }
 
 /* --accent set per-item via inline style */
+.markBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
 .noteType {
   font-size: 11px;
   font-weight: 700;
@@ -27,6 +58,16 @@
   text-transform: uppercase;
   letter-spacing: 0.8px;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.callsignChip {
+  font: 600 11px var(--font-mono);
+  color: var(--text-sub);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
   flex-shrink: 0;
 }
 
@@ -44,77 +85,33 @@
   white-space: nowrap;
 }
 
-.description {
-  font-size: 13px;
-  color: var(--text-sub);
-  line-height: 1.75;
-  white-space: pre-wrap;
-  margin-bottom: 10px;
+/* Two-line body: labelled "What happened" / "Why it matters" */
+.bodyRow {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
 }
 
-.hfacsRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.hfacsRowWithExcerpt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.hfacsLabel {
-  font-size: 11px;
+.bodyLabel {
+  font-size: 10px;
   font-weight: 700;
   color: var(--text-faint);
-  letter-spacing: 1.1px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
 }
 
-.hfacsCode {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-dim);
-  background: var(--surface-2);
-  padding: 2px 7px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-}
-
-.hfacsPlain {
-  font-size: 11px;
-  color: var(--text-ghost);
-}
-
-.safetyPathway {
-  font-size: 11px;
-  color: var(--text-dim);
-  font-style: italic;
+.bodyText {
+  font-size: 13px;
+  color: var(--text-sub);
   line-height: 1.6;
-  padding-left: 2px;
+  white-space: pre-wrap;
 }
 
-.safetyPathwayWithExcerpt {
+/* HFACS neutral tag */
+.hfacsTag {
   font-size: 11px;
-  color: var(--text-dim);
-  font-style: italic;
-  line-height: 1.6;
-  margin-bottom: 8px;
-  padding-left: 2px;
-}
-
-/* --accent set per-item via inline style */
-.excerpt {
-  background: color-mix(in srgb, var(--accent) 5.098%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
-  border-left: 3px solid var(--accent);
-  border-radius: 0 6px 6px 0;
-  padding: 7px 12px;
-  font-size: 12px;
-  font-family: var(--font-mono);
-  color: var(--action-speed);
-  font-style: italic;
-  line-height: 1.6;
+  color: var(--text-faint);
+  margin-top: 2px;
 }

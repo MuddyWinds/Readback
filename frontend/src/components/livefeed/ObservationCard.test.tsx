@@ -45,24 +45,49 @@ function twoAircraftResult() {
   });
 }
 
-describe("ObservationCard layout (Approach A)", () => {
+describe("ObservationCard layout (flat numbered findings)", () => {
   it("renders the transcript exactly once, in the Evidence zone", () => {
     renderCard(<ObservationCard r={twoAircraftResult()} />);
     expect(screen.getAllByTestId("evidence-transcript")).toHaveLength(1);
   });
 
-  it("renders one Analysis group per attributed callsign, each with its own position", () => {
+  it("renders one position per attributed callsign for a multi-aircraft card", () => {
     renderCard(<ObservationCard r={twoAircraftResult()} />);
-    expect(screen.getAllByTestId("analysis-group")).toHaveLength(2);
     expect(screen.getAllByTestId("position-snapshot")).toHaveLength(2);
   });
 
-  it("does NOT render a transcript inside Analysis groups", () => {
+  it("numbers every finding and never shows the old unattributed heading", () => {
     renderCard(<ObservationCard r={twoAircraftResult()} />);
-    const groups = screen.getAllByTestId("analysis-group");
-    for (const g of groups) {
-      expect(g.querySelectorAll('[data-testid="evidence-transcript"]')).toHaveLength(0);
-    }
+    const badges = screen.getAllByTestId("finding-number");
+    expect(badges.map(b => b.textContent)).toEqual(["1", "2"]);
+    expect(screen.queryByText(/General \/ unattributed/i)).toBeNull();
+  });
+
+  it("shows per-finding callsign chips on a multi-aircraft card", () => {
+    renderCard(<ObservationCard r={twoAircraftResult()} />);
+    expect(screen.getAllByText("UAL123").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("DAL456").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("treats two segment callsigns + one attributed finding as single-aircraft (regression)", () => {
+    const r = makeResult({
+      observations: [
+        { kind: "phraseology_note", note_type: "Read-back Error", hfacs_level: "Unsafe Act",
+          significance: "high", description: "n1", safety_pathway: null,
+          relevant_regulation: null, transcript_excerpt: null, callsign: "UAL123" },
+      ],
+      enrichment: {
+        speaker_segments: [
+          { role: "ATC", text: "United 123 cleared to land 31L", callsign: "UAL123" },
+          { role: "ATC", text: "Delta 456 line up and wait 31L", callsign: "DAL456" },
+        ],
+        atc_instruction: null, pilot_readback: null, readback_correct: null,
+        readback_discrepancy: null, callsign_detected: "UAL123", callsign_clarity: 90,
+      },
+    });
+    renderCard(<ObservationCard r={r} />);
+    expect(screen.getAllByTestId("position-snapshot")).toHaveLength(1);
+    expect(screen.getAllByTestId("finding-number")).toHaveLength(1);
   });
 });
 
@@ -86,10 +111,9 @@ describe("ObservationCard preserved behavior", () => {
     // Throwing getters are the assertion; getByText throws if the text is absent.
     screen.getByText("Readback omitted runway");
     screen.getByText(/Review Guidance/i);
-    // UAL123 is the primary callsign: it renders in BOTH the header span and the
-    // analysis-group heading. The default fixture has no observations/segments, so
-    // groupByCallsign returns one legacy group keyed to UAL123 — exactly 2 renders.
-    expect(screen.getAllByText("UAL123")).toHaveLength(2);
+    // Single-aircraft cards show the callsign in the header only (no analysis heading,
+    // no per-finding chip), and the default fixture has no observations.
+    expect(screen.getAllByText("UAL123")).toHaveLength(1);
   });
 
   it("renders the watchlist toggle for the primary callsign", () => {
