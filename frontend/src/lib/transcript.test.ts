@@ -22,6 +22,10 @@ test("parseBullets splits on sentence boundaries and drops fragments of length <
   expect(parseBullets("First sentence here. Short. This is the second sentence."))
     .toEqual(["First sentence here", "This is the second sentence"]);
 });
+test("parseBullets strips markdown list prefixes and splits on newlines", () => {
+  expect(parseBullets("- Readback omitted runway\n* Readback correct altitude\n• Cleared to land 31L"))
+    .toEqual(["Readback omitted runway", "Readback correct altitude", "Cleared to land 31L"]);
+});
 test("extractActions matches instruction keywords", () => {
   expect(extractActions("climb and maintain 5000, contact tower")).toEqual(["CLIMB", "FREQ CHANGE"]);
 });
