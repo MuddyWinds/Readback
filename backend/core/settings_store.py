@@ -18,6 +18,7 @@ def _env_default() -> AppSettings:
         feeds=[],
         runtime=RuntimeConfig(
             batch_interval_seconds=300,
+            batch_max_items=env_settings.BATCH_MAX_ITEMS,
             stt_rms_threshold=env_settings.STT_RMS_THRESHOLD,
             whisper_model=env_settings.WHISPER_MODEL,
             stt_concurrency=env_settings.STT_CONCURRENCY,
@@ -83,3 +84,7 @@ def current_feeds() -> list[FeedConfig]:
 
 def current_runtime() -> RuntimeConfig:
     return get_cached().runtime
+
+
+def current_gemini_model() -> str:
+    return get_cached().runtime.gemini_model or "gemini-2.5-flash"

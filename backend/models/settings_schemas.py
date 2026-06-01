@@ -17,9 +17,11 @@ class FeedConfig(BaseModel):
 
 class RuntimeConfig(BaseModel):
     batch_interval_seconds: int = 300
+    batch_max_items: int = 40
     stt_rms_threshold: float = 0.0
     whisper_model: str = "base"
     stt_concurrency: int = 1
+    gemini_model: str = "gemini-2.5-flash"
     # Floor over the significance ordering at which event-alert toasts fire.
     alert_min_severity: Literal["low", "medium", "high", "critical"] = "high"
 

@@ -53,3 +53,25 @@ def test_current_runtime_falls_back_to_env_when_no_cache(monkeypatch):
     store = _load_store(monkeypatch, rms="0.05")
     monkeypatch.setattr(store, "_cache", None)
     assert store.current_runtime().stt_rms_threshold == pytest.approx(0.05)
+
+
+def test_current_gemini_model_defaults_then_reads_cache(monkeypatch):
+    store = _load_store(monkeypatch)
+    from backend.models.settings_schemas import AppSettings, RuntimeConfig
+    monkeypatch.setattr(store, "_cache", None)
+    assert store.current_gemini_model() == "gemini-2.5-flash"
+    monkeypatch.setattr(
+        store, "_cache",
+        AppSettings(runtime=RuntimeConfig(gemini_model="gemini-3.5-flash")),
+    )
+    assert store.current_gemini_model() == "gemini-3.5-flash"
+
+
+def test_current_gemini_model_falls_back_on_blank(monkeypatch):
+    store = _load_store(monkeypatch)
+    from backend.models.settings_schemas import AppSettings, RuntimeConfig
+    monkeypatch.setattr(
+        store, "_cache",
+        AppSettings(runtime=RuntimeConfig(gemini_model="")),
+    )
+    assert store.current_gemini_model() == "gemini-2.5-flash"
