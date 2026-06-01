@@ -89,7 +89,7 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
           ))}
         </div>
 
-        {/* Right: timestamp · AI confidence */}
+        {/* Right: timestamp · AI confidence · STT confidence */}
         <div className={styles.headerRight}>
           <span className={styles.timestamp}>
             {formatDistanceToNow(new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z"), { addSuffix: true })}

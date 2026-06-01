@@ -70,11 +70,11 @@ describe("ObservationCard STT chip", () => {
   it("surfaces assessable_confidence as a distinct STT % chip (not AI confidence)", () => {
     renderCard(<ObservationCard r={makeResult({ assessable_confidence: 0.42 })} />);
     const chip = screen.getByTestId("stt-confidence");
-    expect(chip.textContent).toContain("STT");
-    expect(chip.textContent).toContain("42%");
+    expect(chip.textContent).toContain("STT 42%");
   });
 
   it("omits the STT chip when assessable_confidence is absent", () => {
+    // override the fixture's baseline 0.8 to exercise the absent (chip-omitted) branch
     renderCard(<ObservationCard r={makeResult({ assessable_confidence: undefined })} />);
     expect(screen.queryByTestId("stt-confidence")).toBeNull();
   });

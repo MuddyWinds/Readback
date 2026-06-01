@@ -98,13 +98,13 @@
 }
 
 .sttBadge {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--text-dim);
-  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
   border-radius: 4px;
-  padding: 1px 5px;
+  padding: 1px 6px;
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
