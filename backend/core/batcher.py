@@ -45,6 +45,13 @@ def _set_next_batch(seconds: int | None = None) -> None:
     pipeline_status["next_batch_at"] = (utc_now_naive() + timedelta(seconds=seconds)).isoformat() + "Z"
 
 
+def _order_items_for_batch(items: list[dict]) -> list[dict]:
+    """Order batch items by (airport_code, timestamp) so any cross-transcript
+    attribution the model performs is chronological and within one airport.
+    Returns a new list; does not mutate the input."""
+    return sorted(items, key=lambda it: (it["airport_code"], it["timestamp"]))
+
+
 def _gemini_failure_pairs(items: list[dict], exc: Exception) -> list[tuple[dict, AnalysisResult]]:
     summary = (
         "Analysis temporarily unavailable: Gemini returned an error while this "
@@ -158,11 +165,15 @@ async def run_batcher() -> None:
         items: list[dict] = []
         while not transcript_queue.empty():
             items.append(transcript_queue.get_nowait())
-        # Cap at 15 per batch to keep Gemini token usage predictable
+        # Order by (airport, timestamp) BEFORE capping so each airport's chunks
+        # stay chronologically contiguous and the cap overflows the sorted tail,
+        # not an arbitrary FIFO tail (which could strand an instruction away from
+        # its read-back). Cap at 15 to keep Gemini token usage predictable.
+        items = _order_items_for_batch(items)
         if len(items) > 15:
             overflow = items[15:]
             items = items[:15]
-            for it in overflow:  # re-queue the rest for next cycle
+            for it in overflow:  # re-queue the sorted tail for next cycle
                 transcript_queue.put_nowait(it)
 
         if not items:
