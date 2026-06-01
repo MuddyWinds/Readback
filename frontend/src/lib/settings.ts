@@ -14,11 +14,29 @@ export interface FeedConfig {
 
 export interface RuntimeConfig {
   batch_interval_seconds: number;
+  batch_max_items: number;
   stt_rms_threshold: number;
   whisper_model: string;
   stt_concurrency: number;
   alert_min_severity: "low" | "medium" | "high" | "critical";
+  gemini_model: string;
 }
+
+export const GEMINI_MODELS: { label: string; value: string }[] = [
+  { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash" },
+  { label: "Gemini 3.5 Flash", value: "gemini-3.5-flash" },
+  { label: "Gemini 3.1 Flash-Lite", value: "gemini-3.1-flash-lite" },
+];
+
+export const DEFAULT_RUNTIME: RuntimeConfig = {
+  batch_interval_seconds: 300,
+  batch_max_items: 40,
+  stt_rms_threshold: 0,
+  whisper_model: "base",
+  stt_concurrency: 1,
+  alert_min_severity: "high",
+  gemini_model: "gemini-2.5-flash",
+};
 
 export interface AppSettings {
   gemini_api_key: string;

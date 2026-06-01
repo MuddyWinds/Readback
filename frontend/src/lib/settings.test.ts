@@ -22,3 +22,17 @@ test("leaves the URL unchanged when verification fails", () => {
   const res: VerifyFeedResult = { ok: false, stream_url: null, reason: "Unreachable" };
   expect(verifiedFeedFields(res, false)).toEqual({});
 });
+
+import { GEMINI_MODELS, DEFAULT_RUNTIME } from "./settings";
+
+test("GEMINI_MODELS lists the three selectable Gemini model IDs", () => {
+  expect(GEMINI_MODELS.map(m => m.value)).toEqual([
+    "gemini-2.5-flash",
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+  ]);
+});
+
+test("DEFAULT_RUNTIME carries gemini_model so it is always in the save payload", () => {
+  expect(DEFAULT_RUNTIME.gemini_model).toBe("gemini-2.5-flash");
+});

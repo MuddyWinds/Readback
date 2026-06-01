@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AppSettings, FeedConfig, RuntimeConfig, saveSettings, suggestAirportCode, verifiedFeedFields, verifyFeed } from "../lib/settings";
+import { AppSettings, DEFAULT_RUNTIME, FeedConfig, GEMINI_MODELS, RuntimeConfig, saveSettings, suggestAirportCode, verifiedFeedFields, verifyFeed } from "../lib/settings";
 import { useSettings } from "../SettingsContext";
 
 const MAX_FEEDS = 5;
@@ -31,10 +31,7 @@ export function SettingsPage() {
   const { settings, reload } = useSettings();
   const [key, setKey] = useState(settings?.gemini_api_key ?? "");
   const [revealKey, setRevealKey] = useState(false);
-  const [runtime, setRuntime] = useState(settings?.runtime ?? {
-    batch_interval_seconds: 300, stt_rms_threshold: 0, whisper_model: "base",
-    stt_concurrency: 1, alert_min_severity: "high" as const,
-  });
+  const [runtime, setRuntime] = useState<RuntimeConfig>(settings?.runtime ?? DEFAULT_RUNTIME);
   const [feeds, setFeeds] = useState<FeedRow[]>(
     (settings?.feeds ?? []).map(f => ({ ...f, _persisted: true, _verify: "idle" as VerifyState }))
   );
@@ -112,6 +109,11 @@ export function SettingsPage() {
               onChange={e => setRuntime({ ...runtime, batch_interval_seconds: Number(e.target.value) })} />
           </div>
           <div>
+            <label style={labelStyle}>Max transcripts per batch - live</label>
+            <input style={input} type="number" min={1} value={runtime.batch_max_items}
+              onChange={e => setRuntime({ ...runtime, batch_max_items: Number(e.target.value) })} />
+          </div>
+          <div>
             <label style={labelStyle}>RMS silence threshold - live</label>
             <input style={input} type="number" step="0.001" min={0} value={runtime.stt_rms_threshold}
               onChange={e => setRuntime({ ...runtime, stt_rms_threshold: Number(e.target.value) })} />
@@ -134,6 +136,13 @@ export function SettingsPage() {
               onChange={e => setRuntime({ ...runtime, alert_min_severity: e.target.value as RuntimeConfig["alert_min_severity"] })}>
               {(["low", "medium", "high", "critical"] as const).map(s =>
                 <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Gemini model - live</label>
+            <select style={input} value={runtime.gemini_model}
+              onChange={e => setRuntime({ ...runtime, gemini_model: e.target.value })}>
+              {GEMINI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </div>
         </div>
