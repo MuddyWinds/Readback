@@ -29,6 +29,8 @@ function twoAircraftResult() {
     { kind: "phraseology_note", note_type: "Read-back Error", hfacs_level: "Unsafe Act",
       significance: "medium", description: "n1", safety_pathway: null,
       relevant_regulation: null, transcript_excerpt: null, callsign: "UAL123" },
+    // NOTE: keep a "high" severity here — it makes posDefault true so showPosition
+    // starts on and the position-snapshot assertions below render.
     { kind: "situational_event", note_type: "Other", hfacs_level: "Unsafe Act",
       significance: "high", description: "e1", safety_pathway: null,
       relevant_regulation: null, transcript_excerpt: null, callsign: "DAL456" },
@@ -61,5 +63,19 @@ describe("ObservationCard layout (Approach A)", () => {
     for (const g of groups) {
       expect(g.querySelectorAll('[data-testid="evidence-transcript"]')).toHaveLength(0);
     }
+  });
+});
+
+describe("ObservationCard STT chip", () => {
+  it("surfaces assessable_confidence as a distinct STT % chip (not AI confidence)", () => {
+    renderCard(<ObservationCard r={makeResult({ assessable_confidence: 0.42 })} />);
+    const chip = screen.getByTestId("stt-confidence");
+    expect(chip.textContent).toContain("STT");
+    expect(chip.textContent).toContain("42%");
+  });
+
+  it("omits the STT chip when assessable_confidence is absent", () => {
+    renderCard(<ObservationCard r={makeResult({ assessable_confidence: undefined })} />);
+    expect(screen.queryByTestId("stt-confidence")).toBeNull();
   });
 });

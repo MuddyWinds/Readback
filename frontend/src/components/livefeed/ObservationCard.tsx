@@ -95,6 +95,15 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
             {formatDistanceToNow(new Date(r.timestamp.endsWith("Z") ? r.timestamp : r.timestamp + "Z"), { addSuffix: true })}
           </span>
           <ConfidenceBadge score={r.confidence_score} />
+          {r.assessable_confidence != null && (
+            <span
+              data-testid="stt-confidence"
+              className={styles.sttBadge}
+              title="Speech-to-text transcription confidence (not AI analysis confidence)"
+            >
+              STT {Math.round(r.assessable_confidence * 100)}%
+            </span>
+          )}
         </div>
       </div>
 
