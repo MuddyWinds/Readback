@@ -1,11 +1,40 @@
 import React from "react";
 import type { Enrichment } from "../../lib/types";
 import { isAsrAmbiguous } from "../../lib/transcript";
+import { resolveExcerptMarks, tokenizeBlock, type ExcerptMark, type TextBlock } from "../../lib/excerptHighlight";
 import styles from "./StructuredTranscript.module.css";
+
+/** Render one text block's tokens, wrapping mark tokens in numbered glow spans. */
+function renderTokens(
+  text: string,
+  allocations: ReturnType<typeof resolveExcerptMarks>,
+  activeMark: number | null | undefined,
+  onMarkHover: ((n: number | null) => void) | undefined,
+) {
+  return tokenizeBlock(text, allocations).map((t, i) => {
+    if (t.type === "text") return <span key={i}>{t.text}</span>;
+    const isActive = activeMark === t.n;
+    return (
+      <mark
+        key={i}
+        className={`${styles.mark} ${isActive ? styles.markActive : ""}`}
+        tabIndex={0}
+        aria-label={`Finding ${t.n} reference`}
+        onMouseEnter={() => onMarkHover?.(t.n)}
+        onMouseLeave={() => onMarkHover?.(null)}
+        onFocus={() => onMarkHover?.(t.n)}
+        onBlur={() => onMarkHover?.(null)}
+      >
+        <sup className={styles.markNum}>{t.n}</sup>{t.text}
+      </mark>
+    );
+  });
+}
 
 /** Structured transcript: speaker-labelled turns, readback comparison. */
 export function StructuredTranscript({
   segments, enrichment, showReadback = true, rawTranscript, borderColor, assessableConfidence,
+  excerptMarks = [], activeMark = null, onMarkHover,
 }: {
   segments?: import("../../lib/types").SpeakerSegment[];
   enrichment: Enrichment | null | undefined;
@@ -13,17 +42,25 @@ export function StructuredTranscript({
   rawTranscript: string;
   borderColor: string;
   assessableConfidence?: number;
+  excerptMarks?: ExcerptMark[];
+  activeMark?: number | null;
+  onMarkHover?: (n: number | null) => void;
 }) {
   const segs = segments ?? enrichment?.speaker_segments;
   const hasStructure = segs && segs.length > 0 && segs.some(s => s.role !== "UNKNOWN");
 
   if (!hasStructure) {
+    const blocks: TextBlock[] = [{ blockId: "raw", text: rawTranscript }];
+    const allocations = resolveExcerptMarks(blocks, excerptMarks);
     return (
       <div className={styles.rawTranscript}>
-        {rawTranscript}
+        {renderTokens(rawTranscript, allocations, activeMark, onMarkHover)}
       </div>
     );
   }
+
+  const blocks: TextBlock[] = segs!.map((s, i) => ({ blockId: `seg-${i}`, text: s.text }));
+  const allocations = resolveExcerptMarks(blocks, excerptMarks);
 
   const roleChipClass: Record<string, string> = {
     ATC: styles.roleAtc,
@@ -41,7 +78,7 @@ export function StructuredTranscript({
           </span>
           {seg.callsign && <span className={styles.segCallsign}>{seg.callsign}</span>}
           <span className={styles.segText}>
-            {seg.text}
+            {renderTokens(seg.text, allocations.filter(a => a.blockId === `seg-${i}`), activeMark, onMarkHover)}
           </span>
         </div>
       ))}

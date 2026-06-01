@@ -176,3 +176,34 @@
   margin-top: 4px;
   font-style: italic;
 }
+
+/* Excerpt highlight linking a finding to its triggering words. Muted by
+   default; brightens (glows) when the matching finding is hovered/focused.
+   Neutral, never a severity hue — severity stays on the finding badge. */
+.mark {
+  /* Override the <mark> element's default yellow background and dark text. */
+  color: inherit;
+  background: color-mix(in srgb, var(--text-dim) 14%, transparent);
+  border-radius: 3px;
+  padding: 0 2px;
+  cursor: pointer;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+
+.markActive {
+  background: color-mix(in srgb, var(--text-dim) 30%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-sub) 45%, transparent);
+}
+
+.mark:focus-visible {
+  outline: 2px solid var(--text-sub);
+  outline-offset: 1px;
+}
+
+.markNum {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-sub);
+  margin-right: 2px;
+  vertical-align: super;
+}
