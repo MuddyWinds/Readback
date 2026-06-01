@@ -135,20 +135,15 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
         </div>
       )}
 
-      {/* ── 2. EVIDENCE — transcript + position snapshot ── */}
+      {/* ── 2. EVIDENCE — transcript (once) + position toggle ── */}
       <div className={styles.evidence}>
         <SectionLabel>Evidence</SectionLabel>
 
-        {/* Toggle buttons — side by side */}
         <div className={styles.toggleRow}>
-          <button
-            onClick={() => setShowTranscript(v => !v)}
-            className={styles.transcriptToggle}
-          >
+          <button onClick={() => setShowTranscript(v => !v)} className={styles.transcriptToggle}>
             <span className={styles.toggleIcon}>{"</>"}</span>
             {showTranscript ? "Hide transcript" : "View transcript"}
           </button>
-
           <button
             onClick={() => setShowPosition(v => !v)}
             className={`${styles.posToggle} ${showPosition ? styles.posToggleActive : styles.posToggleInactive}`}
@@ -158,13 +153,20 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
           </button>
         </div>
 
+        {showTranscript && (
+          <div data-testid="evidence-transcript" className={styles.transcriptBlock}>
+            <StructuredTranscript
+              enrichment={r.enrichment}
+              rawTranscript={r.transcript}
+              borderColor="var(--sev-border)"
+              assessableConfidence={r.assessable_confidence}
+            />
+          </div>
+        )}
       </div>
 
-      {/* ── PER-CALLSIGN GROUPS — transcript + position + observations ── */}
+      {/* ── 3. ANALYSIS — per-callsign position + observations (NO transcript) ── */}
       <div className={styles.analysis}>
-        {/* Header rendered once, above all groups. The transcript/position
-            always live under this heading, so it must render unconditionally
-            rather than be gated on observation count. */}
         <div className={styles.analysisHeader}>
           <SectionLabel>Analysis</SectionLabel>
           <span
@@ -175,9 +177,8 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
           </span>
         </div>
 
-        {groups.map((g, gi) => {
-          const groupConf: "high" | "low" =
-            g.key === UNATTRIBUTED ? "low" : confidence;
+        {groups.map((g) => {
+          const groupConf: "high" | "low" = g.key === UNATTRIBUTED ? "low" : confidence;
           const notes = g.observations
             .filter(v => v.kind === "phraseology_note")
             .sort((a, b) => (SEV_ORDER[b.significance] ?? 0) - (SEV_ORDER[a.significance] ?? 0));
@@ -187,6 +188,7 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
           return (
             <div
               key={g.key}
+              data-testid="analysis-group"
               className={styles.transcriptBlock}
               onMouseEnter={() => onSelectAircraft?.({
                 icao24: g.callsign ? (icaoByCallsign.current.get(g.callsign) ?? null) : null,
@@ -194,37 +196,19 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
               })}
               onMouseLeave={() => onSelectAircraft?.(null)}
             >
-              {g.callsign && (
-                <div className={styles.groupHeading}>{g.callsign}</div>
-              )}
-              {g.key === UNATTRIBUTED && (
-                <div className={styles.groupHeading}>General / unattributed</div>
-              )}
-
-              {showTranscript && (
-                <StructuredTranscript
-                  segments={g.segments}
-                  enrichment={r.enrichment}
-                  /* Enrichment carries a single readback (readback_discrepancy /
-                     readback_correct are not per-callsign). We intentionally show
-                     it once, on the first group — which is ordered by first
-                     speaker-segment appearance (often ATC) and may differ from
-                     the aircraft that actually read back. */
-                  showReadback={gi === 0}
-                  rawTranscript={r.transcript}
-                  borderColor="var(--sev-border)"
-                  assessableConfidence={r.assessable_confidence}
-                />
-              )}
+              {g.callsign && <div className={styles.groupHeading}>{g.callsign}</div>}
+              {g.key === UNATTRIBUTED && <div className={styles.groupHeading}>General / unattributed</div>}
 
               {showPosition && g.callsign && (
-                <PositionSnapshot
-                  r={r}
-                  callsign={g.callsign}
-                  confidence={groupConf}
-                  borderColor="var(--sev-border)"
-                  onResolved={(cs, icao) => { if (cs) icaoByCallsign.current.set(cs, icao); }}
-                />
+                <div data-testid="position-snapshot">
+                  <PositionSnapshot
+                    r={r}
+                    callsign={g.callsign}
+                    confidence={groupConf}
+                    borderColor="var(--sev-border)"
+                    onResolved={(cs, icao) => { if (cs) icaoByCallsign.current.set(cs, icao); }}
+                  />
+                </div>
               )}
 
               {notes.length > 0 && (
