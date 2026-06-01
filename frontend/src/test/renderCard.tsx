@@ -28,7 +28,7 @@ export function makeResult(overrides: Partial<AnalysisResult> = {}): AnalysisRes
       callsign_clarity: 90,
     },
     ...overrides,
-  } as AnalysisResult;
+  };
 }
 
 /**
