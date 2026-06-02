@@ -13,6 +13,7 @@ import { resolveNavTarget } from "./lib/alerts";
 import { severityCounts } from "./lib/selectors";
 import { HeaderBar } from "./components/app/HeaderBar";
 import { TabPeriodBar } from "./components/app/TabPeriodBar";
+import { type TabKey } from "./lib/tabs";
 import styles from "./App.module.css";
 
 const FILTER_BUTTONS: { key: Filter; label: string }[] = [
@@ -36,7 +37,7 @@ export default function App() {
     [settings]
   );
   const [activeFeeds, setActiveFeeds]   = useState<Set<string>>(new Set());
-  const [tab, setTab]                   = useState<"live" | "settings">("live");
+  const [tab, setTab]                   = useState<TabKey>("live");
   const [filter, setFilter]             = useState<Filter>("all");
   const [airportFilter, setAirportFilter] = useState<string>("all");
   const [dateFilter, setDateFilter]     = useState<DateFilter>("all");
