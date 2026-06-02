@@ -5,6 +5,7 @@ import { hourlyActivity } from "../../lib/analytics";
 import { resolveAggregateNavTarget, type AggregateNavTarget } from "../../lib/alerts";
 import { exportUrl } from "../../lib/api";
 import { DateFilter, getStartDate } from "../../lib/format";
+import { EXPORT_ENABLED } from "../../lib/tabs";
 import type { AnalysisResult } from "../../lib/types";
 import styles from "./InsightsTab.module.css";
 
@@ -273,7 +274,7 @@ export function InsightsTab({ stats, results, onNavigate, dateFilter = "all", ai
   if (stats.total_chunks_analyzed === 0) {
     return (
       <div className={styles.tab}>
-        <ExportControls dateFilter={dateFilter} airport={airport} />
+        {EXPORT_ENABLED && <ExportControls dateFilter={dateFilter} airport={airport} />}
         <HeadlineTiles stats={stats} />
         <Section title="Insights">
           <p className={styles.empty}>No analyses in this period.</p>
@@ -284,7 +285,7 @@ export function InsightsTab({ stats, results, onNavigate, dateFilter = "all", ai
 
   return (
     <div className={styles.tab}>
-      <ExportControls dateFilter={dateFilter} airport={airport} />
+      {EXPORT_ENABLED && <ExportControls dateFilter={dateFilter} airport={airport} />}
       <HeadlineTiles stats={stats} />
       <Section title="Severity">
         <SeverityBars stats={stats} />

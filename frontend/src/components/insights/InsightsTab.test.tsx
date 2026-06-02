@@ -19,4 +19,11 @@ describe("InsightsTab", () => {
     render(<InsightsTab stats={{ ...EMPTY_STATS, total_chunks_analyzed: 42 }} results={[]} onNavigate={() => {}} />);
     expect(screen.queryByText("42")).not.toBeNull();
   });
+
+  it("hides export controls while EXPORT_ENABLED is false", () => {
+    render(<InsightsTab stats={{ ...EMPTY_STATS, total_chunks_analyzed: 42 }} results={[]} onNavigate={() => {}} />);
+    expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "CSV" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "JSON" })).toBeNull();
+  });
 });
