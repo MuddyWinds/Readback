@@ -23,6 +23,20 @@ export function useResults(dateFilter: DateFilter) {
   });
 }
 
+export function useStats(dateFilter: DateFilter, airport?: string) {
+  const startDate = getStartDate(dateFilter);
+  return useQuery({
+    queryKey: ["stats", dateFilter, airport ?? null],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (startDate) params.set("start_date", startDate);
+      if (airport) params.set("airport", airport);
+      const qs = params.toString();
+      return fetchJson<any>(`${API_BASE}/api/stats${qs ? `?${qs}` : ""}`);
+    },
+  });
+}
+
 export function usePipelineStatus() {
   return useQuery({
     queryKey: ["pipelineStatus"],
