@@ -48,7 +48,7 @@ export function ObservationItem({
   onReadbackActivate,
   onDeactivate,
 }: Props) {
-  const vLabelColor = ["medium", "low"].includes(v.significance) ? "var(--bg)" : "white";
+  const vLabelColor = ["low", "medium", "high"].includes(v.significance) ? "var(--bg)" : "white";
   const hfacsPlain = HFACS_PLAIN[v.hfacs_level] ?? v.hfacs_level;
   const accentVar = `var(--sev-${v.significance})`;
   const displayPoints = points?.length

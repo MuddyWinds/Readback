@@ -14,6 +14,12 @@
   transition: background 0.12s;
 }
 
+.row,
+.rowLast {
+  --finding-label-col: 96px;
+  --finding-label-gap: 10px;
+}
+
 /* Finding glow — mirrors the Evidence highlight glow on hover/focus.
    Neutral brightness bump, not a severity hue. */
 .rowActive {
@@ -88,8 +94,8 @@
 /* Two-line body: labelled "What happened" / "Why it matters" */
 .bodyRow {
   display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 10px;
+  grid-template-columns: var(--finding-label-col) 1fr;
+  gap: var(--finding-label-gap);
   align-items: baseline;
   margin-bottom: 8px;
 }
@@ -152,7 +158,7 @@
 }
 
 .readbackCompare {
-  margin: 8px 0;
+  margin: 8px 0 8px calc(var(--finding-label-col) + var(--finding-label-gap));
   padding: 8px 10px;
   border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
@@ -202,8 +208,9 @@
 }
 
 .needsReviewBadge {
-  color: var(--bg);
-  background: var(--sev-medium);
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
 .readbackCompareCaveat {

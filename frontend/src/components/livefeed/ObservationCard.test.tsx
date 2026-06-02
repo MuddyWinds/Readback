@@ -162,7 +162,7 @@ describe("ObservationCard readback redesign", () => {
     expect(screen.getByLabelText("Finding PIL reference").textContent).toContain("climb and maintain 6000");
   });
 
-  it("anchors orphan readback as finding #1 without changing the header observation count", () => {
+  it("anchors orphan readback in severity order without changing the header observation count", () => {
     const r = makeResult({
       observations: [
         { kind: "phraseology_note", note_type: "Critical Phraseology", hfacs_level: "Unsafe Act",
@@ -186,9 +186,10 @@ describe("ObservationCard readback redesign", () => {
     renderCard(<ObservationCard r={r} />);
 
     const rows = screen.getAllByTestId("finding-row");
-    expect(rows[0].textContent).toContain("Read-back Error");
-    expect(rows[0].textContent).toContain("detected · unconfirmed");
-    expect(rows[0].textContent).toContain("Needs review");
+    expect(rows[0].textContent).toContain("Critical Phraseology");
+    expect(rows[1].textContent).toContain("Read-back Error");
+    expect(rows[1].textContent).toContain("detected · unconfirmed");
+    expect(rows[1].textContent).toContain("Needs review");
     expect(screen.getAllByTestId("finding-number").map(n => n.textContent)).toEqual(["1", "2"]);
     expect(screen.queryByTestId("orphan-readback-note")).toBeNull();
     expect(screen.getByText("· 1 observation")).toBeTruthy();

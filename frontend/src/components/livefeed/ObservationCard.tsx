@@ -48,7 +48,7 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
   const confidence    = enrichClarity >= 75 ? "high" : (enrichClarity >= 40 ? "low" : regexConf);
 
   const icon          = SEV_ICON[severity] ?? "•";
-  const labelTextColor = ["low", "medium"].includes(severity) ? "var(--bg)" : "white";
+  const labelTextColor = ["low", "medium", "high"].includes(severity) ? "var(--bg)" : "white";
   const bullets       = r.summary ? parseBullets(r.summary) : [];
 
   const baseObservationCount = r.observations?.length ?? 0;

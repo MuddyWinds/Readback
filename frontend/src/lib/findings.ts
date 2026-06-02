@@ -40,19 +40,14 @@ export function buildDisplayFindings(
   observations: Observation[],
   syntheticReadback: Observation | null,
 ): DisplayFinding[] {
-  const real = orderedFindings(observations).map(f => ({ ...f, synthetic: false }));
-  const combined = syntheticReadback
-    ? [{
-      observation: syntheticReadback,
-      n: 0,
-      type: syntheticReadback.kind as "phraseology_note" | "situational_event",
-      synthetic: true,
-    }, ...real]
-    : real;
+  const syntheticObservations = syntheticReadback ? [syntheticReadback] : [];
+  const syntheticSet = new Set<Observation>(syntheticObservations);
+  const ordered = orderedFindings([...observations, ...syntheticObservations]);
 
-  return combined.map((finding, index) => ({
+  return ordered.map((finding, index) => ({
     ...finding,
     n: index + 1,
+    synthetic: syntheticSet.has(finding.observation),
   }));
 }
 

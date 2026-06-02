@@ -107,7 +107,7 @@ forget when validating):
 - **Frontend data layer**
   - `frontend/src/lib/queries.ts` — phase-2 adds `useStats`, `useReviewQueue`, `useCallsigns`,
     `useStudySheet` (current `main` has none of these; `queries.ts:11` is `useResults` only).
-  - `frontend/src/lib/api.ts` — adds `exportUrl` and the stats/review fetchers.
+  - `frontend/src/lib/api.ts` — adds `exportUrl`; stats/review fetchers live in `queries.ts`.
   - Tests: `queries.review.test.tsx`, `queries.stats.test.tsx`, `tabs.test.ts`.
 - **Backend endpoints** (consumed by the above hooks)
   - `backend/api/results.py` — review-status filtering on the results query.
@@ -115,7 +115,7 @@ forget when validating):
   - `backend/api/reports.py`, `backend/analysis/categorizer.py`, `backend/core/batcher.py`,
     `backend/core/callsign.py` — supporting changes.
   - `backend/db/models.py` + `backend/db/migrations/runner.py` — `status` / `reviewer_notes` columns
-    (migrations `0002`/`0003`).
+    (migrations `0002`/`0003`) are already on `main`; verify the merge preserves them.
   - `backend/main.py` — mounts the new routers. Current `main` mounts
     `results, monitor, aviation_data, reports, settings` only (`main.py:40-44`); the merge must add
     the **export** router (and any stats/review router) or the Insights/Review tabs will 404.
@@ -238,11 +238,12 @@ build ReadbackComparison { atcInstruction, pilotReadback, discrepancy, lowConfid
 |---|---|
 | `lib/tabs.ts` | Flag-gate `study` (`enabled: false`); keep `insights` + `review` enabled. Add `EXPORT_ENABLED` flag (default `false`). |
 | `lib/queries.ts`, `lib/api.ts` | Restored (merge): `useStats`, `useReviewQueue`, `useCallsigns`, `useStudySheet`, `exportUrl`. Verify they land — see "Restore surface". |
-| `backend/api/{results,export,reports}.py`, `backend/main.py`, `backend/db/{models.py,migrations/runner.py}` | Restored (merge): review-status filtering, export route + router mount, `status`/`reviewer_notes` columns. |
+| `backend/api/{results,export,reports}.py`, `backend/main.py` | Restored (merge): review-status filtering, export route + router mount. |
+| `backend/db/{models.py,migrations/runner.py}` | Already on `main`: `status`/`reviewer_notes` columns and migrations `0002`/`0003`; verify preserved. |
 | `components/insights/InsightsTab.tsx` | Render `ExportControls` only when `EXPORT_ENABLED`. |
 | `App.tsx` | `tab` state → `TabKey`; reconcile tab registry with card-click handlers. |
-| `ObservationCard.tsx` | Remove orphan note (`275-287`); allocate one shared `readbackMarkId` and emit both ATC/PIL excerpt marks under it; for the orphan case build the synthetic observation and **unshift it to the head of the ordered findings list** (after `orderedFindings`), renumber, and exclude it from the header count; include `readbackMarkId` in the anchor row's point-id set; pass the `unconfirmed` flag to the row. |
-| `ObservationItem.tsx` | Drop ATC/Pilot reprint (`110-120`); render delta only; show the `Needs review` badge + lowConfidence caveat as a sub-line; row hover calls `activate(readbackMarkId, …)`. **No** triage buttons. |
+| `ObservationCard.tsx` | Remove orphan note (`275-287`); allocate one shared `readbackMarkId` and emit both ATC/PIL excerpt marks under it; for the orphan case build the synthetic observation and **unshift it to the head of the ordered findings list** (after `orderedFindings`), renumber, and exclude it from the header count; carry `readbackMarkId` as a row activation id (not a fake rendered `FindingPoint`); pass the `unconfirmed` flag to the row. |
+| `ObservationItem.tsx` | Drop ATC/Pilot reprint (`110-120`); render delta only; show the `Needs review` badge + lowConfidence caveat as a sub-line; row hover calls `activate(readbackMarkId, …)` through a dedicated activation prop. **No** triage buttons. |
 | `findings.ts` | Add the explicit synthetic-insert + renumber step (head-of-list), keeping `orderedFindings` itself severity-sorted for real observations. |
 | `StructuredTranscript.tsx` | **Unchanged** — shared-id approach needs no `activeMark` model change. |
 | `ReportActions.tsx` / `StatusWorkflow.tsx` / `ReviewerNotes.tsx` | Unchanged — already on `main`; remain the single triage surface. |

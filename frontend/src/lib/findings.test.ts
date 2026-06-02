@@ -50,17 +50,17 @@ describe("buildDisplayFindings", () => {
     ]);
   });
 
-  it("inserts synthetic readback at finding #1 regardless of real severity", () => {
+  it("sorts synthetic readback by severity with other phraseology findings", () => {
     const synthetic = obs("phraseology_note", "medium", "Read-back Error");
     const out = buildDisplayFindings([
       obs("phraseology_note", "critical", "Phraseology"),
-      obs("phraseology_note", "high", "Other"),
+      obs("phraseology_note", "low", "Other"),
     ], synthetic);
 
     expect(out.map(f => [f.n, f.observation.note_type, f.observation.significance, f.synthetic])).toEqual([
-      [1, "Read-back Error", "medium", true],
-      [2, "Phraseology", "critical", false],
-      [3, "Other", "high", false],
+      [1, "Phraseology", "critical", false],
+      [2, "Read-back Error", "medium", true],
+      [3, "Other", "low", false],
     ]);
   });
 
