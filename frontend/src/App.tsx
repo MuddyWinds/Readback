@@ -64,6 +64,15 @@ export default function App() {
     setPendingScrollId(t.resultId ?? null);
   }, []);
 
+  const openResultContext = useCallback((
+    result: AnalysisResult,
+    aircraft: { icao24: string | null; callsign: string | null } | null,
+  ) => {
+    setTab("live");
+    setSidebarAirport(result.airport_code);
+    setSelectedAircraft(aircraft);
+  }, []);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: queryResults, error: resultsError } = useResults(dateFilter);
@@ -309,6 +318,7 @@ export default function App() {
                     pipelineStatus={pipelineStatus}
                     apiError={apiError}
                     onSelectAircraft={setSelectedAircraft}
+                    onOpenResultContext={openResultContext}
                   />
               </div>
             </div>

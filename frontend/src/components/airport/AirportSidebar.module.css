@@ -129,12 +129,6 @@
   padding: 2px 7px;
 }
 
-.infoHint {
-  color: var(--text-faint, #484f58);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-
 .infoRight {
   align-items: center;
   display: flex;

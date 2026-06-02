@@ -22,21 +22,23 @@ interface PipelineStatusSummary {
 }
 
 // ─── ResultCard — routes to the right component ──────────────────────────────
-const ResultCard = React.memo(function ResultCard({ r, priorOccurrences, lastSeenAgo, onSelectAircraft }: {
+const ResultCard = React.memo(function ResultCard({ r, priorOccurrences, lastSeenAgo, onSelectAircraft, onOpenResultContext }: {
   r: AnalysisResult;
   priorOccurrences?: number;
   lastSeenAgo?: string | null;
   onSelectAircraft?: (sel: { icao24: string | null; callsign: string | null } | null) => void;
+  onOpenResultContext?: (r: AnalysisResult, sel: { icao24: string | null; callsign: string | null } | null) => void;
 }) {
   const severity = getCardSeverity(r);
-  if (severity === "unassessable") return <UnassessableCard r={r} />;
-  if (severity === "standard") return <CompliantCard r={r} />;
+  if (severity === "unassessable") return <UnassessableCard r={r} onOpenResultContext={onOpenResultContext} />;
+  if (severity === "standard") return <CompliantCard r={r} onOpenResultContext={onOpenResultContext} />;
   return (
     <ObservationCard
       r={r}
       priorOccurrences={priorOccurrences}
       lastSeenAgo={lastSeenAgo}
       onSelectAircraft={onSelectAircraft}
+      onOpenResultContext={onOpenResultContext}
     />
   );
 });
@@ -50,6 +52,7 @@ interface Props {
   pipelineStatus?: PipelineStatusSummary | null;
   apiError?: string | null;
   onSelectAircraft?: (sel: { icao24: string | null; callsign: string | null } | null) => void;
+  onOpenResultContext?: (r: AnalysisResult, sel: { icao24: string | null; callsign: string | null } | null) => void;
 }
 
 function emptyMessage(
@@ -67,7 +70,7 @@ function emptyMessage(
   return "Connecting to live ATC feeds...";
 }
 
-export function LiveFeed({ results, filter, airportFilter, isRunning, pipelineStatus, apiError, onSelectAircraft }: Props) {
+export function LiveFeed({ results, filter, airportFilter, isRunning, pipelineStatus, apiError, onSelectAircraft, onOpenResultContext }: Props) {
   // Build callsign occurrence index (results ordered newest-first)
   // For each result, compute how many OLDER results share the same callsign
   const callsignIndex = React.useMemo(() => {
@@ -128,6 +131,7 @@ export function LiveFeed({ results, filter, airportFilter, isRunning, pipelineSt
               priorOccurrences={priorOccurrences}
               lastSeenAgo={lastSeenAgo}
               onSelectAircraft={onSelectAircraft}
+              onOpenResultContext={onOpenResultContext}
             />
           );
         })}

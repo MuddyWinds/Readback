@@ -89,6 +89,7 @@ export function AirportSidebar({ airportCode, onClose, results = [], selectedAir
   // Resizable map height (drag handle)
   const [mapHeight, setMapHeight] = useState(280);
   const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [, forceTick] = useState(0);
@@ -142,6 +143,14 @@ export function AirportSidebar({ airportCode, onClose, results = [], selectedAir
   }, [selectedAircraft, aircraft]);
   const activeRwy = activeRunway(metar?.wdir ?? null, feed?.runways ?? []);
 
+  // Clicking a card opens that airport here; surface the tracked aircraft by
+  // opening the map and scrolling it back into view.
+  useEffect(() => {
+    if (!selectedAircraft) return;
+    setScopeOpen(true);
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, [airportCode, selectedAircraft]);
+
   const catVar   = catColorVar(metar?.fltCat);
   const catLabel = metar?.fltCat ? (CAT_LABEL[metar.fltCat] ?? metar.fltCat) : null;
   const ceiling  = metar ? deriveCeiling(metar.clouds) : null;
@@ -194,7 +203,7 @@ export function AirportSidebar({ airportCode, onClose, results = [], selectedAir
       </div>
 
       {/* ── Scrollable body ── */}
-      <div className={styles.body}>
+      <div ref={bodyRef} data-testid="airport-sidebar-body" className={styles.body}>
 
         {/* ── Airport Scope / Live Map ── */}
         <div className={styles.scopeSection}>
@@ -221,18 +230,17 @@ export function AirportSidebar({ airportCode, onClose, results = [], selectedAir
 
               {/* Info bar */}
               <div className={styles.infoBar}>
-                <div className={styles.infoLeft}>
+                <div data-testid="map-info-left" className={styles.infoLeft}>
                   {activeRwy && (
                     <span className={styles.activeRwyBadge}>
                       ACTIVE RWY {activeRwy}
                     </span>
                   )}
-                  <span className={styles.infoHint}>OSM · scroll/pinch to zoom</span>
-                </div>
-                <div className={styles.infoRight}>
                   {adsbAge != null && (
                     <span className={adsbAgeClass}>ADS-B {ageLabel}</span>
                   )}
+                </div>
+                <div className={styles.infoRight}>
                   <button onClick={() => adsb.refetch()} className={styles.refetchBtn}>↻</button>
                 </div>
               </div>

@@ -9,16 +9,28 @@ import { StatusWorkflow } from "./StatusWorkflow";
 import { ReviewerNotes } from "./ReviewerNotes";
 import styles from "./CompliantCard.module.css";
 
-export function CompliantCard({ r }: { r: AnalysisResult }) {
+interface Props {
+  r: AnalysisResult;
+  onOpenResultContext?: (
+    r: AnalysisResult,
+    sel: { icao24: string | null; callsign: string | null } | null,
+  ) => void;
+}
+
+export function CompliantCard({ r, onOpenResultContext }: Props) {
   const [expanded, setExpanded] = useState(false);
   const { callsign } = extractCallsign(r.transcript);
   const actions = extractActions(r.transcript);
+  const handleClick = () => {
+    onOpenResultContext?.(r, callsign ? { icao24: null, callsign } : null);
+    setExpanded(v => !v);
+  };
 
   return (
     <div
       id={r.id ? `result-${r.id}` : undefined}
       className={styles.card}
-      onClick={() => setExpanded(v => !v)}
+      onClick={handleClick}
     >
       {/* Single-line header — all info in one row */}
       <div className={styles.header}>

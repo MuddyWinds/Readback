@@ -21,9 +21,19 @@ interface Props {
   priorOccurrences?: number;
   lastSeenAgo?: string | null;
   onSelectAircraft?: (sel: { icao24: string | null; callsign: string | null } | null) => void;
+  onOpenResultContext?: (
+    r: AnalysisResult,
+    sel: { icao24: string | null; callsign: string | null } | null,
+  ) => void;
 }
 
-export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAircraft }: Props) {
+function isInteractiveClick(target: EventTarget | null): boolean {
+  return target instanceof Element && !!target.closest(
+    "button,a,input,select,textarea,[role='button']",
+  );
+}
+
+export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAircraft, onOpenResultContext }: Props) {
   const severity   = getCardSeverity(r);
   const posDefault = severity === "critical" || severity === "high";
   const [showTranscript, setShowTranscript] = useState(true);
@@ -82,11 +92,18 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
     onSelectAircraft?.({ icao24: cs ? (icaoByCallsign.current.get(cs) ?? null) : null, callsign: cs });
   };
   const deactivate = () => { setActiveMark(null); onSelectAircraft?.(null); };
+  const openContext = (event: React.MouseEvent) => {
+    if (isInteractiveClick(event.target)) return;
+    onOpenResultContext?.(r, callsign
+      ? { icao24: icaoByCallsign.current.get(callsign) ?? null, callsign }
+      : null);
+  };
 
   return (
     <div
       id={r.id ? `result-${r.id}` : undefined}
       className={styles.card}
+      onClick={openContext}
       style={{
         ["--sev-border" as any]: `var(--sev-${severity}-border)`,
         ["--sev-bg" as any]: `var(--sev-${severity}-bg)`,

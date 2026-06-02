@@ -97,6 +97,40 @@
   letter-spacing: 1.2px;
   text-transform: uppercase;
   margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: none;
+}
+
+.legendCallsign { color: var(--accent); }
+.legendFreq { color: var(--sev-medium); }
+
+/* Recognisable tokens lifted out of the raw transcript for spot-checking. */
+.callsignHL {
+  color: var(--accent);
+  background: rgba(88, 166, 255, 0.12);
+  border-radius: 3px;
+  padding: 0 2px;
+  font-weight: 600;
+}
+
+.freqHL {
+  color: var(--sev-medium);
+  background: rgba(227, 179, 65, 0.12);
+  border-radius: 3px;
+  padding: 0 2px;
+  font-weight: 600;
 }
 
 .transcriptBlock {
