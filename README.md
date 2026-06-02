@@ -2,7 +2,7 @@
 
 > *ATC phraseology, read back to you.*
 
-<img width="1600" height="1247" alt="image" src="https://github.com/user-attachments/assets/e37a9a23-8e5a-4078-aaa5-4bd939b5da00" />
+<img width="1246" height="954" alt="Screenshot 2026-06-03 at 4 41 55 AM" src="https://github.com/user-attachments/assets/84f572d2-c7ce-47b2-90b8-14110f194f9f" />
 
 > *"I was parked at the threshold of 28R at KSFO, listening to the tower frequency on my handheld, when I heard something that didn't sound right — a clearance that seemed to conflict with another aircraft still on the runway. By the time I processed it, the controller had already issued a go-around. I wished I had something that could catch those moments automatically, log them, and tell me exactly what regulation was implicated."*
 
@@ -26,7 +26,6 @@ Built for aviation enthusiasts, safety researchers, student pilots, and anyone w
 - Correlates findings with live **ADS-B traffic** from OpenSky Network
 - Pulls **METAR weather**, **NOTAMs**, and **SIGMET/AIRMET/PIREP** hazards for full situational context
 - Streams results live to a React dashboard via WebSocket
-- Generates **per-aircraft study sheets** aggregating all transmissions for a callsign
 
 ---
 
@@ -73,12 +72,11 @@ LiveATC Stream (MP3)
         │
         ▼
    React Dashboard
-   ├── AirportSidebar      select/manage monitored airports
+   ├── HeaderBar           feed controls + live audio
    ├── LiveFeed            real-time transcript + observation stream
-   ├── PhraseologyNote /   per-observation detail + HFACS category
-   │   Event rendering
-   ├── SituationRoom       unified ops view with weather + NOTAMs
-   └── SettingsPage        configure feeds, batch interval, STT model
+   │   └── ObservationCard per-transmission detail + HFACS category
+   ├── AirportSidebar      map, ADS-B, weather + NOTAMs for the selected airport
+   └── SettingsPage        configure feeds, batch interval, STT model, alerts
 ```
 
 ### Key Design Decisions
@@ -460,3 +458,9 @@ same way (map marker, ADS-B, hazards, runway overlay):
 ## Contributing
 
 PRs welcome. If you add a new airport, add its coordinates to `AIRPORT_GEO` in `backend/core/batcher.py` so ADS-B correlation works.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE).
