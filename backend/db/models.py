@@ -17,6 +17,7 @@ class AnalysisResultDB(Base):
     chunk_id = Column(Integer, index=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     airport_code = Column(String(10), index=True)
+    callsign = Column(String(16), index=True, nullable=True)  # normalized aircraft callsign
     transcript = Column(Text)
     assessable = Column(Boolean, default=True)
     assessable_confidence = Column(Float, default=1.0)

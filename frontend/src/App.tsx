@@ -6,13 +6,17 @@ import { useSettings } from "./SettingsContext";
 import { useWindowWidth } from "./hooks/useWindowWidth";
 import { API_BASE, fetchJson } from "./lib/api";
 import { DateFilter } from "./lib/format";
-import { useMonitorStatus, usePipelineStatus, useResults } from "./lib/queries";
+import { useMonitorStatus, usePipelineStatus, useResults, useStats } from "./lib/queries";
 import { useLiveSocket } from "./hooks/useLiveSocket";
 import { useEventAlerts } from "./hooks/useEventAlerts";
-import { resolveNavTarget } from "./lib/alerts";
+import { resolveNavTarget, type AggregateNavTarget } from "./lib/alerts";
 import { severityCounts } from "./lib/selectors";
 import { HeaderBar } from "./components/app/HeaderBar";
 import { TabPeriodBar } from "./components/app/TabPeriodBar";
+import { InsightsTab } from "./components/insights/InsightsTab";
+import { ReviewQueue } from "./components/review/ReviewQueue";
+import { StudyTab } from "./components/study/StudyTab";
+import { type TabKey } from "./lib/tabs";
 import styles from "./App.module.css";
 
 const FILTER_BUTTONS: { key: Filter; label: string }[] = [
@@ -36,9 +40,10 @@ export default function App() {
     [settings]
   );
   const [activeFeeds, setActiveFeeds]   = useState<Set<string>>(new Set());
-  const [tab, setTab]                   = useState<"live" | "settings">("live");
+  const [tab, setTab]                   = useState<TabKey>("live");
   const [filter, setFilter]             = useState<Filter>("all");
   const [airportFilter, setAirportFilter] = useState<string>("all");
+  const [noteTypeFilter, setNoteTypeFilter] = useState<string | null>(null);
   const [dateFilter, setDateFilter]     = useState<DateFilter>("all");
   const [activeAudio, setActiveAudio]   = useState<string | null>(null);
   const [actionError, setActionError]   = useState<string | null>(null);
@@ -60,6 +65,7 @@ export default function App() {
     setTab("live");
     setAirportFilter(t.airportFilter);
     setFilter(t.severityFilter);
+    setNoteTypeFilter(null);
     setSidebarAirport(t.sidebarAirport);
     setPendingScrollId(t.resultId ?? null);
   }, []);
@@ -73,9 +79,18 @@ export default function App() {
     setSelectedAircraft(aircraft);
   }, []);
 
+  const navigateToAggregate = useCallback((t: AggregateNavTarget) => {
+    setTab("live");
+    setAirportFilter(t.airportFilter);
+    setFilter(t.severityFilter);
+    setNoteTypeFilter(t.noteTypeFilter);
+    setSidebarAirport(t.sidebarAirport);
+  }, []);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: queryResults, error: resultsError } = useResults(dateFilter);
+  const { data: stats, error: statsError } = useStats(dateFilter);
   const { data: pipelineStatus = null, error: pipelineError } = usePipelineStatus();
   const { data: monitorStatus, error: monitorError } = useMonitorStatus();
   const results: AnalysisResult[] = queryResults ?? [];
@@ -109,6 +124,7 @@ export default function App() {
   const apiError =
     actionError
     ?? (resultsError ? `Unable to load analysis cards: ${(resultsError as Error).message}` : null)
+    ?? (statsError ? `Unable to load insights: ${(statsError as Error).message}` : null)
     ?? (pipelineError ? `Unable to load pipeline status: ${(pipelineError as Error).message}` : null)
     ?? (monitorError ? `Unable to load monitor status: ${(monitorError as Error).message}` : null);
 
@@ -170,6 +186,7 @@ export default function App() {
       await fetchJson(`${API_BASE}/api/monitor/stop`, { method: "POST" });
       setActiveFeeds(new Set());
       setAirportFilter("all");
+      setNoteTypeFilter(null);
       setSidebarAirport(null);
       setSelectedAircraft(null);
       stopAudio();
@@ -188,6 +205,7 @@ export default function App() {
     const isActive = sidebarAirport === code;
     setTab("live");
     setSelectedAircraft(null);
+    setNoteTypeFilter(null);
     if (isActive) {
       setSidebarAirport(null);
       setAirportFilter("all");
@@ -204,6 +222,7 @@ export default function App() {
   const closeSidebar = () => {
     setSidebarAirport(null);
     setAirportFilter("all");
+    setNoteTypeFilter(null);
     setSelectedAircraft(null);
   };
 
@@ -269,6 +288,28 @@ export default function App() {
             ? <SettingsPage key={settings.gemini_api_key + ":" + settings.feeds.length} />
             : <p className={styles.loadingText}>Loading settings...</p>}
         </div>
+      ) : tab === "insights" ? (
+        <div className={styles.contentWrap}>
+          {stats
+            ? (
+              <InsightsTab
+                stats={stats}
+                results={results}
+                onNavigate={navigateToAggregate}
+                dateFilter={dateFilter}
+                airport={airportFilter}
+              />
+            )
+            : <p className={styles.loadingText}>Loading insights...</p>}
+        </div>
+      ) : tab === "review" ? (
+        <div className={styles.contentWrap}>
+          <ReviewQueue />
+        </div>
+      ) : tab === "study" ? (
+        <div className={styles.contentWrap}>
+          <StudyTab />
+        </div>
       ) : (
         /* Live Feed — flex layout; sidebar is side panel on desktop, drawer on mobile/tablet */
         <div className={styles.liveOuter}>
@@ -294,7 +335,10 @@ export default function App() {
                     return (
                       <button
                         key={key}
-                        onClick={() => setFilter(key)}
+                        onClick={() => {
+                          setFilter(key);
+                          setNoteTypeFilter(null);
+                        }}
                         className={btnClass}
                         style={{ ["--filter-accent" as any]: filterAccent }}
                       >
@@ -314,6 +358,7 @@ export default function App() {
                     results={results}
                     filter={filter}
                     airportFilter={airportFilter}
+                    noteTypeFilter={noteTypeFilter}
                     isRunning={isRunning}
                     pipelineStatus={pipelineStatus}
                     apiError={apiError}

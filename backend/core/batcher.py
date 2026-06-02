@@ -16,6 +16,7 @@ import httpx
 
 from backend.config import settings
 from backend.core.airports import airport_geo
+from backend.core.callsign import extract_callsign
 from backend.core.settings_store import current_runtime
 from backend.core.state import (
     broadcast,
@@ -149,6 +150,7 @@ async def _persist_batch(
             result_row = AnalysisResultDB(
                 timestamp=result.timestamp,
                 airport_code=result.airport_code,
+                callsign=extract_callsign(item["transcript"]),
                 transcript=item["transcript"],
                 assessable=result.assessable,
                 assessable_confidence=result.assessable_confidence,

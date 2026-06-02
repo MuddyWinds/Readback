@@ -9,7 +9,8 @@ export const AIRLINE_ICAO: Record<string, string> = {
   emirates: "UAE", singapore: "SIA", qantas: "QFA", air: "ACA",
   continental: "COA", expressjet: "SKW", envoy: "ENY", skywest: "SKW",
 };
-export const CALLSIGN_REGEX = /\b([A-Z]{2,3}\d{1,4}[A-Z]?|N\d{4,5}[A-Z]{0,2})\b/;
+// Q5 standard, shared with backend/core/callsign.py: N + 1-5 digits + up to two trailing letters.
+export const CALLSIGN_REGEX = /\b([A-Z]{2,3}\d{1,4}[A-Z]?|N\d{1,5}[A-Z]{0,2})\b/;
 
 /** Expand phonetic ATC speech to standard callsign format before regex matching. */
 export function phoneticExpand(t: string): string {

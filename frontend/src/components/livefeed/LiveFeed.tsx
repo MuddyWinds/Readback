@@ -48,6 +48,7 @@ interface Props {
   results: AnalysisResult[];
   filter: Filter;
   airportFilter: string;
+  noteTypeFilter?: string | null;
   isRunning?: boolean;
   pipelineStatus?: PipelineStatusSummary | null;
   apiError?: string | null;
@@ -70,7 +71,17 @@ function emptyMessage(
   return "Connecting to live ATC feeds...";
 }
 
-export function LiveFeed({ results, filter, airportFilter, isRunning, pipelineStatus, apiError, onSelectAircraft, onOpenResultContext }: Props) {
+export function LiveFeed({
+  results,
+  filter,
+  airportFilter,
+  noteTypeFilter,
+  isRunning,
+  pipelineStatus,
+  apiError,
+  onSelectAircraft,
+  onOpenResultContext,
+}: Props) {
   // Build callsign occurrence index (results ordered newest-first)
   // For each result, compute how many OLDER results share the same callsign
   const callsignIndex = React.useMemo(() => {
@@ -87,6 +98,7 @@ export function LiveFeed({ results, filter, airportFilter, isRunning, pipelineSt
   const filtered = results.filter(r => {
     if (filter !== "all" && getCardSeverity(r) !== filter) return false;
     if (airportFilter !== "all" && r.airport_code !== airportFilter) return false;
+    if (noteTypeFilter && !(r.observations ?? []).some(o => o.note_type === noteTypeFilter)) return false;
     return true;
   });
 
