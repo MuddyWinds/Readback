@@ -65,7 +65,6 @@ export function CompliantCard({ r }: { r: AnalysisResult }) {
               enrichment={r.enrichment}
               rawTranscript={r.transcript}
               borderColor="var(--sev-standard-border)"
-              assessableConfidence={r.assessable_confidence}
             />
           </div>
 

@@ -109,6 +109,94 @@
   white-space: pre-wrap;
 }
 
+.pointList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pointRow {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  border-radius: 5px;
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.5;
+  transition: background 0.12s;
+}
+
+.pointRowActive {
+  background: color-mix(in srgb, var(--text-dim) 10%, transparent);
+}
+
+.pointRow:focus-visible {
+  outline: 2px solid var(--text-sub);
+  outline-offset: 2px;
+}
+
+.pointLabel {
+  font: 700 11px var(--font-mono);
+  color: var(--accent);
+}
+
+.pointText {
+  min-width: 0;
+}
+
+.safetyChain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.readbackCompare {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.readbackCompareHeading {
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.readbackCompareRow {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.readbackCompareLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-faint);
+}
+
+.readbackCompareText {
+  min-width: 0;
+  font: 12px var(--font-mono);
+  color: var(--text-sub);
+  line-height: 1.5;
+}
+
+.readbackCompareCaveat {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
 /* HFACS neutral tag */
 .hfacsTag {
   font-size: 11px;

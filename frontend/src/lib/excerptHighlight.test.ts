@@ -4,9 +4,9 @@ import { resolveExcerptMarks, tokenizeBlock } from "./excerptHighlight";
 describe("resolveExcerptMarks", () => {
   it("locates an exact excerpt and returns its verbatim range", () => {
     const blocks = [{ blockId: "raw", text: "Cathay 250 descend flight level 100" }];
-    const marks = [{ n: 1, excerpt: "descend flight level 100" }];
+    const marks = [{ n: 1, label: "1.1", excerpt: "descend flight level 100" }];
     const out = resolveExcerptMarks(blocks, marks);
-    expect(out).toEqual([{ n: 1, blockId: "raw", start: 11, end: 35 }]);
+    expect(out).toEqual([{ n: 1, label: "1.1", blockId: "raw", start: 11, end: 35 }]);
     expect(blocks[0].text.slice(11, 35)).toBe("descend flight level 100");
   });
 
@@ -54,10 +54,10 @@ describe("resolveExcerptMarks", () => {
 describe("tokenizeBlock", () => {
   it("splits a block into ordered text and mark tokens", () => {
     const text = "Cathay 250 descend flight level 100";
-    const allocations = [{ n: 1, blockId: "raw", start: 11, end: 35 }];
+    const allocations = [{ n: 1, label: "1.1", blockId: "raw", start: 11, end: 35 }];
     expect(tokenizeBlock(text, allocations)).toEqual([
       { type: "text", text: "Cathay 250 " },
-      { type: "mark", text: "descend flight level 100", n: 1, start: 11, end: 35 },
+      { type: "mark", text: "descend flight level 100", n: 1, label: "1.1", start: 11, end: 35 },
     ]);
   });
 

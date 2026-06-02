@@ -58,4 +58,28 @@ describe("StructuredTranscript excerpt highlights", () => {
     fireEvent.blur(mark);
     expect(onMarkHover).toHaveBeenLastCalledWith(null);
   });
+
+  it("does not render the readback discrepancy block inside the transcript", () => {
+    render(
+      <StructuredTranscript
+        enrichment={{
+          speaker_segments: [
+            { role: "ATC", text: "United 123 climb and maintain 8000", callsign: "UAL123" },
+            { role: "PILOT", text: "climb and maintain 6000 United 123", callsign: "UAL123" },
+          ],
+          atc_instruction: "climb and maintain 8000",
+          pilot_readback: "climb and maintain 6000",
+          readback_correct: false,
+          readback_discrepancy: "Pilot read back 6000 ft instead of 8000 ft",
+          callsign_detected: "UAL123",
+          callsign_clarity: 90,
+        }}
+        rawTranscript="ignored"
+        borderColor="#000"
+      />,
+    );
+
+    expect(screen.queryByText("READBACK DISCREPANCY DETECTED")).toBeNull();
+    expect(screen.queryByText("Pilot read back 6000 ft instead of 8000 ft")).toBeNull();
+  });
 });

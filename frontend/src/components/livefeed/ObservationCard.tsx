@@ -3,7 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import { getCardSeverity } from "../../lib/severity";
 import type { AnalysisResult } from "../../lib/types";
 import { extractCallsign, extractActions, parseBullets } from "../../lib/transcript";
-import { orderedFindings, attributedCallsigns } from "../../lib/findings";
+import { orderedFindings, attributedCallsigns, findingPoints } from "../../lib/findings";
 import { useWatchList } from "../../hooks/useWatchList";
 import { SEV_LABEL, SEV_ICON, ACTION_REQUIRED, ACTION_TOKEN } from "./constants";
 import { SectionLabel } from "./SectionLabel";
@@ -12,6 +12,7 @@ import { HazardBanner } from "./HazardBanner";
 import { StructuredTranscript } from "./StructuredTranscript";
 import { PositionSnapshot } from "./PositionSnapshot";
 import { ObservationItem } from "./ObservationItem";
+import type { ReadbackComparison } from "./ObservationItem";
 import { ReportActions } from "./ReportActions";
 import styles from "./ObservationCard.module.css";
 
@@ -40,13 +41,32 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
   const labelTextColor = ["low", "medium"].includes(severity) ? "var(--bg)" : "white";
   const bullets       = r.summary ? parseBullets(r.summary) : [];
 
-  const findings    = orderedFindings(r.observations ?? []);
+  let nextPointId = 1;
+  const findings    = orderedFindings(r.observations ?? []).map(f => {
+    const points = findingPoints(f, nextPointId);
+    nextPointId += points.length;
+    return { ...f, points };
+  });
   const notes       = findings.filter(f => f.type === "phraseology_note");
   const events      = findings.filter(f => f.type === "situational_event");
   const showTypeLabels = notes.length > 0 && events.length > 0;
+  const readbackComparison: ReadbackComparison | null =
+    r.enrichment?.readback_correct === false && r.enrichment.readback_discrepancy
+      ? {
+        atcInstruction: r.enrichment.atc_instruction,
+        pilotReadback: r.enrichment.pilot_readback,
+        discrepancy: r.enrichment.readback_discrepancy,
+        lowConfidence: (r.assessable_confidence ?? 1) < 0.6,
+      }
+      : null;
+  const readbackFindingN = readbackComparison
+    ? findings.find(f => f.observation.note_type === "Read-back Error")?.n
+    : undefined;
+  const showOrphanReadbackNote = !!readbackComparison && readbackFindingN == null;
   const excerptMarks = findings
-    .filter(f => f.observation.transcript_excerpt)
-    .map(f => ({ n: f.n, excerpt: f.observation.transcript_excerpt as string }));
+    .flatMap(f => f.points
+      .filter(point => point.excerpt)
+      .map(point => ({ n: point.id, label: point.label, excerpt: point.excerpt as string })));
 
   // Attribution is derived from the findings' own callsigns (NOT speaker
   // segments): a transcript that merely mentions two aircraft but attributes one
@@ -188,7 +208,6 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
               enrichment={r.enrichment}
               rawTranscript={r.transcript}
               borderColor="var(--sev-border)"
-              assessableConfidence={r.assessable_confidence}
               excerptMarks={excerptMarks}
               activeMark={activeMark}
               onMarkHover={setActiveMark}
@@ -236,6 +255,20 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
           </span>
         </div>
 
+        {showOrphanReadbackNote && (
+          <div data-testid="orphan-readback-note" className={styles.orphanReadbackNote}>
+            <span className={styles.orphanReadbackLead}>
+              Readback comparison was detected without a Read-back Error finding.
+            </span>
+            <span className={styles.orphanReadbackText}>{readbackComparison.discrepancy}</span>
+            {readbackComparison.lowConfidence && (
+              <span className={styles.orphanReadbackText}>
+                Transcript quality insufficient to verify readback; manual review required.
+              </span>
+            )}
+          </div>
+        )}
+
         {notes.length > 0 && (
           <div className={styles.observationList}>
             {showTypeLabels && <div className={styles.phraseologyLabel}>Phraseology Notes</div>}
@@ -244,10 +277,14 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
                 key={f.n}
                 observation={f.observation}
                 n={f.n}
+                points={f.points}
+                readbackComparison={f.n === readbackFindingN ? readbackComparison : null}
                 isLast={f.n === findings.length}
                 callsign={isMulti ? (f.observation.callsign ?? null) : null}
-                active={activeMark === f.n}
-                onActivate={() => activate(f.n, f.observation.callsign ?? (isMulti ? null : callsign))}
+                active={f.points.some(point => point.id === activeMark)}
+                activePointId={activeMark}
+                onActivate={() => activate(f.points[0]?.id ?? f.n, f.observation.callsign ?? (isMulti ? null : callsign))}
+                onPointActivate={id => activate(id, f.observation.callsign ?? (isMulti ? null : callsign))}
                 onDeactivate={deactivate}
               />
             ))}
@@ -262,10 +299,14 @@ export function ObservationCard({ r, priorOccurrences, lastSeenAgo, onSelectAirc
                 key={f.n}
                 observation={f.observation}
                 n={f.n}
+                points={f.points}
+                readbackComparison={f.n === readbackFindingN ? readbackComparison : null}
                 isLast={f.n === findings.length}
                 callsign={isMulti ? (f.observation.callsign ?? null) : null}
-                active={activeMark === f.n}
-                onActivate={() => activate(f.n, f.observation.callsign ?? (isMulti ? null : callsign))}
+                active={f.points.some(point => point.id === activeMark)}
+                activePointId={activeMark}
+                onActivate={() => activate(f.points[0]?.id ?? f.n, f.observation.callsign ?? (isMulti ? null : callsign))}
+                onPointActivate={id => activate(id, f.observation.callsign ?? (isMulti ? null : callsign))}
                 onDeactivate={deactivate}
               />
             ))}

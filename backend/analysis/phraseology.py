@@ -17,7 +17,7 @@ from google import genai
 from google.genai import types
 
 from backend.core.settings_store import current_gemini_key, current_gemini_model
-from backend.models.schemas import AnalysisResult, Observation, KIND_BY_NOTE_TYPE
+from backend.models.schemas import AnalysisResult, Observation, ObservationDetailPoint, KIND_BY_NOTE_TYPE
 
 _client = None
 _client_key: str | None = None
@@ -231,6 +231,7 @@ Each object schema:
       "safety_pathway": "<wrong action → mechanism → potential outcome>",
       "relevant_regulation": "<e.g. ICAO Doc 4444 §4.5.3.1>",
       "transcript_excerpt": "<exact phrase from transcript>",
+      "detail_points": [],
       "callsign": "<the aircraft this observation concerns, ICAO-format e.g. UAL12, or null>"
     }
   ],
@@ -255,6 +256,10 @@ or when the aircraft is unclear, set callsign null. callsign_detected remains th
 primary (most prominent) callsign of the transcript.
 readback_correct: true=matches; false=discrepancy; null=cannot determine (one-sided or no readback).
 callsign_clarity: 90-100 standard ICAO format; 50-89 phonetically expanded; 20-49 partial; 0-19 none.
+detail_points: default to [] for ordinary findings. Populate only when the
+description would otherwise combine two or more distinct steps AND each step has
+its own exact transcript phrase. Do not split a single-sentence/simple finding
+just to fill the array; keep using description + transcript_excerpt.
 
 If assessable is false: set is_standard true, observations [], still populate enrichment fields.
 If the transmission met standard phraseology: set observations [].
@@ -270,6 +275,25 @@ def _coerce_callsign(value) -> "str | None":
     if isinstance(value, (list, tuple)) and value and isinstance(value[0], str):
         return value[0].strip() or None
     return None
+
+
+def _parse_detail_points(value) -> list[ObservationDetailPoint]:
+    if not isinstance(value, list):
+        return []
+    points: list[ObservationDetailPoint] = []
+    for raw in value:
+        if not isinstance(raw, dict):
+            continue
+        try:
+            point = ObservationDetailPoint(
+                text=str(raw.get("text", "")).strip(),
+                transcript_excerpt=raw.get("transcript_excerpt"),
+            )
+        except Exception:
+            continue
+        if point.text:
+            points.append(point)
+    return points
 
 
 async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
@@ -383,6 +407,7 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
                         safety_pathway=v.get("safety_pathway"),
                         relevant_regulation=v.get("relevant_regulation"),
                         transcript_excerpt=v.get("transcript_excerpt"),
+                        detail_points=_parse_detail_points(v.get("detail_points")),
                         callsign=_coerce_callsign(v.get("callsign")),
                     ))
                 except Exception:

@@ -42,7 +42,13 @@ export interface Observation {
   safety_pathway?: string | null;
   relevant_regulation?: string | null;
   transcript_excerpt?: string | null;
+  detail_points?: ObservationDetailPoint[];
   callsign?: string | null;
+}
+
+export interface ObservationDetailPoint {
+  text: string;
+  transcript_excerpt?: string | null;
 }
 
 export interface AnalysisResult {

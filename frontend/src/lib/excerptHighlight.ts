@@ -1,5 +1,6 @@
 export interface ExcerptMark {
   n: number;
+  label?: string;
   excerpt: string;
 }
 
@@ -10,6 +11,7 @@ export interface TextBlock {
 
 export interface MarkAllocation {
   n: number;
+  label?: string;
   blockId: string;
   start: number;
   end: number;
@@ -17,7 +19,7 @@ export interface MarkAllocation {
 
 export type BlockToken =
   | { type: "text"; text: string }
-  | { type: "mark"; text: string; n: number; start: number; end: number };
+  | { type: "mark"; text: string; n: number; label?: string; start: number; end: number };
 
 /** Lowercase + collapse runs of whitespace, keeping a map from each normalized
  *  char back to its index in the original text so matches slice verbatim. */
@@ -71,7 +73,7 @@ export function resolveExcerptMarks(blocks: TextBlock[], marks: ExcerptMark[]): 
         const ranges = claimed.get(nb.blockId) ?? [];
         const overlaps = ranges.some(([s, e]) => start < e && end > s);
         if (!overlaps) {
-          found = { n: mark.n, blockId: nb.blockId, start, end };
+          found = { n: mark.n, ...(mark.label ? { label: mark.label } : {}), blockId: nb.blockId, start, end };
           break;
         }
         from = idx + 1;
@@ -98,7 +100,14 @@ export function tokenizeBlock(text: string, allocations: MarkAllocation[]): Bloc
     if (a.start > cursor) {
       tokens.push({ type: "text", text: text.slice(cursor, a.start) });
     }
-    tokens.push({ type: "mark", text: text.slice(a.start, a.end), n: a.n, start: a.start, end: a.end });
+    tokens.push({
+      type: "mark",
+      text: text.slice(a.start, a.end),
+      n: a.n,
+      ...(a.label ? { label: a.label } : {}),
+      start: a.start,
+      end: a.end,
+    });
     cursor = a.end;
   }
   if (cursor < text.length) {

@@ -88,12 +88,23 @@ export function SettingsPage() {
       <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Settings</h2>
 
       <div style={panel}>
-        <label style={labelStyle}>Gemini API key</label>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input style={input} type={revealKey ? "text" : "password"} value={key} placeholder="AIza..." onChange={e => setKey(e.target.value)} />
-          <button onClick={() => setRevealKey(v => !v)} style={{ ...input, width: "auto", cursor: "pointer", minWidth: 70 }}>
-            {revealKey ? "Hide" : "Show"}
-          </button>
+        <div style={{ display: "flex", gap: 12, alignItems: "end", flexWrap: "wrap" }}>
+          <div style={{ flex: "0 1 188px" }}>
+            <label style={labelStyle}>Gemini model - live</label>
+            <select style={{ ...input, height: 36 }} value={runtime.gemini_model}
+              onChange={e => setRuntime({ ...runtime, gemini_model: e.target.value })}>
+              {GEMINI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: "1 1 390px", minWidth: 280 }}>
+            <label style={labelStyle}>Gemini API key</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input style={{ ...input, height: 36 }} type={revealKey ? "text" : "password"} value={key} placeholder="AIza..." onChange={e => setKey(e.target.value)} />
+              <button onClick={() => setRevealKey(v => !v)} style={{ ...input, height: 36, width: "auto", cursor: "pointer", minWidth: 70 }}>
+                {revealKey ? "Hide" : "Show"}
+              </button>
+            </div>
+          </div>
         </div>
         <p style={{ fontSize: 11, color: "#484f58", margin: "6px 0 0" }}>
           Applies immediately; the analyzer rebuilds its client on the next batch.
@@ -120,7 +131,7 @@ export function SettingsPage() {
           </div>
           <div>
             <label style={labelStyle}>Whisper model - restart required</label>
-            <select style={input} value={runtime.whisper_model}
+            <select style={{ ...input, height: 36 }} value={runtime.whisper_model}
               onChange={e => setRuntime({ ...runtime, whisper_model: e.target.value })}>
               {["tiny", "base", "small", "medium", "large"].map(m => <option key={m} value={m}>{m}</option>)}
             </select>
@@ -132,17 +143,10 @@ export function SettingsPage() {
           </div>
           <div>
             <label style={labelStyle}>Alert threshold (toast on / above)</label>
-            <select style={input} value={runtime.alert_min_severity}
+            <select style={{ ...input, height: 36 }} value={runtime.alert_min_severity}
               onChange={e => setRuntime({ ...runtime, alert_min_severity: e.target.value as RuntimeConfig["alert_min_severity"] })}>
               {(["low", "medium", "high", "critical"] as const).map(s =>
                 <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={labelStyle}>Gemini model - live</label>
-            <select style={input} value={runtime.gemini_model}
-              onChange={e => setRuntime({ ...runtime, gemini_model: e.target.value })}>
-              {GEMINI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </div>
         </div>

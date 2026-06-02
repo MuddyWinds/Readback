@@ -8,6 +8,13 @@ export interface NumberedFinding {
   type: "phraseology_note" | "situational_event";
 }
 
+export interface FindingPoint {
+  id: number;
+  label: string;
+  text: string;
+  excerpt: string | null;
+}
+
 /**
  * Canonical card display order (and numbering source):
  *   phraseology notes first, then situational events,
@@ -23,6 +30,31 @@ export function orderedFindings(observations: Observation[]): NumberedFinding[] 
     n: i + 1,
     type: observation.kind as "phraseology_note" | "situational_event",
   }));
+}
+
+export function findingPoints(finding: NumberedFinding, firstId = 1): FindingPoint[] {
+  const details = (finding.observation.detail_points ?? [])
+    .map(p => ({
+      text: (p.text ?? "").trim(),
+      excerpt: (p.transcript_excerpt ?? null) || null,
+    }))
+    .filter(p => p.text);
+
+  if (details.length > 0) {
+    return details.map((p, i) => ({
+      id: firstId + i,
+      label: `${finding.n}.${i + 1}`,
+      text: p.text,
+      excerpt: p.excerpt,
+    }));
+  }
+
+  return [{
+    id: firstId,
+    label: String(finding.n),
+    text: finding.observation.description,
+    excerpt: finding.observation.transcript_excerpt ?? null,
+  }];
 }
 
 /**

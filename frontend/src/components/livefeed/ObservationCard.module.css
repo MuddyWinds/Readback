@@ -262,13 +262,42 @@
   flex-shrink: 0;
 }
 
+.orphanReadbackNote {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-faint);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-dim) 5%, transparent);
+}
+
+.orphanReadbackLead {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-sub);
+}
+
+.orphanReadbackText {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+/* Category headers are structural, not severity signals — they must not reuse
+   severity hues (the blue here previously collided with the "Low" tag). Both
+   stay neutral; "Phraseology Notes" reads a touch brighter as primary content,
+   "Situational Events" sits one step quieter. Per-observation significance and
+   the card border carry the actual severity colour. */
 .phraseologyLabel {
   font-size: 11px;
   font-weight: 700;
-  color: var(--sev-low);
+  color: var(--text-sub);
   letter-spacing: 1.1px;
   text-transform: uppercase;
-  border-left: 3px solid color-mix(in srgb, var(--sev-low) 26.6667%, transparent);
+  border-left: 3px solid var(--border);
   padding-left: 8px;
   margin-bottom: 10px;
 }

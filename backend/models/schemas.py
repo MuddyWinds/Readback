@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, Field, field_serializer
 
 
 def _iso_utc(dt: datetime) -> str:
@@ -64,6 +64,11 @@ class SignificanceLevel(str, Enum):
     CRITICAL = "critical"
 
 
+class ObservationDetailPoint(BaseModel):
+    text: str
+    transcript_excerpt: Optional[str] = None
+
+
 class Observation(BaseModel):
     kind: ObservationKind
     note_type: NoteType
@@ -73,6 +78,7 @@ class Observation(BaseModel):
     safety_pathway: Optional[str] = None   # teaching explanation: why this phraseology matters
     relevant_regulation: Optional[str] = None
     transcript_excerpt: Optional[str] = None
+    detail_points: list[ObservationDetailPoint] = Field(default_factory=list)
     callsign: Optional[str] = None         # aircraft this observation concerns, or None
 
 

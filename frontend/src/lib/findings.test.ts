@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { orderedFindings, attributedCallsigns } from "./findings";
+import { orderedFindings, attributedCallsigns, findingPoints } from "./findings";
 import type { Observation } from "./types";
 
 function obs(kind: Observation["kind"], significance: Observation["significance"], note: string): Observation {
@@ -34,6 +34,41 @@ describe("orderedFindings", () => {
 
   it("returns an empty list for no observations", () => {
     expect(orderedFindings([])).toEqual([]);
+  });
+});
+
+describe("findingPoints", () => {
+  it("expands detail_points into sub-numbered transcript-linked points", () => {
+    const [finding] = orderedFindings([
+      {
+        ...obs("phraseology_note", "high", "Read-back Error"),
+        description: "Pilot readback diverged from ATC instruction.",
+        transcript_excerpt: "left heading 280",
+        detail_points: [
+          { text: "ATC assigned heading 270.", transcript_excerpt: "turn left heading 270" },
+          { text: "Pilot read back heading 280.", transcript_excerpt: "left heading 280" },
+        ],
+      },
+    ]);
+
+    expect(findingPoints(finding)).toEqual([
+      { id: 1, label: "1.1", text: "ATC assigned heading 270.", excerpt: "turn left heading 270" },
+      { id: 2, label: "1.2", text: "Pilot read back heading 280.", excerpt: "left heading 280" },
+    ]);
+  });
+
+  it("falls back to the legacy description and excerpt when detail_points is empty", () => {
+    const [finding] = orderedFindings([
+      {
+        ...obs("phraseology_note", "medium", "Other"),
+        description: "Legacy description.",
+        transcript_excerpt: "legacy excerpt",
+      },
+    ]);
+
+    expect(findingPoints(finding)).toEqual([
+      { id: 1, label: "1", text: "Legacy description.", excerpt: "legacy excerpt" },
+    ]);
   });
 });
 
