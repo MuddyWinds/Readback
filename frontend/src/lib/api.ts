@@ -33,6 +33,20 @@ export function apiUrl(path: string): string {
   return `${API_BASE}${path}`;
 }
 
+export function exportUrl(opts: {
+  format?: "csv" | "json";
+  startDate?: string | null;
+  airport?: string | null;
+  status?: string | null;
+}): string {
+  const params = new URLSearchParams();
+  params.set("format", opts.format ?? "csv");
+  if (opts.startDate) params.set("start_date", opts.startDate);
+  if (opts.airport) params.set("airport", opts.airport);
+  if (opts.status) params.set("status", opts.status);
+  return `${API_BASE}/api/export?${params.toString()}`;
+}
+
 export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { resolveApiBase, resolveWsUrl } from "./api";
+import { exportUrl, resolveApiBase, resolveWsUrl } from "./api";
 
 test("defaults the API base to the page origin when no env override is set", () => {
   expect(resolveApiBase({}, { origin: "https://readback.example.com" }))
@@ -25,4 +25,13 @@ test("derives a same-origin wss:// URL from an https page", () => {
 test("an explicit VITE_WS_URL overrides the derived socket URL", () => {
   expect(resolveWsUrl({ VITE_WS_URL: "ws://localhost:8000/ws/live" }, { protocol: "https:", host: "x" }))
     .toBe("ws://localhost:8000/ws/live");
+});
+
+test("builds an export URL with format and filters", () => {
+  const url = exportUrl({ format: "csv", startDate: "2026-05-01T00:00:00", airport: "KSFO" });
+
+  expect(url).toContain("/api/export?");
+  expect(url).toContain("format=csv");
+  expect(url).toContain("start_date=2026-05-01");
+  expect(url).toContain("airport=KSFO");
 });

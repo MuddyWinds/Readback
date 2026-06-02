@@ -16,7 +16,7 @@ from backend.config import settings as app_settings
 from backend.db.database import init_db
 from backend.core.batcher import run_batcher
 from backend.core.settings_store import load_settings
-from backend.api import results, monitor, aviation_data, reports, settings
+from backend.api import aviation_data, export, monitor, reports, results, settings
 
 
 @asynccontextmanager
@@ -42,3 +42,4 @@ app.include_router(monitor.router)
 app.include_router(aviation_data.router)
 app.include_router(reports.router)
 app.include_router(settings.router)
+app.include_router(export.router)

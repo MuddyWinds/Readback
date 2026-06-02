@@ -282,7 +282,15 @@ export default function App() {
       ) : tab === "insights" ? (
         <div className={styles.contentWrap}>
           {stats
-            ? <InsightsTab stats={stats} results={results} onNavigate={navigateToAggregate} />
+            ? (
+              <InsightsTab
+                stats={stats}
+                results={results}
+                onNavigate={navigateToAggregate}
+                dateFilter={dateFilter}
+                airport={airportFilter}
+              />
+            )
             : <p className={styles.loadingText}>Loading insights...</p>}
         </div>
       ) : tab === "review" ? (

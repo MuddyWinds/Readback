@@ -1,7 +1,10 @@
 import type { CSSProperties } from "react";
+import { useState } from "react";
 
 import { hourlyActivity } from "../../lib/analytics";
 import { resolveAggregateNavTarget, type AggregateNavTarget } from "../../lib/alerts";
+import { exportUrl } from "../../lib/api";
+import { DateFilter, getStartDate } from "../../lib/format";
 import type { AnalysisResult } from "../../lib/types";
 import styles from "./InsightsTab.module.css";
 
@@ -42,6 +45,8 @@ interface Props {
   stats: InsightsStats;
   results: AnalysisResult[];
   onNavigate: (target: AggregateNavTarget) => void;
+  dateFilter?: DateFilter;
+  airport?: string;
 }
 
 const SEVERITIES: SeverityKey[] = ["critical", "high", "medium", "low"];
@@ -231,10 +236,44 @@ function ActivityChart({ results }: { results: AnalysisResult[] }) {
   return <Bars values={values} emptyLabel="No activity in the last 24 hours." />;
 }
 
-export function InsightsTab({ stats, results, onNavigate }: Props) {
+function ExportControls({ dateFilter, airport }: { dateFilter: DateFilter; airport?: string }) {
+  const [format, setFormat] = useState<"csv" | "json">("csv");
+  const href = exportUrl({
+    format,
+    startDate: getStartDate(dateFilter),
+    airport: airport && airport !== "all" ? airport : null,
+  });
+
+  return (
+    <div className={styles.exportControls}>
+      <div className={styles.formatToggle} aria-label="Export format">
+        {(["csv", "json"] as const).map(f => (
+          <button
+            key={f}
+            type="button"
+            className={`${styles.formatBtn} ${format === f ? styles.formatBtnActive : ""}`}
+            onClick={() => setFormat(f)}
+          >
+            {f.toUpperCase()}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        className={styles.exportBtn}
+        onClick={() => { window.location.href = href; }}
+      >
+        Export
+      </button>
+    </div>
+  );
+}
+
+export function InsightsTab({ stats, results, onNavigate, dateFilter = "all", airport }: Props) {
   if (stats.total_chunks_analyzed === 0) {
     return (
       <div className={styles.tab}>
+        <ExportControls dateFilter={dateFilter} airport={airport} />
         <HeadlineTiles stats={stats} />
         <Section title="Insights">
           <p className={styles.empty}>No analyses in this period.</p>
@@ -245,6 +284,7 @@ export function InsightsTab({ stats, results, onNavigate }: Props) {
 
   return (
     <div className={styles.tab}>
+      <ExportControls dateFilter={dateFilter} airport={airport} />
       <HeadlineTiles stats={stats} />
       <Section title="Severity">
         <SeverityBars stats={stats} />
