@@ -24,9 +24,9 @@ export function ReviewQueue() {
   const [status, setStatus] = React.useState<ReviewChip>("new");
   const [selected, setSelected] = React.useState(0);
   const selectedRef = React.useRef(0);
-  const { data = [], isLoading, error } = useReviewQueue(status);
+  const { data, isLoading, error } = useReviewQueue(status);
   const updateResult = useUpdateResult();
-  const rows = data;
+  const rows: AnalysisResult[] = data ?? [];
 
   const setSelectedIndex = React.useCallback((next: number | ((current: number) => number)) => {
     const raw = typeof next === "function" ? next(selectedRef.current) : next;
