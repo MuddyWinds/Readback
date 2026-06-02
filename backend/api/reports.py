@@ -2,9 +2,6 @@ from __future__ import annotations
 
 """Aircraft-level Gemini study sheet, aggregating all transmissions for a callsign."""
 
-import re
-from typing import Optional
-
 from fastapi import APIRouter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,15 +10,9 @@ from fastapi import Depends
 from backend.db.database import get_db
 from backend.db.models import AnalysisResultDB
 from backend.analysis.phraseology import generate_study_sheet
+from backend.core.callsign import extract_callsign
 
 router = APIRouter()
-
-_CALLSIGN_RE = re.compile(r'\b([A-Z]{2,3}\d{1,4}[A-Z]?|N\d{4,5}[A-Z]{0,2})\b')
-
-
-def _extract_callsign(text: str) -> Optional[str]:
-    m = _CALLSIGN_RE.search(text)
-    return m.group(1) if m else None
 
 
 @router.get("/api/study-sheet/{result_id}")
@@ -30,7 +21,7 @@ async def get_study_sheet(result_id: int, db: AsyncSession = Depends(get_db)):
     if not row:
         return {"error": "Result not found"}
 
-    callsign = _extract_callsign(row.transcript.upper())
+    callsign = extract_callsign(row.transcript)
     if not callsign:
         return {"error": "No callsign detected in this transmission"}
 
