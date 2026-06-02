@@ -76,14 +76,19 @@ async def get_results(
     offset: int = 0,
     airport: Optional[str] = None,
     start_date: Optional[str] = None,
+    status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
+    if status is not None and status not in _VALID_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
     query = select(AnalysisResultDB).order_by(desc(AnalysisResultDB.timestamp))
     if airport:
         query = query.where(AnalysisResultDB.airport_code == airport.upper())
     if start_date:
         dt = datetime.fromisoformat(start_date.replace("Z", ""))
         query = query.where(AnalysisResultDB.timestamp >= dt)
+    if status:
+        query = query.where(AnalysisResultDB.status == status)
     rows = await db.execute(query.offset(offset).limit(limit))
     return [_row_to_dict(r) for r in rows.scalars().all()]
 

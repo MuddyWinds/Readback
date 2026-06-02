@@ -14,6 +14,7 @@ import { severityCounts } from "./lib/selectors";
 import { HeaderBar } from "./components/app/HeaderBar";
 import { TabPeriodBar } from "./components/app/TabPeriodBar";
 import { InsightsTab } from "./components/insights/InsightsTab";
+import { ReviewQueue } from "./components/review/ReviewQueue";
 import { type TabKey } from "./lib/tabs";
 import styles from "./App.module.css";
 
@@ -282,6 +283,10 @@ export default function App() {
           {stats
             ? <InsightsTab stats={stats} results={results} onNavigate={navigateToAggregate} />
             : <p className={styles.loadingText}>Loading insights...</p>}
+        </div>
+      ) : tab === "review" ? (
+        <div className={styles.contentWrap}>
+          <ReviewQueue />
         </div>
       ) : (
         /* Live Feed — flex layout; sidebar is side panel on desktop, drawer on mobile/tablet */

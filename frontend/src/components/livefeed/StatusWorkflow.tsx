@@ -11,7 +11,15 @@ const STATUS_TOKEN: Record<ReviewStatus, string> = {
   false_positive: "--sev-standard",
 };
 
-export function StatusWorkflow({ resultId, initial }: { resultId?: number; initial?: string }) {
+export function StatusWorkflow({
+  resultId,
+  initial,
+  onChanged,
+}: {
+  resultId?: number;
+  initial?: string;
+  onChanged?: (next: ReviewStatus) => void;
+}) {
   const [status, setStatus] = React.useState<ReviewStatus>((initial || "new") as ReviewStatus);
   const [saving, setSaving] = React.useState(false);
   const updateResult = useUpdateResult();
@@ -21,6 +29,7 @@ export function StatusWorkflow({ resultId, initial }: { resultId?: number; initi
     setSaving(true);
     try {
       await updateResult.mutateAsync({ id: resultId, patch: { status: s } });
+      onChanged?.(s);
     } finally { setSaving(false); }
   };
   return (

@@ -25,8 +25,8 @@ describe("tab registry", () => {
     const visible = visibleTabs().map(t => t.key);
     expect(visible).toContain("live");
     expect(visible).toContain("insights");
+    expect(visible).toContain("review");
     expect(visible).toContain("settings");
-    expect(visible).not.toContain("review");
     expect(visible).not.toContain("study");
   });
 });

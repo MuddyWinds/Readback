@@ -37,6 +37,14 @@ export function useStats(dateFilter: DateFilter, airport?: string) {
   });
 }
 
+export function useReviewQueue(status: string) {
+  const qs = status && status !== "all" ? `?status=${encodeURIComponent(status)}` : "";
+  return useQuery({
+    queryKey: ["results", { status }],
+    queryFn: () => fetchJson<AnalysisResult[]>(`${API_BASE}/api/results${qs}`),
+  });
+}
+
 export function usePipelineStatus() {
   return useQuery({
     queryKey: ["pipelineStatus"],
