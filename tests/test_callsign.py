@@ -4,6 +4,8 @@ from backend.core.callsign import normalize_callsign, is_plausible_callsign, pho
 
 @pytest.mark.parametrize("raw,expected", [
     ("AAL 0123", "AAL123"),
+    ("AAL0123", "AAL123"),   # zero-only strip (no space) — parity with callsign.test.ts
+    ("DLH009", "DLH9"),      # multi-zero strip — parity with callsign.test.ts
     ("aal-123", "AAL123"),
     ("N123AB", "N123AB"),
     ("  ", None),

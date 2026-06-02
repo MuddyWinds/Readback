@@ -5,9 +5,11 @@ Ports frontend/src/lib/callsign.ts (normalizeCallsign) and
 frontend/src/lib/transcript.ts (phoneticExpand / extractCallsign).
 
 Python-specific notes:
-- is_plausible_callsign is a new backend helper (not in the TS sources).
-- The N-number pattern uses the Q5-standard N\\d{1,5}[A-Z]{0,2} rather than
-  the frontend CALLSIGN_REGEX's N\\d{4,5}[A-Z]{0,2}.
+- is_plausible_callsign has no equivalent in the current callsign.ts (which
+  exports only normalizeCallsign + callsignsMatch); it is derived here from the
+  shared CALLSIGN_REGEX.
+- The N-number pattern uses the Q5-standard N\\d{1,5}[A-Z]{0,2}, matching the
+  frontend CALLSIGN_REGEX after the Q5 standardization.
 - extract_callsign returns a normalized key (str | None) rather than the TS
   {callsign, confidence} object.
 """
