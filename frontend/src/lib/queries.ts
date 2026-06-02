@@ -45,6 +45,24 @@ export function useReviewQueue(status: string) {
   });
 }
 
+export function useCallsigns() {
+  return useQuery({
+    queryKey: ["callsigns"],
+    queryFn: () => fetchJson<{ callsign: string; count: number }[]>(`${API_BASE}/api/callsigns`),
+  });
+}
+
+export function useStudySheet(callsign: string | null) {
+  return useQuery({
+    queryKey: ["studySheet", callsign],
+    enabled: !!callsign,
+    queryFn: () =>
+      fetchJson<{ callsign: string; transmission_count: number; study_sheet: string }>(
+        `${API_BASE}/api/study-sheet/by-callsign/${encodeURIComponent(callsign || "")}`,
+      ),
+  });
+}
+
 export function usePipelineStatus() {
   return useQuery({
     queryKey: ["pipelineStatus"],

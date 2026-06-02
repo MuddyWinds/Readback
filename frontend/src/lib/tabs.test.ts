@@ -26,7 +26,7 @@ describe("tab registry", () => {
     expect(visible).toContain("live");
     expect(visible).toContain("insights");
     expect(visible).toContain("review");
+    expect(visible).toContain("study");
     expect(visible).toContain("settings");
-    expect(visible).not.toContain("study");
   });
 });

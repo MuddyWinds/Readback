@@ -15,6 +15,7 @@ import { HeaderBar } from "./components/app/HeaderBar";
 import { TabPeriodBar } from "./components/app/TabPeriodBar";
 import { InsightsTab } from "./components/insights/InsightsTab";
 import { ReviewQueue } from "./components/review/ReviewQueue";
+import { StudyTab } from "./components/study/StudyTab";
 import { type TabKey } from "./lib/tabs";
 import styles from "./App.module.css";
 
@@ -287,6 +288,10 @@ export default function App() {
       ) : tab === "review" ? (
         <div className={styles.contentWrap}>
           <ReviewQueue />
+        </div>
+      ) : tab === "study" ? (
+        <div className={styles.contentWrap}>
+          <StudyTab />
         </div>
       ) : (
         /* Live Feed — flex layout; sidebar is side panel on desktop, drawer on mobile/tablet */

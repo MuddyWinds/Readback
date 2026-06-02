@@ -14,7 +14,7 @@ export const TABS: TabDef[] = [
   { key: "live",     label: "Live Feed", mobileLabel: "Feed" },
   { key: "insights", label: "Insights",  mobileLabel: "Stats" },
   { key: "review",   label: "Review",    mobileLabel: "Review" },
-  { key: "study",    label: "Study",     mobileLabel: "Study", enabled: false },
+  { key: "study",    label: "Study",     mobileLabel: "Study" },
   { key: "settings", label: "Settings",  mobileLabel: "Setup" },
 ];
 

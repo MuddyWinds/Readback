@@ -1,0 +1,126 @@
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px 28px;
+}
+
+.header {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+}
+
+.title {
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.subtitle,
+.empty {
+  color: var(--text-faint);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.layout {
+  align-items: flex-start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+}
+
+.picker {
+  background: var(--surface);
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 100%;
+}
+
+.callsignBtn {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border-dim);
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  justify-content: space-between;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.callsignBtn:last-child {
+  border-bottom: 0;
+}
+
+.callsignBtn:hover,
+.callsignBtn:focus-visible,
+.callsignBtnActive {
+  background: var(--surface-2);
+  color: var(--text);
+  outline: none;
+}
+
+.callsign {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.callsignCount {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.sheet {
+  background: var(--surface);
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+  min-height: 220px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.sheetHead {
+  align-items: center;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-dim);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.sheetCallsign {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sheetCount {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.sheetBody {
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.65;
+  padding: 14px;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

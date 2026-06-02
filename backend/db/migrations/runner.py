@@ -38,6 +38,24 @@ def _add_column_if_missing(conn, table, column, ddl_type, default_sql=None):
     conn.execute(sa.text(ddl))
 
 
+def _backfill_callsign(conn):
+    from backend.core.callsign import extract_callsign
+
+    rows = conn.execute(
+        sa.text(
+            "SELECT id, transcript FROM analysis_results "
+            "WHERE callsign IS NULL AND transcript IS NOT NULL"
+        )
+    ).fetchall()
+    for row_id, transcript in rows:
+        callsign = extract_callsign(transcript or "")
+        if callsign:
+            conn.execute(
+                sa.text("UPDATE analysis_results SET callsign = :callsign WHERE id = :id"),
+                {"callsign": callsign, "id": row_id},
+            )
+
+
 # Ordered list. version_id strings are stable identifiers - never renumber or
 # reuse them. New migrations append to the end.
 MIGRATIONS: list[tuple[str, str, Callable]] = [
@@ -60,6 +78,23 @@ MIGRATIONS: list[tuple[str, str, Callable]] = [
         "0004_adsb_snapshot_column",
         "add analysis_results.adsb_snapshot",
         lambda c: _add_column_if_missing(c, "analysis_results", "adsb_snapshot", "JSON"),
+    ),
+    (
+        "0005_callsign_column",
+        "add analysis_results.callsign",
+        lambda c: _add_column_if_missing(c, "analysis_results", "callsign", "VARCHAR(16)"),
+    ),
+    (
+        "0006_callsign_index",
+        "index analysis_results.callsign",
+        lambda c: c.execute(
+            sa.text("CREATE INDEX IF NOT EXISTS ix_analysis_results_callsign ON analysis_results (callsign)")
+        ),
+    ),
+    (
+        "0007_callsign_backfill",
+        "backfill analysis_results.callsign from transcript",
+        _backfill_callsign,
     ),
 ]
 
