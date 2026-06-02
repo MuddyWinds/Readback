@@ -160,8 +160,14 @@
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
+.readbackCompareHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .readbackCompareHeading {
-  margin-bottom: 6px;
   font-size: 10px;
   font-weight: 700;
   color: var(--accent);
@@ -169,25 +175,35 @@
   text-transform: uppercase;
 }
 
-.readbackCompareRow {
-  display: grid;
-  grid-template-columns: 48px 1fr;
-  gap: 8px;
-  align-items: baseline;
-  margin-bottom: 4px;
+.readbackDelta {
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
-.readbackCompareLabel {
+.readbackStatusBadge,
+.needsReviewBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--text-faint);
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
-.readbackCompareText {
-  min-width: 0;
-  font: 12px var(--font-mono);
-  color: var(--text-sub);
-  line-height: 1.5;
+.readbackStatusBadge {
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.needsReviewBadge {
+  color: var(--bg);
+  background: var(--sev-medium);
 }
 
 .readbackCompareCaveat {

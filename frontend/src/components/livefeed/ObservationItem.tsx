@@ -10,6 +10,9 @@ export interface ReadbackComparison {
   pilotReadback: string | null;
   discrepancy: string;
   lowConfidence: boolean;
+  needsReview: boolean;
+  unconfirmed: boolean;
+  markId: number | null;
 }
 
 interface Props {
@@ -23,6 +26,7 @@ interface Props {
   activePointId?: number | null;
   onActivate?: () => void;
   onPointActivate?: (id: number) => void;
+  onReadbackActivate?: (id: number) => void;
   onDeactivate?: () => void;
 }
 
@@ -41,6 +45,7 @@ export function ObservationItem({
   activePointId,
   onActivate,
   onPointActivate,
+  onReadbackActivate,
   onDeactivate,
 }: Props) {
   const vLabelColor = ["medium", "low"].includes(v.significance) ? "var(--bg)" : "white";
@@ -105,20 +110,29 @@ export function ObservationItem({
       </div>
 
       {readbackComparison && (
-        <div data-testid="finding-readback-comparison" className={styles.readbackCompare}>
-          <div className={styles.readbackCompareHeading}>Readback comparison</div>
-          {readbackComparison.atcInstruction && (
-            <div className={styles.readbackCompareRow}>
-              <span className={styles.readbackCompareLabel}>ATC</span>
-              <span className={styles.readbackCompareText}>{readbackComparison.atcInstruction}</span>
-            </div>
-          )}
-          {readbackComparison.pilotReadback && (
-            <div className={styles.readbackCompareRow}>
-              <span className={styles.readbackCompareLabel}>Pilot</span>
-              <span className={styles.readbackCompareText}>{readbackComparison.pilotReadback}</span>
-            </div>
-          )}
+        <div
+          data-testid="finding-readback-comparison"
+          className={styles.readbackCompare}
+          tabIndex={readbackComparison.markId != null ? 0 : undefined}
+          onMouseEnter={() => {
+            if (readbackComparison.markId != null) onReadbackActivate?.(readbackComparison.markId);
+          }}
+          onFocus={() => {
+            if (readbackComparison.markId != null) onReadbackActivate?.(readbackComparison.markId);
+          }}
+          onMouseLeave={onDeactivate}
+          onBlur={onDeactivate}
+        >
+          <div className={styles.readbackCompareHeader}>
+            <span className={styles.readbackCompareHeading}>Readback comparison</span>
+            {readbackComparison.unconfirmed && (
+              <span className={styles.readbackStatusBadge}>detected · unconfirmed</span>
+            )}
+            {readbackComparison.needsReview && (
+              <span className={styles.needsReviewBadge}>Needs review</span>
+            )}
+          </div>
+          <div className={styles.readbackDelta}>{readbackComparison.discrepancy}</div>
           {readbackComparison.lowConfidence && (
             <div className={styles.readbackCompareCaveat}>
               Transcript quality insufficient to verify readback; manual review required.
