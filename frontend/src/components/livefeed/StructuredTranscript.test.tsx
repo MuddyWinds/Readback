@@ -82,4 +82,37 @@ describe("StructuredTranscript excerpt highlights", () => {
     expect(screen.queryByText("READBACK DISCREPANCY DETECTED")).toBeNull();
     expect(screen.queryByText("Pilot read back 6000 ft instead of 8000 ft")).toBeNull();
   });
+
+  it("lights two transcript marks that share the same active id", () => {
+    const enrichment = {
+      speaker_segments: [
+        { role: "ATC", text: "United 123 climb and maintain 8000", callsign: "UAL123" },
+        { role: "PILOT", text: "climb and maintain 6000 United 123", callsign: "UAL123" },
+      ],
+      atc_instruction: "climb and maintain 8000",
+      pilot_readback: "climb and maintain 6000",
+      readback_correct: false,
+      readback_discrepancy: "Pilot read back 6000 ft instead of 8000 ft",
+      callsign_detected: "UAL123",
+      callsign_clarity: 90,
+    };
+
+    render(
+      <StructuredTranscript
+        enrichment={enrichment as any}
+        rawTranscript="ignored"
+        borderColor="#000"
+        excerptMarks={[
+          { n: 9, label: "ATC", excerpt: "climb and maintain 8000" },
+          { n: 9, label: "PIL", excerpt: "climb and maintain 6000" },
+        ]}
+        activeMark={9}
+      />,
+    );
+
+    const atc = screen.getByLabelText("Finding ATC reference");
+    const pil = screen.getByLabelText("Finding PIL reference");
+    expect(atc.className).toContain("markActive");
+    expect(pil.className).toContain("markActive");
+  });
 });
