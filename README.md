@@ -57,7 +57,7 @@ LiveATC Stream (MP3)
         │
         ▼
    run_batcher()          drains queue every 5 minutes (configurable)
-        │                 caps at 15 transcripts per batch
+        │                 caps at batch_max_items per batch (default 40)
         ▼
   Gemini Flash            single API call covering all airports
   (batch analysis)        applies FAA/ICAO/HFACS rules
@@ -435,7 +435,7 @@ same way (map marker, ADS-B, hazards, runway overlay):
 - **One-sided transcripts** — LiveATC captures one radio side only. The analyser is explicitly told not to flag missing readbacks that may simply be on the other side.
 - **Transcription noise** — Whisper on VHF radio audio is imperfect. Low-confidence segments are filtered out rather than sent for analysis.
 - **Not a safety-critical system** — This is a hobbyist/research tool. Do not use it for operational decisions.
-- **Gemini quota** — The free tier has a daily token limit. The 5-minute batch window and 15-transcript cap are designed to stay within it.
+- **Gemini quota** — The free tier has a daily token limit. The 5-minute batch window and the per-batch transcript cap (`batch_max_items`, default 40) are designed to stay within it; lower either in Settings if you hit limits.
 
 ---
 

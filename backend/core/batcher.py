@@ -36,9 +36,14 @@ from backend.models.schemas import AnalysisResult
 
 BATCH_INTERVAL_SECONDS = 300  # flush to Gemini every 5 minutes
 IDLE_POLL_SECONDS = 30        # while waiting for first transcripts, check more often
+BATCH_MAX_ITEMS = 15          # fallback cap when runtime config is unavailable
 
 def _batch_interval() -> int:
     return current_runtime().batch_interval_seconds or BATCH_INTERVAL_SECONDS
+
+
+def _batch_max_items() -> int:
+    return current_runtime().batch_max_items or BATCH_MAX_ITEMS
 
 
 def _set_next_batch(seconds: int | None = None) -> None:
@@ -196,11 +201,13 @@ async def run_batcher() -> None:
         # Order by (airport, timestamp) BEFORE capping so each airport's chunks
         # stay chronologically contiguous and the cap overflows the sorted tail,
         # not an arbitrary FIFO tail (which could strand an instruction away from
-        # its read-back). Cap at 15 to keep Gemini token usage predictable.
+        # its read-back). The cap (runtime.batch_max_items) keeps Gemini token
+        # usage predictable.
         items = _order_items_for_batch(items)
-        if len(items) > 15:
-            overflow = items[15:]
-            items = items[:15]
+        max_items = _batch_max_items()
+        if len(items) > max_items:
+            overflow = items[max_items:]
+            items = items[:max_items]
             for it in overflow:  # re-queue the sorted tail for next cycle
                 transcript_queue.put_nowait(it)
 
@@ -355,4 +362,5 @@ def get_pipeline_snapshot() -> dict:
         **pipeline_status,
         "queued_transcripts": transcript_queue.qsize(),
         "batch_interval_seconds": _batch_interval(),
+        "batch_max_items": _batch_max_items(),
     }

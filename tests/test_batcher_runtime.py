@@ -24,3 +24,21 @@ def test_snapshot_reports_live_batch_interval(monkeypatch):
     monkeypatch.setattr(store, "_cache", AppSettings(runtime=RuntimeConfig(batch_interval_seconds=42)))
     snap = batcher.get_pipeline_snapshot()
     assert snap["batch_interval_seconds"] == 42
+
+
+def test_batch_max_items_reads_runtime_setting(monkeypatch):
+    batcher = _load_batcher(monkeypatch)
+    from backend.models.settings_schemas import AppSettings, RuntimeConfig
+    import backend.core.settings_store as store
+    monkeypatch.setattr(store, "_cache", AppSettings(runtime=RuntimeConfig(batch_max_items=25)))
+    assert batcher._batch_max_items() == 25
+    assert batcher.get_pipeline_snapshot()["batch_max_items"] == 25
+
+
+def test_batch_max_items_falls_back_when_unset(monkeypatch):
+    batcher = _load_batcher(monkeypatch)
+    from backend.models.settings_schemas import AppSettings, RuntimeConfig
+    import backend.core.settings_store as store
+    # 0 is falsy → use the module fallback constant, never an unbounded batch.
+    monkeypatch.setattr(store, "_cache", AppSettings(runtime=RuntimeConfig(batch_max_items=0)))
+    assert batcher._batch_max_items() == batcher.BATCH_MAX_ITEMS
