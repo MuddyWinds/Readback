@@ -1,5 +1,5 @@
-import { expect, test } from "vitest";
-import { shouldAlert, resolveNavTarget } from "./alerts";
+import { expect, test, describe, it } from "vitest";
+import { shouldAlert, resolveNavTarget, resolveAggregateNavTarget } from "./alerts";
 import type { AnalysisResult } from "./types";
 
 function r(over: Partial<AnalysisResult> = {}): AnalysisResult {
@@ -41,4 +41,18 @@ test("resolveNavTarget keeps a matching severity filter", () => {
 test("resolveNavTarget relaxes a filter that would hide the card", () => {
   const t = resolveNavTarget(r({ observations: [obs("high")] }), "low");
   expect(t.severityFilter).toBe("all");
+});
+
+describe("resolveAggregateNavTarget", () => {
+  it("airport row → airport filter, severity all, no note type", () => {
+    expect(resolveAggregateNavTarget({ airport: "KSFO" })).toEqual({
+      airportFilter: "KSFO", severityFilter: "all", noteTypeFilter: null, sidebarAirport: "KSFO",
+    });
+  });
+  it("error-type row → note-type filter, severity all, no airport scope", () => {
+    // note_type values are DISPLAY strings, e.g. "Read-back Error"
+    expect(resolveAggregateNavTarget({ noteType: "Read-back Error" })).toEqual({
+      airportFilter: "all", severityFilter: "all", noteTypeFilter: "Read-back Error", sidebarAirport: null,
+    });
+  });
 });

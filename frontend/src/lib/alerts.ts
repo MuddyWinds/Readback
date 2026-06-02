@@ -35,3 +35,29 @@ export function resolveNavTarget(result: AnalysisResult, currentSeverityFilter: 
     resultId: result.id,
   };
 }
+
+export interface AggregateNavTarget {
+  airportFilter: string;
+  severityFilter: Filter;
+  noteTypeFilter: string | null;
+  sidebarAirport: string | null;
+}
+
+/**
+ * Where an Insights aggregate row should take the user. No resultId — aggregates
+ * have no single card. Severity is always "all": a note type spans severities, so
+ * constraining it would hide matching cards.
+ */
+export function resolveAggregateNavTarget(
+  row: { airport?: string; noteType?: string },
+): AggregateNavTarget {
+  if (row.noteType) {
+    return { airportFilter: "all", severityFilter: "all", noteTypeFilter: row.noteType, sidebarAirport: null };
+  }
+  return {
+    airportFilter: row.airport ?? "all",
+    severityFilter: "all",
+    noteTypeFilter: null,
+    sidebarAirport: row.airport ?? null,
+  };
+}
