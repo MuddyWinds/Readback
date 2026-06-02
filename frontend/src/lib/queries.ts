@@ -23,46 +23,6 @@ export function useResults(dateFilter: DateFilter) {
   });
 }
 
-export function useStats(dateFilter: DateFilter, airport?: string) {
-  const startDate = getStartDate(dateFilter);
-  return useQuery({
-    queryKey: ["stats", dateFilter, airport ?? null],
-    queryFn: () => {
-      const params = new URLSearchParams();
-      if (startDate) params.set("start_date", startDate);
-      if (airport) params.set("airport", airport);
-      const qs = params.toString();
-      return fetchJson<any>(`${API_BASE}/api/stats${qs ? `?${qs}` : ""}`);
-    },
-  });
-}
-
-export function useReviewQueue(status: string) {
-  const qs = status && status !== "all" ? `?status=${encodeURIComponent(status)}` : "";
-  return useQuery<AnalysisResult[]>({
-    queryKey: ["results", { status }],
-    queryFn: () => fetchJson<AnalysisResult[]>(`${API_BASE}/api/results${qs}`),
-  });
-}
-
-export function useCallsigns() {
-  return useQuery({
-    queryKey: ["callsigns"],
-    queryFn: () => fetchJson<{ callsign: string; count: number }[]>(`${API_BASE}/api/callsigns`),
-  });
-}
-
-export function useStudySheet(callsign: string | null) {
-  return useQuery({
-    queryKey: ["studySheet", callsign],
-    enabled: !!callsign,
-    queryFn: () =>
-      fetchJson<{ callsign: string; transmission_count: number; study_sheet: string }>(
-        `${API_BASE}/api/study-sheet/by-callsign/${encodeURIComponent(callsign || "")}`,
-      ),
-  });
-}
-
 export function usePipelineStatus() {
   return useQuery({
     queryKey: ["pipelineStatus"],

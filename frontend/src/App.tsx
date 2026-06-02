@@ -6,16 +6,13 @@ import { useSettings } from "./SettingsContext";
 import { useWindowWidth } from "./hooks/useWindowWidth";
 import { API_BASE, fetchJson } from "./lib/api";
 import { DateFilter } from "./lib/format";
-import { useMonitorStatus, usePipelineStatus, useResults, useStats } from "./lib/queries";
+import { useMonitorStatus, usePipelineStatus, useResults } from "./lib/queries";
 import { useLiveSocket } from "./hooks/useLiveSocket";
 import { useEventAlerts } from "./hooks/useEventAlerts";
-import { resolveNavTarget, type AggregateNavTarget } from "./lib/alerts";
+import { resolveNavTarget } from "./lib/alerts";
 import { severityCounts } from "./lib/selectors";
 import { HeaderBar } from "./components/app/HeaderBar";
 import { TabPeriodBar } from "./components/app/TabPeriodBar";
-import { InsightsTab } from "./components/insights/InsightsTab";
-import { ReviewQueue } from "./components/review/ReviewQueue";
-import { StudyTab } from "./components/study/StudyTab";
 import { type TabKey } from "./lib/tabs";
 import styles from "./App.module.css";
 
@@ -79,18 +76,9 @@ export default function App() {
     setSelectedAircraft(aircraft);
   }, []);
 
-  const navigateToAggregate = useCallback((t: AggregateNavTarget) => {
-    setTab("live");
-    setAirportFilter(t.airportFilter);
-    setFilter(t.severityFilter);
-    setNoteTypeFilter(t.noteTypeFilter);
-    setSidebarAirport(t.sidebarAirport);
-  }, []);
-
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: queryResults, error: resultsError } = useResults(dateFilter);
-  const { data: stats, error: statsError } = useStats(dateFilter);
   const { data: pipelineStatus = null, error: pipelineError } = usePipelineStatus();
   const { data: monitorStatus, error: monitorError } = useMonitorStatus();
   const results: AnalysisResult[] = queryResults ?? [];
@@ -124,7 +112,6 @@ export default function App() {
   const apiError =
     actionError
     ?? (resultsError ? `Unable to load analysis cards: ${(resultsError as Error).message}` : null)
-    ?? (statsError ? `Unable to load insights: ${(statsError as Error).message}` : null)
     ?? (pipelineError ? `Unable to load pipeline status: ${(pipelineError as Error).message}` : null)
     ?? (monitorError ? `Unable to load monitor status: ${(monitorError as Error).message}` : null);
 
@@ -287,28 +274,6 @@ export default function App() {
           {settings
             ? <SettingsPage key={settings.gemini_api_key + ":" + settings.feeds.length} />
             : <p className={styles.loadingText}>Loading settings...</p>}
-        </div>
-      ) : tab === "insights" ? (
-        <div className={styles.contentWrap}>
-          {stats
-            ? (
-              <InsightsTab
-                stats={stats}
-                results={results}
-                onNavigate={navigateToAggregate}
-                dateFilter={dateFilter}
-                airport={airportFilter}
-              />
-            )
-            : <p className={styles.loadingText}>Loading insights...</p>}
-        </div>
-      ) : tab === "review" ? (
-        <div className={styles.contentWrap}>
-          <ReviewQueue />
-        </div>
-      ) : tab === "study" ? (
-        <div className={styles.contentWrap}>
-          <StudyTab />
         </div>
       ) : (
         /* Live Feed — flex layout; sidebar is side panel on desktop, drawer on mobile/tablet */

@@ -1,4 +1,4 @@
-export type TabKey = "live" | "settings" | "insights" | "review" | "study";
+export type TabKey = "live" | "settings";
 
 export interface TabDef {
   key: TabKey;
@@ -14,9 +14,6 @@ export const EXPORT_ENABLED = false;
 
 export const TABS: TabDef[] = [
   { key: "live",     label: "Live Feed", mobileLabel: "Feed" },
-  { key: "insights", label: "Insights",  mobileLabel: "Stats" },
-  { key: "review",   label: "Review",    mobileLabel: "Review" },
-  { key: "study",    label: "Study",     mobileLabel: "Study", enabled: false },
   { key: "settings", label: "Settings",  mobileLabel: "Setup" },
 ];
 

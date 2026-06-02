@@ -5,7 +5,6 @@ import { render, screen, fireEvent } from "@testing-library/react";
 vi.mock("../../lib/tabs", () => ({
   visibleTabs: () => [
     { key: "live", label: "Live Feed", mobileLabel: "Feed" },
-    { key: "insights", label: "Insights", mobileLabel: "Stats" },
     { key: "settings", label: "Settings", mobileLabel: "Setup" },
   ],
 }));
@@ -18,10 +17,10 @@ describe("TabPeriodBar", () => {
     render(
       <TabPeriodBar tab="live" onTab={onTab} dateFilter="all" onDateFilter={() => {}} isMobile={false} />
     );
-    // "Insights" only renders if the bar is registry-driven — hard-coded code never shows it.
-    const insights = screen.getByRole("button", { name: "Insights" });
+    // "Settings" only renders if the bar is registry-driven — hard-coded code never shows it.
+    const settings = screen.getByRole("button", { name: "Settings" });
     expect(screen.getByRole("button", { name: "Live Feed" })).toBeTruthy();
-    fireEvent.click(insights);
-    expect(onTab).toHaveBeenCalledWith("insights");
+    fireEvent.click(settings);
+    expect(onTab).toHaveBeenCalledWith("settings");
   });
 });
