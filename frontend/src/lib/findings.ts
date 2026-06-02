@@ -8,6 +8,10 @@ export interface NumberedFinding {
   type: "phraseology_note" | "situational_event";
 }
 
+export interface DisplayFinding extends NumberedFinding {
+  synthetic: boolean;
+}
+
 export interface FindingPoint {
   id: number;
   label: string;
@@ -29,6 +33,26 @@ export function orderedFindings(observations: Observation[]): NumberedFinding[] 
     observation,
     n: i + 1,
     type: observation.kind as "phraseology_note" | "situational_event",
+  }));
+}
+
+export function buildDisplayFindings(
+  observations: Observation[],
+  syntheticReadback: Observation | null,
+): DisplayFinding[] {
+  const real = orderedFindings(observations).map(f => ({ ...f, synthetic: false }));
+  const combined = syntheticReadback
+    ? [{
+      observation: syntheticReadback,
+      n: 0,
+      type: syntheticReadback.kind as "phraseology_note" | "situational_event",
+      synthetic: true,
+    }, ...real]
+    : real;
+
+  return combined.map((finding, index) => ({
+    ...finding,
+    n: index + 1,
   }));
 }
 

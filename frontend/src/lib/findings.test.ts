@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { orderedFindings, attributedCallsigns, findingPoints } from "./findings";
+import { orderedFindings, attributedCallsigns, findingPoints, buildDisplayFindings } from "./findings";
 import type { Observation } from "./types";
 
 function obs(kind: Observation["kind"], significance: Observation["significance"], note: string): Observation {
@@ -34,6 +34,46 @@ describe("orderedFindings", () => {
 
   it("returns an empty list for no observations", () => {
     expect(orderedFindings([])).toEqual([]);
+  });
+});
+
+describe("buildDisplayFindings", () => {
+  it("keeps real observations severity-sorted when no synthetic readback exists", () => {
+    const out = buildDisplayFindings([
+      obs("phraseology_note", "low", "Low"),
+      obs("phraseology_note", "high", "High"),
+    ], null);
+
+    expect(out.map(f => [f.n, f.observation.note_type, f.synthetic])).toEqual([
+      [1, "High", false],
+      [2, "Low", false],
+    ]);
+  });
+
+  it("inserts synthetic readback at finding #1 regardless of real severity", () => {
+    const synthetic = obs("phraseology_note", "medium", "Read-back Error");
+    const out = buildDisplayFindings([
+      obs("phraseology_note", "critical", "Phraseology"),
+      obs("phraseology_note", "high", "Other"),
+    ], synthetic);
+
+    expect(out.map(f => [f.n, f.observation.note_type, f.observation.significance, f.synthetic])).toEqual([
+      [1, "Read-back Error", "medium", true],
+      [2, "Phraseology", "critical", false],
+      [3, "Other", "high", false],
+    ]);
+  });
+
+  it("does not change orderedFindings real-observation behavior", () => {
+    const out = orderedFindings([
+      obs("phraseology_note", "low", "Low"),
+      obs("phraseology_note", "high", "High"),
+    ]);
+
+    expect(out.map(f => [f.n, f.observation.note_type])).toEqual([
+      [1, "High"],
+      [2, "Low"],
+    ]);
   });
 });
 
