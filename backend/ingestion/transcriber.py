@@ -17,9 +17,59 @@ from backend.core.settings_store import current_runtime
 _model: WhisperModel | None = None
 _stt_executor: ThreadPoolExecutor | None = None
 
-# Plan B thresholds — if either is exceeded, mark transcript unassessable
-NO_SPEECH_PROB_THRESHOLD = 0.60   # >60% chance segment is not speech
-AVG_LOGPROB_THRESHOLD    = -0.85  # model very uncertain about its output
+# Per-segment cutoff: a segment is "speech" if its no-speech probability is below
+# this. Used to scope confidence to speech, not the silence around a short burst.
+NO_SPEECH_PROB_THRESHOLD = 0.60
+
+# Word-density hallucination heuristic. Whisper can invent fluent, high-logprob
+# text from noise; such output crams many words into little speech duration.
+# Real ATC rarely exceeds ~3 wps; 6.0 drops only egregious cases. NOT an
+# independent control (timestamps are Whisper's own) — see spec §1a / Rollout.
+WORDS_PER_SPEECH_SECOND_MAX = 6.0
+
+
+def score_segments(segments) -> dict:
+    """Speech-weighted scoring of Whisper segments.
+
+    `segments` is any iterable of objects exposing text, avg_logprob,
+    no_speech_prob, start, end. Confidence, text, and word_count are scoped to
+    *speech-bearing* segments (no_speech_prob < NO_SPEECH_PROB_THRESHOLD) so a
+    short clear transmission is not diluted by surrounding static — and so the
+    text sent downstream is the same text the hallucination heuristic measures.
+    """
+    segments = list(segments)
+    speech = [s for s in segments if s.no_speech_prob < NO_SPEECH_PROB_THRESHOLD]
+
+    text = " ".join(s.text for s in speech).strip()
+    word_count = len(text.split())
+
+    if speech:
+        avg_logprob_speech = sum(s.avg_logprob for s in speech) / len(speech)
+        speech_seconds = sum((s.end - s.start) for s in speech)
+    else:
+        avg_logprob_speech = (
+            sum(s.avg_logprob for s in segments) / len(segments) if segments else -2.0
+        )
+        speech_seconds = 0.0
+
+    stt_confidence = max(0.0, min(1.0, 1.0 + avg_logprob_speech))
+
+    return {
+        "text": text,
+        "stt_confidence": stt_confidence,
+        "has_speech": bool(speech),
+        "avg_logprob_speech": avg_logprob_speech,
+        "speech_seconds": speech_seconds,
+        "word_count": word_count,
+    }
+
+
+def is_likely_hallucination(word_count: int, speech_seconds: float) -> bool:
+    """True when word density is implausibly high for the speech duration.
+
+    The 0.5s floor avoids division by zero when no speech duration was measured.
+    """
+    return (word_count / max(speech_seconds, 0.5)) > WORDS_PER_SPEECH_SECOND_MAX
 
 
 def get_model() -> WhisperModel:
@@ -59,46 +109,39 @@ def transcribe(audio: np.ndarray) -> dict:
     Transcribe a float32 numpy audio array.
     Returns:
       {
-        "text": str,
-        "avg_logprob": float,       # average log-prob across segments (higher = better)
-        "no_speech_prob": float,    # average no-speech probability (lower = better)
-        "assessable": bool,         # False if confidence below threshold
-        "reason": str | None        # why unassessable, if applicable
+        "text": str,                # speech-bearing segments only
+        "stt_confidence": float,    # 0..1, speech-scoped
+        "speech_seconds": float,
+        "word_count": int,
+        "assessable": bool,         # recoverable, plausibly-real speech exists
+        "reason": str | None,       # why not assessable, if applicable
       }
+    `assessable` is no longer a hard logprob gate — low confidence is reported via
+    stt_confidence and left for Gemini to judge. We only refuse genuinely empty /
+    no-speech audio and obvious hallucinations (see score_segments / spec §1a).
     """
     model = get_model()
 
-    # faster-whisper accepts a float32 numpy array directly — no temp WAV needed.
     segments_gen, _ = model.transcribe(
         audio, language="en", beam_size=5, vad_filter=settings.WHISPER_VAD_FILTER
     )
-    segments = list(segments_gen)
+    scored = score_segments(segments_gen)
 
-    if not segments:
-        return {
-            "text": "", "avg_logprob": -2.0, "no_speech_prob": 1.0,
-            "assessable": False, "reason": "No speech segments detected",
-        }
-
-    text = " ".join(seg.text for seg in segments).strip()
-    avg_logprob   = sum(s.avg_logprob   for s in segments) / len(segments)
-    no_speech_prob = sum(s.no_speech_prob for s in segments) / len(segments)
-
-    # Plan B quality gate
-    if no_speech_prob > NO_SPEECH_PROB_THRESHOLD:
-        return {
-            "text": text, "avg_logprob": avg_logprob,
-            "no_speech_prob": no_speech_prob, "assessable": False,
-            "reason": f"High no-speech probability ({no_speech_prob:.2f}) — likely noise or silence",
-        }
-    if avg_logprob < AVG_LOGPROB_THRESHOLD:
-        return {
-            "text": text, "avg_logprob": avg_logprob,
-            "no_speech_prob": no_speech_prob, "assessable": False,
-            "reason": f"Low transcription confidence (logprob {avg_logprob:.2f}) — audio may be too degraded",
-        }
-
-    return {
-        "text": text, "avg_logprob": avg_logprob,
-        "no_speech_prob": no_speech_prob, "assessable": True, "reason": None,
+    base = {
+        "text": scored["text"],
+        "stt_confidence": scored["stt_confidence"],
+        "speech_seconds": scored["speech_seconds"],
+        "word_count": scored["word_count"],
     }
+
+    if not scored["has_speech"] or not scored["text"]:
+        return {**base, "assessable": False, "reason": "No recoverable speech"}
+
+    if is_likely_hallucination(scored["word_count"], scored["speech_seconds"]):
+        return {
+            **base,
+            "assessable": False,
+            "reason": "Likely transcription hallucination — word density too high for speech duration",
+        }
+
+    return {**base, "assessable": True, "reason": None}

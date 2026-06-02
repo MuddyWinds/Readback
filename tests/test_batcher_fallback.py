@@ -32,3 +32,46 @@ def test_gemini_fallback_preserves_each_transcript_as_visible_result(monkeypatch
         assert result.observations == []
         assert result.confidence_score == 0.0
         assert "Analysis temporarily unavailable" in result.summary
+
+
+def test_gemini_fallback_preserves_stt_confidence(monkeypatch):
+    batcher = _load_batcher(monkeypatch)
+    items = [
+        {"airport_code": "KJFK", "transcript": "cleared to land", "timestamp": datetime(2026, 5, 20, 1, 0), "stt_confidence": 0.62},
+        {"airport_code": "KATL", "transcript": "hold short", "timestamp": datetime(2026, 5, 20, 1, 1)},  # missing key
+    ]
+
+    pairs = batcher._gemini_failure_pairs(items, RuntimeError("503 UNAVAILABLE"))
+
+    # Real STT confidence is preserved; a Gemini failure is not a transcription failure.
+    assert pairs[0][1].assessable_confidence == 0.62
+    # Missing key falls back to 0.0.
+    assert pairs[1][1].assessable_confidence == 0.0
+
+
+def test_batch_assessability_summary_separates_outage_from_verdict(monkeypatch):
+    batcher = _load_batcher(monkeypatch)
+    from backend.models.schemas import AnalysisResult
+
+    def _res(assessable):
+        return AnalysisResult(
+            timestamp=datetime(2026, 5, 20, 1, 0), airport_code="KJFK", transcript="x",
+            assessable=assessable, assessable_confidence=0.5, is_standard=True,
+            observations=[], summary="", confidence_score=0.5,
+        )
+
+    pairs = [
+        ({"airport_code": "KJFK", "stt_confidence": 0.3}, _res(True)),   # low-conf, assessable
+        ({"airport_code": "KATL", "stt_confidence": 0.9}, _res(False)),  # genuine Gemini "unassessable"
+        ({"airport_code": "KSFO", "stt_confidence": 0.5, "analysis_failed": True}, _res(False)),  # outage fallback
+        ({"airport_code": "KLAX", "stt_confidence": 0.2, "analysis_failed": True}, _res(False)),  # low-conf AND outage
+    ]
+
+    summary = batcher._batch_assessability_summary(pairs)
+    assert summary == {
+        "total": 4,
+        "assessable": 1,
+        "gemini_unassessable": 1,     # only the real verdict, NOT either outage card
+        "analysis_unavailable": 2,    # both outage fallbacks
+        "low_conf_routed": 2,         # the 0.3 assessable + the 0.2 outage (both were routed)
+    }

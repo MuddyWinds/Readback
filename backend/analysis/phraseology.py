@@ -41,12 +41,13 @@ def get_client():
 
 
 def _missing_analysis_result(item: dict, reason: str) -> AnalysisResult:
+    item["analysis_failed"] = True  # Gemini did not return a verdict for this index
     return AnalysisResult(
         timestamp=item["timestamp"],
         airport_code=item["airport_code"],
         transcript=item["transcript"],
         assessable=False,
-        assessable_confidence=0.0,
+        assessable_confidence=item.get("stt_confidence", 0.0),
         is_standard=True,
         observations=[],
         summary=reason,
@@ -83,6 +84,12 @@ CRITICAL CONTEXT — READ BEFORE ANALYSING
    mis-heard callsigns, and filler sounds. Do not flag transcription
    artefacts as phraseology errors. If the transcript is too degraded
    to assess reliably, set assessable: false.
+
+   Each transcript header carries stt_conf (0-1), the speech-recognition
+   confidence. Low values mean the text may contain more transcription noise —
+   weigh this, but readable text with low conf is still assessable. Set
+   assessable: false only when the text itself is too garbled to interpret,
+   not merely because stt_conf is low.
 
 3. YOUR PRIMARY STANDARD
    Apply the "Reasonable Controller Test": would an experienced,
@@ -277,7 +284,8 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
     client = get_client()
 
     chunks_text = "\n\n".join(
-        f"[{i} | {item['airport_code']} | {item['timestamp'].isoformat()}Z]\n\"\"\"\n{item['transcript']}\n\"\"\""
+        f"[{i} | {item['airport_code']} | {item['timestamp'].isoformat()}Z | "
+        f"stt_conf={item.get('stt_confidence', 0.0):.2f}]\n\"\"\"\n{item['transcript']}\n\"\"\""
         for i, item in enumerate(items)
     )
     user_message = f"""Analyze the following {len(items)} ATC transcript(s) against FAA/ICAO standard phraseology.
@@ -358,7 +366,6 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
             continue
 
         assessable = entry.get("assessable", True)
-        assessable_confidence = entry.get("assessable_confidence", 0.5)
 
         observations = []
         if assessable:
@@ -417,7 +424,7 @@ async def analyze_batch(items: list[dict]) -> list[AnalysisResult]:
             airport_code=item["airport_code"],
             transcript=item["transcript"],
             assessable=assessable,
-            assessable_confidence=assessable_confidence,
+            assessable_confidence=item.get("stt_confidence", 0.0),
             is_standard=entry.get("is_standard", entry.get("is_compliant", True)),
             observations=observations,
             summary=entry.get("summary", ""),

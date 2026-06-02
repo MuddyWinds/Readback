@@ -64,7 +64,7 @@ def _gemini_failure_pairs(items: list[dict], exc: Exception) -> list[tuple[dict,
             airport_code=it["airport_code"],
             transcript=it["transcript"],
             assessable=False,
-            assessable_confidence=0.0,
+            assessable_confidence=it.get("stt_confidence", 0.0),
             is_standard=True,
             observations=[],
             summary=summary,
@@ -72,6 +72,32 @@ def _gemini_failure_pairs(items: list[dict], exc: Exception) -> list[tuple[dict,
         ))
         for it in items
     ]
+
+
+def _batch_assessability_summary(pairs: list[tuple[dict, AnalysisResult]]) -> dict:
+    """Coverage/quality counts for one persisted batch (rollout instrumentation).
+
+    `gemini_unassessable` counts only results where Gemini actually judged the text
+    and returned unassessable. Outage/omission fallbacks are flagged with
+    `analysis_failed` on the item and counted separately as `analysis_unavailable`,
+    so a provider outage cannot masquerade as a text-quality problem (review #2).
+    `low_conf_routed` is how many items we sent to Gemini despite low STT confidence.
+    """
+    total = len(pairs)
+    assessable = sum(1 for _, r in pairs if r.assessable)
+    analysis_unavailable = sum(1 for it, _ in pairs if it.get("analysis_failed"))
+    gemini_unassessable = sum(
+        1 for it, r in pairs
+        if not r.assessable and not it.get("analysis_failed") and it.get("stt_assessable", True)
+    )
+    low_conf = sum(1 for it, _ in pairs if it.get("stt_confidence", 1.0) < 0.4)
+    return {
+        "total": total,
+        "assessable": assessable,
+        "gemini_unassessable": gemini_unassessable,
+        "analysis_unavailable": analysis_unavailable,
+        "low_conf_routed": low_conf,
+    }
 
 
 async def _fetch_adsb_snapshot(airports: set[str]) -> dict[str, list]:
@@ -195,7 +221,7 @@ async def run_batcher() -> None:
                 airport_code=it["airport_code"],
                 transcript=it["transcript"],
                 assessable=False,
-                assessable_confidence=it.get("assessable_confidence", 0.0),
+                assessable_confidence=it.get("stt_confidence", 0.0),
                 is_standard=True,
                 observations=[],
                 summary=it.get("stt_reason") or "Audio quality too low for reliable transcription",
@@ -211,9 +237,27 @@ async def run_batcher() -> None:
             except Exception as exc:
                 print(f"[Batcher] Gemini batch failed: {exc}", flush=True)
                 pipeline_status["last_gemini_error"] = str(exc)
+                for it in stt_good:
+                    it["analysis_failed"] = True
                 pairs.extend(_gemini_failure_pairs(stt_good, exc))
 
         batch_adsb = await _fetch_adsb_snapshot({it["airport_code"] for it in items})
+
+        summary = _batch_assessability_summary(pairs)
+        pipeline_status["last_batch_assessability"] = summary
+        print(f"[Batcher] assessability {summary}", flush=True)
+        # One structured line per low-confidence routed item: airport, stt_conf, word
+        # density, and the Gemini verdict together — the signal the validation gate
+        # consumes (spec Rollout / review #1). Skip outage fallbacks (no real verdict).
+        for it, r in pairs:
+            if it.get("stt_confidence", 1.0) < 0.4 and not it.get("analysis_failed"):
+                print(
+                    f"[Batcher] low-conf verdict: airport={it['airport_code']} "
+                    f"stt_conf={it.get('stt_confidence', 0.0):.2f} "
+                    f"wps={it.get('words_per_speech_second', 0.0):.1f} "
+                    f"assessable={r.assessable}",
+                    flush=True,
+                )
 
         print(f"[Batcher] Persisting {len(pairs)} result(s)...", flush=True)
         await _persist_batch(pairs, batch_adsb)
@@ -259,17 +303,17 @@ async def run_monitor(feed_url: str, airport_code: str, start_delay: float = 0) 
             transcript = result["text"]
 
             if not result["assessable"]:
-                print(f"[{airport_code}] STT unassessable — {result['reason']}", flush=True)
-                await transcript_queue.put({
-                    "airport_code": airport_code,
-                    "transcript": transcript or "[audio not assessable]",
-                    "timestamp": utc_now_naive(),
-                    "stt_assessable": False,
-                    "stt_reason": result["reason"],
-                    "assessable_confidence": max(0.0, 1.0 + result["avg_logprob"]),
-                })
-                pipeline_status["last_transcript_at"] = utc_iso()
-                mark_feed(feed_url, airport_code, "queued_unassessable", result["reason"])
+                reason = result["reason"] or ""
+                # Count hallucination rejections for rollout instrumentation
+                # (spec Rollout). pipeline_status is surfaced via get_pipeline_snapshot.
+                if "hallucination" in reason.lower():
+                    pipeline_status["hallucination_skips"] = (
+                        pipeline_status.get("hallucination_skips", 0) + 1
+                    )
+                # No recoverable speech or a likely hallucination: skip silently —
+                # no card. (Spec: stop carding no-speech chunks.)
+                print(f"[{airport_code}] Skipped — {reason}", flush=True)
+                mark_feed(feed_url, airport_code, "skipped", reason)
                 continue
 
             if not transcript or len(transcript.split()) < 5:
@@ -277,6 +321,10 @@ async def run_monitor(feed_url: str, airport_code: str, start_delay: float = 0) 
                 mark_feed(feed_url, airport_code, "too_short")
                 continue
 
+            # Carry word density on the item so the post-Gemini validation log
+            # (Task 5) can emit ONE structured line with the Gemini verdict —
+            # rather than correlating two separate prints (review #1).
+            wps = result["word_count"] / max(result["speech_seconds"], 0.5)
             print(f"[{airport_code}] Queued: {transcript[:80]}", flush=True)
             await transcript_queue.put({
                 "airport_code": airport_code,
@@ -284,7 +332,8 @@ async def run_monitor(feed_url: str, airport_code: str, start_delay: float = 0) 
                 "timestamp": utc_now_naive(),
                 "stt_assessable": True,
                 "stt_reason": None,
-                "assessable_confidence": 1.0,
+                "stt_confidence": result["stt_confidence"],
+                "words_per_speech_second": wps,
             })
             pipeline_status["last_transcript_at"] = utc_iso()
             mark_feed(feed_url, airport_code, "queued", f"{transcript[:80]}")
