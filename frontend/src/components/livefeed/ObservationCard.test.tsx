@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { screen, cleanup } from "@testing-library/react";
+import { screen, cleanup, fireEvent } from "@testing-library/react";
 import { ObservationCard } from "./ObservationCard";
 import { makeResult, renderCard } from "../../test/renderCard";
 import type { Observation, SpeakerSegment } from "../../lib/types";
@@ -126,5 +126,100 @@ describe("ObservationCard preserved behavior", () => {
     renderCard(<ObservationCard r={makeResult()} priorOccurrences={2} lastSeenAgo="5 minutes ago" />);
     // priorOccurrences=2 → renders "3th occurrence this session"; pin the count math.
     expect(screen.getByText(/3th occurrence this session/i)).toBeTruthy();
+  });
+});
+
+describe("ObservationCard readback redesign", () => {
+  it("renders readback delta inside the real Read-back Error row without duplicating ATC/Pilot text", () => {
+    const r = makeResult({
+      observations: [
+        { kind: "phraseology_note", note_type: "Read-back Error", hfacs_level: "Unsafe Act",
+          significance: "medium", description: "Readback diverged.", safety_pathway: null,
+          relevant_regulation: null, transcript_excerpt: null, callsign: "UAL123" },
+      ],
+      enrichment: {
+        speaker_segments: [
+          { role: "ATC", text: "United 123 climb and maintain 8000", callsign: "UAL123" },
+          { role: "PILOT", text: "climb and maintain 6000 United 123", callsign: "UAL123" },
+        ],
+        atc_instruction: "climb and maintain 8000",
+        pilot_readback: "climb and maintain 6000",
+        readback_correct: false,
+        readback_discrepancy: "Pilot read back 6000 ft instead of 8000 ft",
+        callsign_detected: "UAL123",
+        callsign_clarity: 90,
+      },
+    });
+
+    renderCard(<ObservationCard r={r} />);
+
+    const comparison = screen.getByTestId("finding-readback-comparison");
+    expect(comparison.textContent).toContain("Pilot read back 6000 ft instead of 8000 ft");
+    expect(comparison.textContent).not.toContain("climb and maintain 8000");
+    expect(comparison.textContent).not.toContain("climb and maintain 6000");
+    expect(screen.queryByTestId("orphan-readback-note")).toBeNull();
+    expect(screen.getByLabelText("Finding ATC reference").textContent).toContain("climb and maintain 8000");
+    expect(screen.getByLabelText("Finding PIL reference").textContent).toContain("climb and maintain 6000");
+  });
+
+  it("anchors orphan readback as finding #1 without changing the header observation count", () => {
+    const r = makeResult({
+      observations: [
+        { kind: "phraseology_note", note_type: "Critical Phraseology", hfacs_level: "Unsafe Act",
+          significance: "critical", description: "Critical real finding.", safety_pathway: null,
+          relevant_regulation: null, transcript_excerpt: null, callsign: "UAL123" },
+      ],
+      enrichment: {
+        speaker_segments: [
+          { role: "ATC", text: "United 123 climb and maintain 8000", callsign: "UAL123" },
+          { role: "PILOT", text: "climb and maintain 6000 United 123", callsign: "UAL123" },
+        ],
+        atc_instruction: "climb and maintain 8000",
+        pilot_readback: "climb and maintain 6000",
+        readback_correct: false,
+        readback_discrepancy: "Pilot read back 6000 ft instead of 8000 ft",
+        callsign_detected: "UAL123",
+        callsign_clarity: 90,
+      },
+    });
+
+    renderCard(<ObservationCard r={r} />);
+
+    const rows = screen.getAllByTestId("finding-row");
+    expect(rows[0].textContent).toContain("Read-back Error");
+    expect(rows[0].textContent).toContain("detected · unconfirmed");
+    expect(rows[0].textContent).toContain("Needs review");
+    expect(screen.getAllByTestId("finding-number").map(n => n.textContent)).toEqual(["1", "2"]);
+    expect(screen.queryByTestId("orphan-readback-note")).toBeNull();
+    expect(screen.getByText("· 1 observation")).toBeTruthy();
+  });
+
+  it("uses one shared readback mark id so hovering either transcript mark activates the anchor row", () => {
+    const r = makeResult({
+      observations: [
+        { kind: "phraseology_note", note_type: "Read-back Error", hfacs_level: "Unsafe Act",
+          significance: "medium", description: "Readback diverged.", safety_pathway: null,
+          relevant_regulation: null, transcript_excerpt: null, callsign: "UAL123",
+          detail_points: [{ text: "Subpoint exists", transcript_excerpt: "United 123" }] },
+      ],
+      enrichment: {
+        speaker_segments: [
+          { role: "ATC", text: "United 123 climb and maintain 8000", callsign: "UAL123" },
+          { role: "PILOT", text: "climb and maintain 6000 United 123", callsign: "UAL123" },
+        ],
+        atc_instruction: "climb and maintain 8000",
+        pilot_readback: "climb and maintain 6000",
+        readback_correct: false,
+        readback_discrepancy: "Pilot read back 6000 ft instead of 8000 ft",
+        callsign_detected: "UAL123",
+        callsign_clarity: 90,
+      },
+    });
+
+    renderCard(<ObservationCard r={r} />);
+    fireEvent.mouseEnter(screen.getByLabelText("Finding ATC reference"));
+    expect(screen.getByTestId("finding-row").className).toContain("rowActive");
+    fireEvent.mouseEnter(screen.getByLabelText("Finding PIL reference"));
+    expect(screen.getByTestId("finding-row").className).toContain("rowActive");
   });
 });
