@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings
 
 
@@ -7,6 +9,10 @@ class Settings(BaseSettings):
     WHISPER_MODEL: str = "base"  # tiny | base | small | medium | large
     LIVEATC_FEED_URL: str = "http://feeds.liveatc.net/ksfo"
     CHUNK_DURATION_SECONDS: int = 30
+
+    # Max transmissions batched into one Gemini analysis call. Seeds
+    # RuntimeConfig.batch_max_items when no settings row is stored yet.
+    BATCH_MAX_ITEMS: int = 40
 
     # Comma-separated CORS origins for the browser frontend. Default is the CRA
     # dev server; set this (e.g. "https://readback.example.com") to deploy.
@@ -28,7 +34,10 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
     class Config:
-        env_file = ".env"
+        # Tests set READBACK_TEST_ENV=1 (see conftest.py) so settings resolve from
+        # real env vars + code defaults only — never a developer's local .env,
+        # whose machine-specific CORS origins / DB URL would leak into assertions.
+        env_file = None if os.getenv("READBACK_TEST_ENV") else ".env"
 
 
 settings = Settings()
