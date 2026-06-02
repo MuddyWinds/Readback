@@ -17,6 +17,7 @@ def build_stats(results: list[AnalysisResult]) -> dict:
     assessable_total = len(assessable_results)
 
     severity_counts: dict[str, int] = defaultdict(int)
+    hfacs_counts: dict[str, int] = defaultdict(int)
     airport_totals: dict[str, int] = defaultdict(int)
     airport_non_standard: dict[str, int] = defaultdict(int)
     airport_unassessable: dict[str, int] = defaultdict(int)
@@ -46,6 +47,7 @@ def build_stats(results: list[AnalysisResult]) -> dict:
             vt = v.note_type.value
 
             severity_counts[sev] += 1
+            hfacs_counts[v.hfacs_level.value] += 1
             airport_matrix[code][sev] += 1
 
             if vt not in note_details:
@@ -80,6 +82,7 @@ def build_stats(results: list[AnalysisResult]) -> dict:
             SignificanceLevel.MEDIUM:   severity_counts.get("medium", 0),
             SignificanceLevel.LOW:      severity_counts.get("low", 0),
         },
+        "hfacs_breakdown": dict(hfacs_counts),
         "airport_conformance": airport_conformance,
         "airport_risk_matrix": airport_matrix,
         "note_type_details": {
