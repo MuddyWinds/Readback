@@ -21,11 +21,12 @@ describe("tab registry", () => {
     expect(isTabKey("nope")).toBe(false);
   });
 
-  it("visibleTabs hides flagged-off tabs but keeps live + settings", () => {
+  it("visibleTabs shows enabled tabs and hides flagged-off tabs", () => {
     const visible = visibleTabs().map(t => t.key);
     expect(visible).toContain("live");
+    expect(visible).toContain("insights");
     expect(visible).toContain("settings");
-    // insights/review/study start disabled
-    expect(visible).not.toContain("insights");
+    expect(visible).not.toContain("review");
+    expect(visible).not.toContain("study");
   });
 });

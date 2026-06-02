@@ -12,7 +12,7 @@ export interface TabDef {
 // their own flag to true as the final step of their feature.
 export const TABS: TabDef[] = [
   { key: "live",     label: "Live Feed", mobileLabel: "Feed" },
-  { key: "insights", label: "Insights",  mobileLabel: "Stats", enabled: false },
+  { key: "insights", label: "Insights",  mobileLabel: "Stats" },
   { key: "review",   label: "Review",    mobileLabel: "Review", enabled: false },
   { key: "study",    label: "Study",     mobileLabel: "Study", enabled: false },
   { key: "settings", label: "Settings",  mobileLabel: "Setup" },
