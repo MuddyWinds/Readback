@@ -27,6 +27,22 @@ export function normalizeCallsign(cs: string | null | undefined): string | null 
   return trimmed;
 }
 
+// Plausibility patterns (parity with backend/core/callsign.py is_plausible_callsign):
+// ICAO operator + numeric block (+ optional trailing letter), or an N-number.
+const PLAUSIBLE_ICAO = /^[A-Z]{2,3}\d{1,4}[A-Z]?$/;
+const PLAUSIBLE_NNUM = /^N\d{1,5}[A-Z]{0,2}$/;
+
+/**
+ * True when a callsign looks real after normalization — i.e. an ICAO airline
+ * callsign or an N-number. Used to drop digit-fragment noise (e.g. "273") from
+ * finding attribution. Mirrors the backend is_plausible_callsign (R2).
+ */
+export function isPlausibleCallsign(cs: string | null | undefined): boolean {
+  const norm = normalizeCallsign(cs);
+  if (!norm) return false;
+  return PLAUSIBLE_ICAO.test(norm) || PLAUSIBLE_NNUM.test(norm);
+}
+
 /** True when both callsigns normalize to the same key. */
 export function callsignsMatch(a: string | null | undefined, b: string | null | undefined): boolean {
   const na = normalizeCallsign(a);
