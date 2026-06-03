@@ -2,7 +2,9 @@
 
 > *ATC phraseology, read back to you.*
 
-<img width="1246" height="954" alt="Screenshot 2026-06-03 at 4 41 55 AM" src="https://github.com/user-attachments/assets/84f572d2-c7ce-47b2-90b8-14110f194f9f" />
+
+https://github.com/user-attachments/assets/492c1183-24e6-4f17-9e14-7e773a6118fa
+
 
 > *"I was parked at the threshold of 28R at KSFO, listening to the tower frequency on my handheld, when I heard something that didn't sound right — a clearance that seemed to conflict with another aircraft still on the runway. By the time I processed it, the controller had already issued a go-around. I wished I had something that could catch those moments automatically, log them, and tell me exactly what regulation was implicated."*
 
