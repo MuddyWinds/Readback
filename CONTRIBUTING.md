@@ -14,7 +14,7 @@ Thanks for your interest in contributing. This is a hobbyist aviation education 
 
 ## Reporting a Bug
 
-1. Check [existing issues](https://github.com/MuddyWinds/atc-monitor/issues) first
+1. Check [existing issues](https://github.com/MuddyWinds/Readback/issues) first
 2. Open a new issue and include:
    - What you expected to happen
    - What actually happened
@@ -51,8 +51,8 @@ Open a PR with the airport code, full name, and source for the coordinates (e.g.
 ## Development Setup
 
 ```bash
-git clone https://github.com/MuddyWinds/atc-monitor.git
-cd atc-monitor
+git clone https://github.com/MuddyWinds/Readback.git
+cd Readback
 cp .env.example .env
 # Add your GEMINI_API_KEY to .env
 
